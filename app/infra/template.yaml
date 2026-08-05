@@ -85,7 +85,7 @@ Resources:
             ExpirationInDays: !Ref ArtifactRetentionDays
       Tags:
         - Key: application
-          Value: youbike-ops-radar
+          Value: hackathon2026ctrlcity
         - Key: environment
           Value: !Ref EnvironmentName
 
@@ -124,7 +124,7 @@ Resources:
         SSEEnabled: true
       Tags:
         - Key: application
-          Value: youbike-ops-radar
+          Value: hackathon2026ctrlcity
         - Key: environment
           Value: !Ref EnvironmentName
 
@@ -142,7 +142,7 @@ Resources:
           - OPTIONS
         MaxAge: 600
       Tags:
-        application: youbike-ops-radar
+        application: hackathon2026ctrlcity
         environment: !Ref EnvironmentName
 
   OperationsApiFunction:
