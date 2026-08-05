@@ -1,16 +1,20 @@
-# YouBike 調度雷達應用程式
+# App
 
-這是 Nuxt 4 + Nitro 應用程式。專案操作、資料處理與部署說明請看根目錄的 [README](../README.md)。
+Nuxt 4 的靜態 SPA。正式 Pages 產物放在 dist，歷史回放是靜態 JSON；只有新北即時資料保留一條極薄的 Pages Function 代理。
 
-```powershell
+~~~
 npm install
 npm run dev
-```
-
-常用驗證：
-
-```powershell
 npm test
+npm run data:validate
 npm run typecheck
 npm run build:cloudflare
-```
+~~~
+
+build:cloudflare 會先以 nuxi generate 產出 SPA，再把內容 stage 至 dist，並產生：
+
+- dist/data/replay/manifest.json
+- 三份正規化的歷史 DashboardArtifact 情境
+- dist/_routes.json，只允許 /api/* 觸發 Function
+
+不要把 docs/資料集/ 或建置產物加入 Git。
