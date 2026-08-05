@@ -2,7 +2,7 @@ export default defineNuxtConfig({
   srcDir: '.',
   compatibilityDate: '2026-08-05',
   devtools: { enabled: true },
-  css: ['~/assets/css/main.css'],
+  css: ['leaflet/dist/leaflet.css', '~/assets/css/main.css'],
   app: {
     head: {
       title: 'YouBike 調度雷達',
@@ -11,6 +11,7 @@ export default defineNuxtConfig({
         { name: 'theme-color', content: '#071b28' },
       ],
       link: [
+        { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
         { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
         { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' },
         { rel: 'stylesheet', href: 'https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Noto+Sans+TC:wght@400;500;600;700&display=swap' },

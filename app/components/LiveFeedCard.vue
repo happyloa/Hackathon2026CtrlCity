@@ -12,7 +12,7 @@ const props = defineProps<{
   updated?: boolean
 }>()
 
-const emit = defineEmits<{ refresh: [] }>()
+const emit = defineEmits<{ refresh: []; select: [stationId: string] }>()
 
 const stations = computed(() => props.payload?.data.stations ?? [])
 const emptyCount = computed(() => stations.value.filter(station => station.currentState === 'empty_now').length)
@@ -80,6 +80,7 @@ function statusLabel(station: LiveStation) {
           <span class="live-station-name"><b>{{ station.name.replace(/^YouBike2\.0_/, '') }}</b><small>{{ station.district }}</small></span>
           <span class="live-stock">車 {{ station.availableBikes }} · 位 {{ station.availableDocks }}</span>
           <span class="live-status" :class="station.currentState">{{ statusLabel(station) }}</span>
+          <button type="button" class="text-link" :aria-label="`在地圖定位 ${station.name}`" @click="emit('select', station.id)">地圖定位 <Icon icon="solar:map-point-outline" /></button>
         </div>
       </div>
       <p v-else-if="!pending" class="live-feed-empty">目前沒有需要優先處理的即時站點。</p>

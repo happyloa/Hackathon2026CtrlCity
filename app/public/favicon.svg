@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">YouBike 新北營運調度雷達</title>
+  <rect width="64" height="64" rx="15" fill="#0b2a3c" />
+  <rect x="1" y="1" width="62" height="62" rx="14" fill="none" stroke="#4bbfd0" stroke-opacity=".45" stroke-width="2" />
+  <path d="M15 43.5 25.5 23.5 36 34.5 50 17.5" fill="none" stroke="#58e3d4" stroke-linecap="round" stroke-linejoin="round" stroke-width="4.5" />
+  <circle cx="15" cy="43.5" r="5" fill="#071721" stroke="#58e3d4" stroke-width="3" />
+  <circle cx="36" cy="34.5" r="5" fill="#071721" stroke="#58e3d4" stroke-width="3" />
+  <path d="M45 14.5h8v8" fill="none" stroke="#f7fbff" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" />
+  <circle cx="50" cy="17.5" r="5" fill="#f7fbff" />
+  <circle cx="50" cy="17.5" r="2" fill="#0b2a3c" />
+</svg>

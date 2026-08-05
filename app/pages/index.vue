@@ -355,7 +355,7 @@ function selectStation(stationId: string) {
         </section>
       </template>
       <template v-else>
-        <LiveFeedCard :district="selectedDistrict" :payload="livePayload" :pending="livePending" :error-message="liveError" :updated="liveUpdateState === 'updated'" @refresh="refreshLive({ manual: true })" />
+        <LiveFeedCard :district="selectedDistrict" :payload="livePayload" :pending="livePending" :error-message="liveError" :updated="liveUpdateState === 'updated'" @refresh="refreshLive({ manual: true })" @select="selectStation" />
         <section class="data-footnote">
           <Icon icon="solar:info-circle-outline" />
           <span>即時模式僅反映官方來源當下庫存，不混入預測值；如要判讀未來 30／60／120 分鐘風險，請切換至「歷史預測」。</span>
