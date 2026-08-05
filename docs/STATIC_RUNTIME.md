@@ -9,7 +9,7 @@ Cloudflare 1102 代表 Function 超出執行資源限制。原本的首頁 SSR �
 build:cloudflare 現在執行以下步驟：
 
 1. nuxi generate 產生 Nuxt SPA 與 fallback。
-2. scripts/stage-pages-static.mjs 將 .output/public 複製到 dist。
+2. scripts/stage-pages-static.mjs 在一般靜態模式將 .output/public 複製到 dist；Cloudflare Pages 的 cloudflare-pages-static preset 則直接產出 dist，腳本會保留該產物。
 3. scripts/export-replay-static.mjs 讀取已產製的 server/data/dashboard.json，輸出三份正規化情境與 manifest 至 dist/data/replay/。
 4. dist/_routes.json 只讓 /api/* 進入 Pages Functions。
 

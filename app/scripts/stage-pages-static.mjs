@@ -7,9 +7,28 @@ const APP_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const generatedPublicDir = resolve(APP_DIR, '.output', 'public')
 const pagesOutputDir = resolve(APP_DIR, 'dist')
 
-await access(generatedPublicDir)
-await rm(pagesOutputDir, { recursive: true, force: true })
-await cp(generatedPublicDir, pagesOutputDir, { recursive: true })
+async function exists(path) {
+  try {
+    await access(path)
+    return true
+  } catch (error) {
+    if (error && error.code === 'ENOENT') return false
+    throw error
+  }
+}
+
+// Nuxt's generic static preset writes to .output/public. Cloudflare Pages
+// selects cloudflare-pages-static during its Git build and writes directly to
+// dist, so only copy when the generic output is present.
+const outputIsAlreadyPagesDist = process.env.NITRO_PRESET === 'cloudflare-pages-static'
+
+if (!outputIsAlreadyPagesDist && await exists(generatedPublicDir)) {
+  await rm(pagesOutputDir, { recursive: true, force: true })
+  await cp(generatedPublicDir, pagesOutputDir, { recursive: true })
+} else if (!(await exists(pagesOutputDir))) {
+  throw new Error('Expected either .output/public or dist from the Nuxt static build.')
+}
+
 const result = await exportReplayStatic(pagesOutputDir)
 
 try {
