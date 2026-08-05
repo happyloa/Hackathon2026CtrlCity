@@ -1,4 +1,4 @@
-import { access, cp, rm } from 'node:fs/promises'
+import { access, cp, rm, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { exportReplayStatic } from './export-replay-static.mjs'
@@ -28,6 +28,12 @@ if (!outputIsAlreadyPagesDist && await exists(generatedPublicDir)) {
 } else if (!(await exists(pagesOutputDir))) {
   throw new Error('Expected either .output/public or dist from the Nuxt static build.')
 }
+
+// Nuxt's default fallback is `/* /404.html 404`. Replace it with an SPA
+// fallback after removing 404.html so direct station URLs preserve their URL
+// and load the client-side route without invoking a Function.
+await rm(resolve(pagesOutputDir, '404.html'), { force: true })
+await writeFile(resolve(pagesOutputDir, '_redirects'), '/* /index.html 200\n', 'utf8')
 
 const result = await exportReplayStatic(pagesOutputDir)
 
