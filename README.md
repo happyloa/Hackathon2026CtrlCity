@@ -4,9 +4,9 @@
 
 ## 可以展示什麼
 
-- **官方即時站況**：首頁預設接入新北市政府 Open Data，顯示全站地圖、空車／滿位／暫停狀態；先立即取得一次資料，再配合來源節奏於每個五分鐘邊界後比對。只有資料時間或庫存變動才替換畫面並給同步效果。
+- **官方即時站況與新北實景地圖**：首頁預設接入新北市政府 Open Data，以 OpenStreetMap 顯示全新北市站點、空車／滿位／暫停狀態；可搜尋站名或行政區、定位異常站，並回到新北全域。先立即取得一次資料，再配合來源節奏於每個五分鐘邊界後比對。只有資料時間或庫存變動才替換畫面並給同步效果。
 - **歷史預測**：六個月、12 份 CSV、約 1,332 萬筆站點快照產生可重現的早尖峰、晚尖峰與一般情境，預測 30／60／120 分鐘的庫存失衡風險。
-- **持續異常與調度**：連續半小時 bucket 回推空車／滿位／暫停的開始時間與持續時間；調度建議依安全庫存、距離與優先分數配對，永遠由人員確認。
+- **持續異常與調度**：連續半小時 bucket 回推空車／滿位／暫停的開始時間與持續時間；調度建議依安全庫存、距離與優先分數配對，並可展開查看搬運前後庫存與安全庫存試算，永遠由人員確認。
 - **事實受限的 AI 摘要**：本機 template 是可追溯的預設；可選 Amazon Bedrock adapter 只改寫既有事實，不能生成新的站名、數字或派車動作。
 - **可讀性**：淺／深色模式、持久化主題選擇、自訂高對比 scrollbar，所有使用者可見的 UI 文字與圖表字級皆不低於 16px。
 
@@ -20,7 +20,7 @@
 | 優化調度 | 對高風險需求站配對不會跌破安全庫存的鄰近供給站，呈現台數、距離、理由與人工覆核。 |
 | 生成式 AI 應用 | 受限事實摘要 + Amazon Bedrock migration adapter；線上 Demo 預設不宣稱已實際呼叫 Bedrock。 |
 
-完整的命題對照在 [docs/REQUIREMENT_COVERAGE.md](docs/REQUIREMENT_COVERAGE.md)，三分鐘講稿在 [docs/DEMO_3MIN.md](docs/DEMO_3MIN.md)。
+完整的命題對照在 [docs/REQUIREMENT_COVERAGE.md](docs/REQUIREMENT_COVERAGE.md)，三分鐘講稿在 [docs/DEMO_3MIN.md](docs/DEMO_3MIN.md)，上台前檢查表在 [docs/PITCH_CHECKLIST.md](docs/PITCH_CHECKLIST.md)。
 
 ## 基線驗證結果
 
@@ -43,10 +43,9 @@ cd app
 npm test
 npm run typecheck
 npm run build:cloudflare
-npm run deploy:cloudflare
 ```
 
-`deploy:cloudflare` 是目前 Pages Direct Upload 的部署流程。`wrangler.toml` 不建立 KV、D1、R2、Workers AI 或任何付費 binding；即時資料為公開 API，資料產製在本機完成。
+Cloudflare Pages 已透過 Git Integration 連到 `main`；推送通過驗證的提交後會自動建置與部署。`wrangler.toml` 不建立 KV、D1、R2、Workers AI 或任何付費 binding；即時資料為公開 API，資料產製在本機完成。
 
 ## 資料與隱私
 

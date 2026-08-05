@@ -15,8 +15,10 @@
 | 功能 | 主要程式位置 | 說明 |
 | --- | --- | --- |
 | 官方即時站況與五分鐘比對 | `app/server/utils/live-feed.ts`、`app/pages/index.vue` | 伺服端取用官方資料，前端依發布節奏比對，資料改變才同步畫面。 |
+| 新北市實景站點地圖 | `app/components/RiskMap.vue` | 以 OpenStreetMap 呈現新北市官方座標，可搜尋站名／行政區、定位異常站並回到新北全域；即時與歷史模式使用不同圖例。 |
 | 歷史風險與品質規則 | `app/scripts/build-artifacts.mjs`、`app/server/data/dashboard.json` | 用站點半小時歷史型態與當前庫存計算 30／60／120 分鐘庫存失衡風險。 |
 | 告警與調度建議 | `app/server/utils/ops-store.ts`、`app/pages/alerts.vue`、`app/pages/dispatch.vue` | 將持續異常與高風險轉成可由人員確認的任務。 |
+| 調度影響試算 | `app/components/DispatchList.vue` | 顯示搬運前後的可借車、可還位與安全庫存檢查；明示為模擬且需人工覆核，不改寫模型預測。 |
 | 受限事實摘要 | `app/server/utils/briefing.ts`、`app/aws/bedrock-narrative.ts` | 模板為預設；Bedrock adapter 不讓模型產生新的營運事實。 |
 | AWS 遷移設計 | `app/infra/template.yaml`、`app/aws/README.md` | 僅是正式競賽環境的可選部署路徑，不是目前 Cloudflare Demo 的後端。 |
 
