@@ -1,0 +1,553 @@
+{
+  "schemaVersion": "1.0",
+  "generatedAt": "2026-08-05T14:36:15.723Z",
+  "model": {
+    "version": "historical-profile-heuristic-v1",
+    "objective": "預測未來時點是否空車或滿位",
+    "horizonsMinutes": [
+      30,
+      60,
+      120
+    ],
+    "featurePolicy": "僅使用當前庫存、前一個半小時桶的庫存動量，以及訓練期站點×半小時槽統計。"
+  },
+  "timeSplit": {
+    "train": "2026-01-01 至 2026-04-30",
+    "validation": "2026-05-01 至 2026-05-31",
+    "test": "2026-06-01 至 2026-06-30"
+  },
+  "cohort": {
+    "selection": "sha256(normalized city|district|station name) mod 8 = 0",
+    "stationCount": 217,
+    "sampledFraction": "1/8"
+  },
+  "data": {
+    "sourceFiles": 12,
+    "rawRowsRead": 13324945,
+    "cohortRowsRead": 1813015,
+    "trainRows": 1196543,
+    "validationRows": 312140,
+    "testRows": 304332,
+    "trainingProfiles": 10128,
+    "invalidTimestampRows": 0,
+    "invalidNumericRows": 0,
+    "encodings": {
+      "cp950": 9,
+      "utf8": 3
+    }
+  },
+  "thresholdSelection": {
+    "split": "validation",
+    "criterion": "最大化 combined empty/full event F1；同分時依序較高 precision、較高 recall、較高 threshold。",
+    "candidates": [
+      0.02,
+      0.05,
+      0.1,
+      0.15,
+      0.2,
+      0.25,
+      0.3,
+      0.35,
+      0.4,
+      0.45,
+      0.5,
+      0.55,
+      0.6,
+      0.65,
+      0.7,
+      0.75,
+      0.8,
+      0.85,
+      0.9
+    ],
+    "selected": {
+      "30": {
+        "threshold": 0.45,
+        "inventoryIssue": {
+          "tp": 7732,
+          "fp": 11687,
+          "fn": 7583,
+          "tn": 282343,
+          "predictionCount": 309345,
+          "precision": 0.398,
+          "recall": 0.505,
+          "f1": 0.445,
+          "specificity": 0.96,
+          "alertRate": 0.063
+        }
+      },
+      "60": {
+        "threshold": 0.45,
+        "inventoryIssue": {
+          "tp": 5867,
+          "fp": 13387,
+          "fn": 9441,
+          "tn": 280349,
+          "predictionCount": 309044,
+          "precision": 0.305,
+          "recall": 0.383,
+          "f1": 0.34,
+          "specificity": 0.954,
+          "alertRate": 0.062
+        }
+      },
+      "120": {
+        "threshold": 0.4,
+        "inventoryIssue": {
+          "tp": 5110,
+          "fp": 18560,
+          "fn": 10192,
+          "tn": 274580,
+          "predictionCount": 308442,
+          "precision": 0.216,
+          "recall": 0.334,
+          "f1": 0.262,
+          "specificity": 0.937,
+          "alertRate": 0.077
+        }
+      }
+    }
+  },
+  "validation": {
+    "split": "2026-05",
+    "horizons": {
+      "30": {
+        "threshold": 0.45,
+        "inventoryIssue": {
+          "tp": 7732,
+          "fp": 11687,
+          "fn": 7583,
+          "tn": 282343,
+          "predictionCount": 309345,
+          "precision": 0.398,
+          "recall": 0.505,
+          "f1": 0.445,
+          "specificity": 0.96,
+          "alertRate": 0.063
+        },
+        "empty": {
+          "tp": 7036,
+          "fp": 10342,
+          "fn": 6364,
+          "tn": 285603,
+          "predictionCount": 309345,
+          "precision": 0.405,
+          "recall": 0.525,
+          "f1": 0.457,
+          "specificity": 0.965,
+          "alertRate": 0.056
+        },
+        "full": {
+          "tp": 675,
+          "fp": 1366,
+          "fn": 1240,
+          "tn": 306064,
+          "predictionCount": 309345,
+          "precision": 0.331,
+          "recall": 0.352,
+          "f1": 0.341,
+          "specificity": 0.996,
+          "alertRate": 0.007
+        },
+        "probabilityQuality": {
+          "inventoryIssue": {
+            "predictionCount": 309345,
+            "actualPositive": 15315,
+            "baseRate": 0.05,
+            "meanRisk": 0.139,
+            "brierScore": 0.052,
+            "logLoss": 0.19
+          },
+          "empty": {
+            "predictionCount": 309345,
+            "actualPositive": 13400,
+            "baseRate": 0.043,
+            "meanRisk": 0.113,
+            "brierScore": 0.044,
+            "logLoss": 0.158
+          },
+          "full": {
+            "predictionCount": 309345,
+            "actualPositive": 1915,
+            "baseRate": 0.006,
+            "meanRisk": 0.035,
+            "brierScore": 0.009,
+            "logLoss": 0.047
+          }
+        },
+        "coverage": {
+          "missingFutureSnapshot": 210,
+          "excludedUnavailableCurrent": 2491,
+          "excludedUnavailableTarget": 94,
+          "averageHistoricalProfileObservations": 118.309
+        }
+      },
+      "60": {
+        "threshold": 0.45,
+        "inventoryIssue": {
+          "tp": 5867,
+          "fp": 13387,
+          "fn": 9441,
+          "tn": 280349,
+          "predictionCount": 309044,
+          "precision": 0.305,
+          "recall": 0.383,
+          "f1": 0.34,
+          "specificity": 0.954,
+          "alertRate": 0.062
+        },
+        "empty": {
+          "tp": 5407,
+          "fp": 11841,
+          "fn": 7987,
+          "tn": 283809,
+          "predictionCount": 309044,
+          "precision": 0.313,
+          "recall": 0.404,
+          "f1": 0.353,
+          "specificity": 0.96,
+          "alertRate": 0.056
+        },
+        "full": {
+          "tp": 430,
+          "fp": 1576,
+          "fn": 1484,
+          "tn": 305554,
+          "predictionCount": 309044,
+          "precision": 0.214,
+          "recall": 0.225,
+          "f1": 0.219,
+          "specificity": 0.995,
+          "alertRate": 0.006
+        },
+        "probabilityQuality": {
+          "inventoryIssue": {
+            "predictionCount": 309044,
+            "actualPositive": 15308,
+            "baseRate": 0.05,
+            "meanRisk": 0.139,
+            "brierScore": 0.057,
+            "logLoss": 0.205
+          },
+          "empty": {
+            "predictionCount": 309044,
+            "actualPositive": 13394,
+            "baseRate": 0.043,
+            "meanRisk": 0.113,
+            "brierScore": 0.048,
+            "logLoss": 0.173
+          },
+          "full": {
+            "predictionCount": 309044,
+            "actualPositive": 1914,
+            "baseRate": 0.006,
+            "meanRisk": 0.035,
+            "brierScore": 0.01,
+            "logLoss": 0.05
+          }
+        },
+        "coverage": {
+          "missingFutureSnapshot": 420,
+          "excludedUnavailableCurrent": 2488,
+          "excludedUnavailableTarget": 188,
+          "averageHistoricalProfileObservations": 118.309
+        }
+      },
+      "120": {
+        "threshold": 0.4,
+        "inventoryIssue": {
+          "tp": 5110,
+          "fp": 18560,
+          "fn": 10192,
+          "tn": 274580,
+          "predictionCount": 308442,
+          "precision": 0.216,
+          "recall": 0.334,
+          "f1": 0.262,
+          "specificity": 0.937,
+          "alertRate": 0.077
+        },
+        "empty": {
+          "tp": 4733,
+          "fp": 16719,
+          "fn": 8657,
+          "tn": 278333,
+          "predictionCount": 308442,
+          "precision": 0.221,
+          "recall": 0.353,
+          "f1": 0.272,
+          "specificity": 0.943,
+          "alertRate": 0.07
+        },
+        "full": {
+          "tp": 285,
+          "fp": 1936,
+          "fn": 1627,
+          "tn": 304594,
+          "predictionCount": 308442,
+          "precision": 0.128,
+          "recall": 0.149,
+          "f1": 0.138,
+          "specificity": 0.994,
+          "alertRate": 0.007
+        },
+        "probabilityQuality": {
+          "inventoryIssue": {
+            "predictionCount": 308442,
+            "actualPositive": 15302,
+            "baseRate": 0.05,
+            "meanRisk": 0.139,
+            "brierScore": 0.062,
+            "logLoss": 0.223
+          },
+          "empty": {
+            "predictionCount": 308442,
+            "actualPositive": 13390,
+            "baseRate": 0.043,
+            "meanRisk": 0.113,
+            "brierScore": 0.053,
+            "logLoss": 0.189
+          },
+          "full": {
+            "predictionCount": 308442,
+            "actualPositive": 1912,
+            "baseRate": 0.006,
+            "meanRisk": 0.035,
+            "brierScore": 0.011,
+            "logLoss": 0.056
+          }
+        },
+        "coverage": {
+          "missingFutureSnapshot": 840,
+          "excludedUnavailableCurrent": 2482,
+          "excludedUnavailableTarget": 376,
+          "averageHistoricalProfileObservations": 118.308
+        }
+      }
+    }
+  },
+  "test": {
+    "split": "2026-06",
+    "horizons": {
+      "30": {
+        "threshold": 0.45,
+        "inventoryIssue": {
+          "tp": 6844,
+          "fp": 8980,
+          "fn": 5513,
+          "tn": 280530,
+          "predictionCount": 301867,
+          "precision": 0.433,
+          "recall": 0.554,
+          "f1": 0.486,
+          "specificity": 0.969,
+          "alertRate": 0.052
+        },
+        "empty": {
+          "tp": 6204,
+          "fp": 7913,
+          "fn": 4557,
+          "tn": 283193,
+          "predictionCount": 301867,
+          "precision": 0.439,
+          "recall": 0.577,
+          "f1": 0.499,
+          "specificity": 0.973,
+          "alertRate": 0.047
+        },
+        "full": {
+          "tp": 627,
+          "fp": 1081,
+          "fn": 969,
+          "tn": 299190,
+          "predictionCount": 301867,
+          "precision": 0.367,
+          "recall": 0.393,
+          "f1": 0.38,
+          "specificity": 0.996,
+          "alertRate": 0.006
+        },
+        "probabilityQuality": {
+          "inventoryIssue": {
+            "predictionCount": 301867,
+            "actualPositive": 12357,
+            "baseRate": 0.041,
+            "meanRisk": 0.126,
+            "brierScore": 0.043,
+            "logLoss": 0.165
+          },
+          "empty": {
+            "predictionCount": 301867,
+            "actualPositive": 10761,
+            "baseRate": 0.036,
+            "meanRisk": 0.102,
+            "brierScore": 0.036,
+            "logLoss": 0.134
+          },
+          "full": {
+            "predictionCount": 301867,
+            "actualPositive": 1596,
+            "baseRate": 0.005,
+            "meanRisk": 0.032,
+            "brierScore": 0.008,
+            "logLoss": 0.042
+          }
+        },
+        "coverage": {
+          "missingFutureSnapshot": 216,
+          "excludedUnavailableCurrent": 2158,
+          "excludedUnavailableTarget": 91,
+          "averageHistoricalProfileObservations": 117.436
+        }
+      },
+      "60": {
+        "threshold": 0.45,
+        "inventoryIssue": {
+          "tp": 5495,
+          "fp": 10226,
+          "fn": 6849,
+          "tn": 278994,
+          "predictionCount": 301564,
+          "precision": 0.35,
+          "recall": 0.445,
+          "f1": 0.392,
+          "specificity": 0.965,
+          "alertRate": 0.052
+        },
+        "empty": {
+          "tp": 5069,
+          "fp": 8976,
+          "fn": 5680,
+          "tn": 281839,
+          "predictionCount": 301564,
+          "precision": 0.361,
+          "recall": 0.472,
+          "f1": 0.409,
+          "specificity": 0.969,
+          "alertRate": 0.047
+        },
+        "full": {
+          "tp": 406,
+          "fp": 1270,
+          "fn": 1189,
+          "tn": 298699,
+          "predictionCount": 301564,
+          "precision": 0.242,
+          "recall": 0.255,
+          "f1": 0.248,
+          "specificity": 0.996,
+          "alertRate": 0.006
+        },
+        "probabilityQuality": {
+          "inventoryIssue": {
+            "predictionCount": 301564,
+            "actualPositive": 12344,
+            "baseRate": 0.041,
+            "meanRisk": 0.126,
+            "brierScore": 0.047,
+            "logLoss": 0.176
+          },
+          "empty": {
+            "predictionCount": 301564,
+            "actualPositive": 10749,
+            "baseRate": 0.036,
+            "meanRisk": 0.102,
+            "brierScore": 0.039,
+            "logLoss": 0.145
+          },
+          "full": {
+            "predictionCount": 301564,
+            "actualPositive": 1595,
+            "baseRate": 0.005,
+            "meanRisk": 0.032,
+            "brierScore": 0.009,
+            "logLoss": 0.046
+          }
+        },
+        "coverage": {
+          "missingFutureSnapshot": 432,
+          "excludedUnavailableCurrent": 2155,
+          "excludedUnavailableTarget": 181,
+          "averageHistoricalProfileObservations": 117.438
+        }
+      },
+      "120": {
+        "threshold": 0.4,
+        "inventoryIssue": {
+          "tp": 4855,
+          "fp": 14738,
+          "fn": 7468,
+          "tn": 273897,
+          "predictionCount": 300958,
+          "precision": 0.248,
+          "recall": 0.394,
+          "f1": 0.304,
+          "specificity": 0.949,
+          "alertRate": 0.065
+        },
+        "empty": {
+          "tp": 4559,
+          "fp": 13163,
+          "fn": 6173,
+          "tn": 277063,
+          "predictionCount": 300958,
+          "precision": 0.257,
+          "recall": 0.425,
+          "f1": 0.32,
+          "specificity": 0.955,
+          "alertRate": 0.059
+        },
+        "full": {
+          "tp": 258,
+          "fp": 1614,
+          "fn": 1333,
+          "tn": 297753,
+          "predictionCount": 300958,
+          "precision": 0.138,
+          "recall": 0.162,
+          "f1": 0.149,
+          "specificity": 0.995,
+          "alertRate": 0.006
+        },
+        "probabilityQuality": {
+          "inventoryIssue": {
+            "predictionCount": 300958,
+            "actualPositive": 12323,
+            "baseRate": 0.041,
+            "meanRisk": 0.126,
+            "brierScore": 0.05,
+            "logLoss": 0.19
+          },
+          "empty": {
+            "predictionCount": 300958,
+            "actualPositive": 10732,
+            "baseRate": 0.036,
+            "meanRisk": 0.102,
+            "brierScore": 0.042,
+            "logLoss": 0.158
+          },
+          "full": {
+            "predictionCount": 300958,
+            "actualPositive": 1591,
+            "baseRate": 0.005,
+            "meanRisk": 0.032,
+            "brierScore": 0.009,
+            "logLoss": 0.051
+          }
+        },
+        "coverage": {
+          "missingFutureSnapshot": 864,
+          "excludedUnavailableCurrent": 2149,
+          "excludedUnavailableTarget": 361,
+          "averageHistoricalProfileObservations": 117.439
+        }
+      }
+    }
+  },
+  "limitations": [
+    "固定站點抽樣用於控制本機記憶體，並非全站點離線評估。",
+    "服務不可用（同時無車與無可還位）不納入空車／滿位二元事件指標。",
+    "未使用天氣、活動、交通、調度或即時事件資料；結果是啟發式基線而非可校準機率模型。",
+    "每次重跑會更新 generatedAt，但資料切分、特徵、閾值候選與抽樣規則固定。"
+  ]
+}

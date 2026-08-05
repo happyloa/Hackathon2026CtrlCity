@@ -1,0 +1,36 @@
+{
+  "name": "youbike-ops-radar",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "build:cloudflare": "nuxi build --preset=cloudflare_pages",
+    "deploy:cloudflare": "npm run build:cloudflare && wrangler pages deploy dist --project-name youbike-ops-radar",
+    "postinstall": "nuxt prepare",
+    "data:build": "node scripts/build-artifacts.mjs",
+    "data:validate": "node scripts/validate-artifacts.mjs",
+    "model:evaluate": "node scripts/evaluate-forecast.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "typecheck": "nuxt typecheck"
+  },
+  "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "^3.1103.0",
+    "@iconify/vue": "^5.0.1",
+    "csv-parse": "^7.0.2",
+    "echarts": "^6.1.0",
+    "iconv-lite": "^0.7.3",
+    "nuxt": "^4.5.1",
+    "vue": "^3.5.40",
+    "vue-router": "^5.2.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "typescript": "^6.0.3",
+    "vue-tsc": "^3.3.9",
+    "wrangler": "^4.119.0"
+  }
+}
