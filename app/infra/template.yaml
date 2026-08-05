@@ -1,0 +1,303 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >-
+  YouBike Operations Radar - local-first AWS migration scaffold.
+  The frontend remains a separately generated Nuxt static site; this stack owns
+  the API, materialized dashboard data, artifacts, and optional scheduled work.
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: hackathon
+    Description: Lowercase deployment label used in resource names and object prefixes.
+    AllowedPattern: '^[a-z0-9-]+$'
+
+  AllowedCorsOrigin:
+    Type: String
+    Default: http://localhost:3000
+    Description: Exact Nuxt origin allowed to call the API. Use the deployed HTTPS origin in AWS.
+
+  ArtifactPrefix:
+    Type: String
+    Default: youbike-ops
+    Description: S3 prefix for normalized dashboard artifacts; raw CSV is intentionally not uploaded by this stack.
+    AllowedPattern: '^[a-z0-9-]+$'
+
+  DataMode:
+    Type: String
+    Default: historical_replay
+    AllowedValues:
+      - historical_replay
+      - live
+    Description: Exposed in API metadata so a replay is never presented as live data.
+
+  BedrockModelId:
+    Type: String
+    Default: ''
+    Description: Optional organizer-approved Bedrock model ID or inference profile ID. This is configuration, not a secret.
+
+  LiveFeedUrl:
+    Type: String
+    Default: ''
+    Description: Optional public live-feed endpoint. Do not put an API key in this parameter.
+
+  EnableForecastSchedule:
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Description: Keep false until the S3/DynamoDB forecast worker adapter is wired and tested.
+
+  ForecastScheduleExpression:
+    Type: String
+    Default: rate(30 minutes)
+    Description: EventBridge Scheduler expression for ingest and forecast materialization.
+
+  ArtifactRetentionDays:
+    Type: Number
+    Default: 90
+    MinValue: 1
+    Description: Lifecycle retention for generated S3 artifacts. Export anything needed before the event account is suspended.
+
+Conditions:
+  ScheduleEnabled: !Equals [!Ref EnableForecastSchedule, 'true']
+  HasBedrockModel: !Not [!Equals [!Ref BedrockModelId, '']]
+
+Resources:
+  DashboardArtifactsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-generated-artifacts
+            Status: Enabled
+            Prefix: !Sub '${ArtifactPrefix}/'
+            ExpirationInDays: !Ref ArtifactRetentionDays
+      Tags:
+        - Key: application
+          Value: youbike-ops-radar
+        - Key: environment
+          Value: !Ref EnvironmentName
+
+  DashboardTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${EnvironmentName}-youbike-dashboard'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+        - AttributeName: gsi1pk
+          AttributeType: S
+        - AttributeName: gsi1sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: gsi1
+          KeySchema:
+            - AttributeName: gsi1pk
+              KeyType: HASH
+            - AttributeName: gsi1sk
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: true
+      SSESpecification:
+        SSEEnabled: true
+      Tags:
+        - Key: application
+          Value: youbike-ops-radar
+        - Key: environment
+          Value: !Ref EnvironmentName
+
+  OperationsApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      CorsConfiguration:
+        AllowOrigins:
+          - !Ref AllowedCorsOrigin
+        AllowHeaders:
+          - content-type
+        AllowMethods:
+          - GET
+          - POST
+          - OPTIONS
+        MaxAge: 600
+      Tags:
+        application: youbike-ops-radar
+        environment: !Ref EnvironmentName
+
+  OperationsApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../
+      Handler: aws/handler.lambdaHandler
+      Runtime: nodejs24.x
+      Architectures:
+        - arm64
+      MemorySize: 1024
+      Timeout: 29
+      Description: Read-side API plus Bedrock briefing boundary for YouBike Operations Radar.
+      Environment:
+        Variables:
+          APP_MODE: aws
+          DATA_BACKEND: dynamodb
+          OBJECT_BACKEND: s3
+          DATA_MODE: !Ref DataMode
+          ARTIFACT_BUCKET: !Ref DashboardArtifactsBucket
+          ARTIFACT_PREFIX: !Ref ArtifactPrefix
+          DDB_DASHBOARD_TABLE: !Ref DashboardTable
+          GENAI_BACKEND: !If [HasBedrockModel, bedrock, template]
+          BEDROCK_MODEL_ID: !Ref BedrockModelId
+          LIVE_FEED_URL: !Ref LiveFeedUrl
+      Policies:
+        - S3ReadPolicy:
+            BucketName: !Ref DashboardArtifactsBucket
+        - DynamoDBReadPolicy:
+            TableName: !Ref DashboardTable
+        - Statement:
+            - Sid: InvokeOrganizerApprovedBedrockModel
+              Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+              Resource:
+                - !Sub 'arn:${AWS::Partition}:bedrock:${AWS::Region}::foundation-model/*'
+                - !Sub 'arn:${AWS::Partition}:bedrock:*:${AWS::AccountId}:inference-profile/*'
+      Events:
+        Root:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref OperationsApi
+            Path: /
+            Method: ANY
+        Proxy:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref OperationsApi
+            Path: /{proxy+}
+            Method: ANY
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - aws/handler.ts
+        Format: esm
+        Target: es2022
+        Sourcemap: true
+
+  ForecastWorkerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../
+      Handler: aws/forecast-worker.lambdaHandler
+      Runtime: nodejs24.x
+      Architectures:
+        - arm64
+      MemorySize: 2048
+      Timeout: 300
+      Description: Disabled-by-default materialization worker boundary for ingest, risk scoring, and dispatch recommendations.
+      Environment:
+        Variables:
+          APP_MODE: aws
+          DATA_BACKEND: dynamodb
+          OBJECT_BACKEND: s3
+          DATA_MODE: !Ref DataMode
+          ARTIFACT_BUCKET: !Ref DashboardArtifactsBucket
+          ARTIFACT_PREFIX: !Ref ArtifactPrefix
+          DDB_DASHBOARD_TABLE: !Ref DashboardTable
+          LIVE_FEED_URL: !Ref LiveFeedUrl
+      Policies:
+        - S3WritePolicy:
+            BucketName: !Ref DashboardArtifactsBucket
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DashboardTable
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - aws/forecast-worker.ts
+        Format: esm
+        Target: es2022
+        Sourcemap: true
+
+  ForecastSchedulerRole:
+    Type: AWS::IAM::Role
+    Condition: ScheduleEnabled
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: scheduler.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: invoke-forecast-worker
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: !GetAtt ForecastWorkerFunction.Arn
+
+  ForecastScheduler:
+    Type: AWS::Scheduler::Schedule
+    Condition: ScheduleEnabled
+    Properties:
+      Description: Runs the YouBike ingestion and forecast materialization worker.
+      FlexibleTimeWindow:
+        Mode: 'OFF'
+      ScheduleExpression: !Ref ForecastScheduleExpression
+      ScheduleExpressionTimezone: Asia/Taipei
+      State: ENABLED
+      Target:
+        Arn: !GetAtt ForecastWorkerFunction.Arn
+        RoleArn: !GetAtt ForecastSchedulerRole.Arn
+        Input: '{"source":"eventbridge-scheduler","mode":"incremental"}'
+        RetryPolicy:
+          MaximumEventAgeInSeconds: 3600
+          MaximumRetryAttempts: 2
+
+  AllowSchedulerToInvokeForecastWorker:
+    Type: AWS::Lambda::Permission
+    Condition: ScheduleEnabled
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref ForecastWorkerFunction
+      Principal: scheduler.amazonaws.com
+      SourceArn: !GetAtt ForecastScheduler.Arn
+
+Outputs:
+  ApiUrl:
+    Description: HTTP API base URL. Configure the Nuxt deployment to call this value, or proxy /api through CloudFront.
+    Value: !Sub 'https://${OperationsApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}'
+
+  DashboardArtifactsBucketName:
+    Description: Private S3 bucket for generated artifacts and optional raw/curated data prefixes.
+    Value: !Ref DashboardArtifactsBucket
+
+  DashboardTableName:
+    Description: DynamoDB materialized-view table for current and near-term dashboard data.
+    Value: !Ref DashboardTable
+
+  OperationsApiFunctionName:
+    Description: Lambda API function name.
+    Value: !Ref OperationsApiFunction

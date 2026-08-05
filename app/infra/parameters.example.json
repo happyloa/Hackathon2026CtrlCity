@@ -1,0 +1,13 @@
+{
+  "Parameters": {
+    "EnvironmentName": "hackathon",
+    "AllowedCorsOrigin": "http://localhost:3000",
+    "ArtifactPrefix": "youbike-ops",
+    "DataMode": "historical_replay",
+    "BedrockModelId": "",
+    "LiveFeedUrl": "",
+    "EnableForecastSchedule": "false",
+    "ForecastScheduleExpression": "rate(30 minutes)",
+    "ArtifactRetentionDays": "90"
+  }
+}
