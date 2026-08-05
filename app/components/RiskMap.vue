@@ -162,9 +162,8 @@ function fitNewTaipeiBounds() {
 function focusSelectedStation() {
   if (!leafletMap || !props.selectedId) return
   const selected = mappedStations.value.find(station => station.id === props.selectedId)
-  if (selected?.latitude !== null && selected?.longitude !== null) {
-    leafletMap.panTo([selected.latitude, selected.longitude], { animate: true, duration: .35 })
-  }
+  if (!selected || selected.latitude === null || selected.longitude === null) return
+  leafletMap.panTo([selected.latitude, selected.longitude], { animate: true, duration: .35 })
 }
 
 async function initialiseMap() {

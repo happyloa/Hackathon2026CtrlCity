@@ -1,35 +1,38 @@
-import { defineEventHandler, setResponseHeader } from 'h3'
-import { fetchLiveStations } from '../../utils/live-feed'
-import { queryValue } from '../../utils/request'
+import { defineEventHandler, setResponseHeader, setResponseStatus } from 'h3'
 
-function asOfFromSourceTime(value: string | undefined): string {
-  if (value && /^\d{8}T\d{6}$/.test(value)) {
-    return `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)}T${value.slice(9, 11)}:${value.slice(11, 13)}:${value.slice(13, 15)}+08:00`
-  }
-  return new Date().toISOString()
-}
+const NTPC_LIVE_STATIONS_URL = 'https://data.ntpc.gov.tw/api/datasets/010e5b15-3823-4b20-b401-b1cf000550c5/json?page=0&size=2000'
 
+/**
+ * Keep Nuxt development behaviour aligned with the Pages Function.  The client
+ * owns filtering and normalisation, so this route only forwards the official
+ * raw feed and never loads the replay artifact.
+ */
 export default defineEventHandler(async (event) => {
-  // The client owns the five-minute polling cadence; never let an intermediary serve an old API response.
-  setResponseHeader(event, 'cache-control', 'no-store, max-age=0')
-  const district = queryValue(event, 'district')
-  const forceRefresh = queryValue(event, 'refresh') === '1'
-  const stations = await fetchLiveStations(district, { forceRefresh })
-  const sourceUpdatedAt = stations.map(station => station.sourceUpdatedAt).filter(Boolean).sort().at(-1)
-  return {
-    data: {
-      dataMode: 'live' as const,
-      source: 'ntpc-open-data',
-      district: district ?? null,
-      stations,
-    },
-    meta: {
-      asOf: asOfFromSourceTime(sourceUpdatedAt),
-      generatedAt: new Date().toISOString(),
-      dataMode: 'live' as const,
-      forecastModel: 'live-inventory-only',
-      narrativeProvider: 'template' as const,
-      persistence: 'none' as const,
-    },
+  try {
+    const upstream = await fetch(NTPC_LIVE_STATIONS_URL, {
+      headers: {
+        accept: 'application/json',
+        'cache-control': 'no-cache',
+      },
+      cache: 'no-store',
+    })
+
+    if (!upstream.ok || !upstream.body) {
+      setResponseHeader(event, 'cache-control', 'no-store, max-age=0')
+      setResponseStatus(event, 502)
+      return { error: 'Unable to retrieve the New Taipei live station feed.' }
+    }
+
+    return new Response(upstream.body, {
+      status: 200,
+      headers: {
+        'content-type': upstream.headers.get('content-type') || 'application/json; charset=utf-8',
+        'cache-control': 'no-store, max-age=0',
+      },
+    })
+  } catch {
+    setResponseHeader(event, 'cache-control', 'no-store, max-age=0')
+    setResponseStatus(event, 502)
+    return { error: 'Unable to retrieve the New Taipei live station feed.' }
   }
 })

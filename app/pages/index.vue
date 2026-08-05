@@ -2,6 +2,8 @@
 import { Icon } from '@iconify/vue'
 import type {
   ApiEnvelope,
+  ApiMeta,
+  CurrentState,
   DashboardArtifact,
   Forecast,
   HorizonKey,
@@ -12,6 +14,7 @@ import type {
 
 type SourceMode = 'historical_replay' | 'live'
 type LiveResponse = ApiEnvelope<LiveStationsPayload>
+type NtpRawStation = Record<string, unknown>
 
 const LIVE_POLL_INTERVAL_MS = 5 * 60 * 1000
 const selectedAt = ref('')
@@ -30,15 +33,101 @@ let livePollStartTimer: ReturnType<typeof setTimeout> | undefined
 let liveUpdateResetTimer: ReturnType<typeof setTimeout> | undefined
 let liveSignature = ''
 
-const query = computed(() => ({
-  at: selectedAt.value || undefined,
-  district: selectedDistrict.value || undefined,
-  horizon: horizon.value,
-}))
+const {
+  manifest: replayManifest,
+  dashboard: replayArtifact,
+  pending: replayPending,
+  error: replayError,
+  loadScenario,
+  acknowledge: acknowledgeReplay,
+  acceptDispatch: acceptReplay,
+  dashboardForDistrict,
+} = useReplayDashboard()
 
-const { data: payload, pending, error, refresh } = await useFetch<ApiEnvelope<DashboardArtifact>>('/api/v1/command-center', { query })
-const dashboard = computed(() => payload.value?.data)
-const meta = computed(() => payload.value?.meta)
+function asRecord(value: unknown): NtpRawStation {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? value as NtpRawStation
+    : {}
+}
+
+function asString(value: unknown, fallback = ''): string {
+  return typeof value === 'string' && value.trim() ? value.trim() : fallback
+}
+
+function asNumber(value: unknown, fallback = 0): number {
+  const candidate = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(candidate) ? candidate : fallback
+}
+
+function asCurrentState(active: boolean, bikes: number, docks: number): CurrentState {
+  if (!active || (bikes === 0 && docks === 0)) return 'unavailable'
+  if (bikes === 0) return 'empty_now'
+  if (docks === 0) return 'full_now'
+  return 'normal'
+}
+
+function mapLiveStation(value: unknown): LiveStation | null {
+  const station = asRecord(value)
+  const id = asString(station.sno)
+  if (!id) return null
+
+  const totalDocks = Math.max(0, Math.round(asNumber(station.tot_quantity)))
+  const availableBikes = Math.max(0, Math.round(asNumber(station.sbi_quantity, asNumber(station.sbi))))
+  const availableDocks = Math.max(0, Math.round(asNumber(station.bemp)))
+  const active = asString(station.act) === '1' || asNumber(station.act) === 1
+  const latitude = asNumber(station.lat, Number.NaN)
+  const longitude = asNumber(station.lng, Number.NaN)
+
+  return {
+    id,
+    name: asString(station.sna, '未命名站點'),
+    district: asString(station.sarea, '未分類'),
+    totalDocks,
+    availableBikes,
+    availableDocks,
+    capacityGap: totalDocks - availableBikes - availableDocks,
+    latitude: Number.isFinite(latitude) ? latitude : null,
+    longitude: Number.isFinite(longitude) ? longitude : null,
+    active,
+    currentState: asCurrentState(active, availableBikes, availableDocks),
+    sourceUpdatedAt: asString(station.mday),
+    youbike2Bikes: Math.max(0, Math.round(asNumber(station.yb2_quantity))),
+    eBikeBikes: Math.max(0, Math.round(asNumber(station.eyb_quantity))),
+    dataMode: 'live',
+  }
+}
+
+function asOfFromSourceTime(value: string | undefined): string {
+  if (value && /^\d{8}T\d{6}$/.test(value)) {
+    return value.slice(0, 4) + '-' + value.slice(4, 6) + '-' + value.slice(6, 8) + 'T' + value.slice(9, 11) + ':' + value.slice(11, 13) + ':' + value.slice(13, 15) + '+08:00'
+  }
+  return new Date().toISOString()
+}
+
+function createLiveResponse(payload: unknown, district: string): LiveResponse {
+  const allStations = Array.isArray(payload)
+    ? payload.map(mapLiveStation).filter((station): station is LiveStation => station !== null)
+    : []
+  const stations = district ? allStations.filter(station => station.district === district) : allStations
+  const sourceUpdatedAt = stations.map(station => station.sourceUpdatedAt).filter(Boolean).sort().at(-1)
+  const meta: ApiMeta = {
+    asOf: asOfFromSourceTime(sourceUpdatedAt),
+    generatedAt: new Date().toISOString(),
+    dataMode: 'live',
+    forecastModel: 'live-inventory-only',
+    narrativeProvider: 'template',
+  }
+
+  return {
+    data: {
+      dataMode: 'live',
+      source: 'ntpc-open-data',
+      district: district || null,
+      stations,
+    },
+    meta,
+  }
+}
 
 function liveStationForecast(station: LiveStation): Forecast {
   const empty = station.currentState === 'empty_now'
@@ -130,17 +219,15 @@ function snapshotSignature(response: LiveResponse) {
   return `${response.meta.asOf}|${response.data.stations.map(station => `${station.id}:${station.availableBikes}:${station.availableDocks}:${station.currentState}`).join('|')}`
 }
 
-async function refreshLive(options: { manual?: boolean; selectionChanged?: boolean; forceRefresh?: boolean } = {}) {
+async function refreshLive(options: { manual?: boolean; selectionChanged?: boolean } = {}) {
   if (livePending.value) return
   livePending.value = true
   liveError.value = ''
   try {
-    const response = await $fetch<LiveResponse>('/api/v1/live-stations', {
-      query: {
-        ...(selectedDistrict.value ? { district: selectedDistrict.value } : {}),
-        ...(options.forceRefresh ? { refresh: '1' } : {}),
-      },
+    const rawStations = await $fetch<unknown>('/api/v1/live-stations', {
+      cache: 'no-store',
     })
+    const response = createLiveResponse(rawStations, selectedDistrict.value)
     const nextSignature = snapshotSignature(response)
     const hasPreviousSnapshot = Boolean(livePayload.value)
     const changed = hasPreviousSnapshot && nextSignature !== liveSignature
@@ -167,8 +254,8 @@ function startLivePolling() {
   const delayToNextCheck = LIVE_POLL_INTERVAL_MS - (Date.now() % LIVE_POLL_INTERVAL_MS) + 2_000
   livePollStartTimer = setTimeout(() => {
     livePollStartTimer = undefined
-    void refreshLive({ forceRefresh: true })
-    livePollTimer = setInterval(() => { void refreshLive({ forceRefresh: true }) }, LIVE_POLL_INTERVAL_MS)
+    void refreshLive()
+    livePollTimer = setInterval(() => { void refreshLive() }, LIVE_POLL_INTERVAL_MS)
   }, delayToNextCheck)
 }
 
@@ -184,14 +271,15 @@ function stopLivePolling() {
 }
 
 const liveDashboard = computed(() => livePayload.value ? createLiveDashboard(livePayload.value) : undefined)
-const activeDashboard = computed(() => sourceMode.value === 'live' ? liveDashboard.value : dashboard.value)
-const activeMeta = computed(() => sourceMode.value === 'live' ? livePayload.value?.meta : meta.value)
-const activePending = computed(() => sourceMode.value === 'live' ? livePending.value : pending.value)
-const activeError = computed(() => sourceMode.value === 'live' ? liveError.value : error.value)
+const historicalDashboard = computed(() => dashboardForDistrict(selectedDistrict.value))
+const activeDashboard = computed(() => sourceMode.value === 'live' ? liveDashboard.value : historicalDashboard.value || undefined)
+const activeMeta = computed(() => sourceMode.value === 'live' ? livePayload.value?.meta : historicalDashboard.value?.meta)
+const activePending = computed(() => sourceMode.value === 'live' ? livePending.value : replayPending.value)
+const activeError = computed(() => sourceMode.value === 'live' ? liveError.value : replayError.value)
 
 watch(activeDashboard, (value) => {
   if (!value) return
-  if (sourceMode.value === 'historical_replay' && !selectedAt.value) selectedAt.value = meta.value?.asOf || value.meta.asOf
+  if (sourceMode.value === 'historical_replay' && !selectedAt.value) selectedAt.value = value.meta.asOf
   if (!selectedStationId.value || !value.stations.some(station => station.id === selectedStationId.value)) {
     selectedStationId.value = value.stations[0]?.id || ''
   }
@@ -203,6 +291,7 @@ watch(sourceMode, (mode) => {
     startLivePolling()
   } else {
     stopLivePolling()
+    void loadScenario(selectedAt.value || undefined)
   }
 })
 
@@ -211,7 +300,9 @@ watch([selectedAt, selectedDistrict, horizon], () => {
     void refreshLive({ selectionChanged: true })
     return
   }
-  void refresh()
+  if (selectedAt.value && selectedAt.value !== replayArtifact.value?.meta.asOf) {
+    void loadScenario(selectedAt.value)
+  }
 })
 
 onBeforeUnmount(() => {
@@ -228,8 +319,8 @@ onMounted(() => {
 
 const selectedStation = computed<StationRisk | null>(() => activeDashboard.value?.stations.find(station => station.id === selectedStationId.value) || null)
 const selectedHistory = computed(() => sourceMode.value === 'historical_replay' && selectedStationId.value ? activeDashboard.value?.stationHistories[selectedStationId.value] || [] : [])
-const dateOptions = computed(() => dashboard.value?.availableTimes || [])
-const districtOptions = computed(() => activeDashboard.value?.districts || dashboard.value?.districts || [])
+const dateOptions = computed(() => replayManifest.value?.availableTimes || replayArtifact.value?.availableTimes || [])
+const districtOptions = computed(() => activeDashboard.value?.districts || replayManifest.value?.districts || [])
 const asOfLabel = computed(() => {
   const date = activeMeta.value?.asOf || activeDashboard.value?.meta.asOf
   if (!date) return '載入中'
@@ -261,14 +352,12 @@ const modeDescription = computed(() => sourceMode.value === 'live'
   ? '同步新北市政府 Open Data 的各站可借車與可還位；每 5 分鐘比對一次，資料來源更新後才會替換畫面。'
   : '以六個月站點快照計算空車／滿位風險，將需要介入的站點轉成可覆核的調度任務。')
 
-async function acknowledge(alertId: string) {
-  await $fetch(`/api/v1/alerts/${alertId}/ack`, { method: 'POST' })
-  await refresh()
+function acknowledge(alertId: string) {
+  acknowledgeReplay(alertId)
 }
 
-async function acceptDispatch(dispatchId: string) {
-  await $fetch(`/api/v1/dispatches/${dispatchId}/accept`, { method: 'POST' })
-  await refresh()
+function acceptDispatch(dispatchId: string) {
+  acceptReplay(dispatchId)
 }
 
 function selectStation(stationId: string) {
@@ -288,7 +377,7 @@ function selectStation(stationId: string) {
       <div class="intro-data-note">
         <span><Icon icon="solar:database-outline" /> {{ sourceMode === 'live' ? '官方資料時間' : '資料時間' }}</span>
         <strong>{{ asOfLabel }}</strong>
-        <small>{{ sourceMode === 'live' ? '即時庫存 · 每 5 分鐘比對' : `歷史回放 · ${activeMeta?.forecastModel || '載入中'}` }}</small>
+        <small>{{ sourceMode === 'live' ? '即時庫存 · 每 5 分鐘比對' : `歷史回放 · ${activeDashboard?.meta.modelVersion || '載入中'}` }}</small>
       </div>
     </section>
 
@@ -348,7 +437,13 @@ function selectStation(stationId: string) {
           <AlertList :alerts="activeDashboard.alerts" :stations="activeDashboard.stations" compact @select="selectStation" @acknowledge="acknowledge" />
           <DispatchList :dispatches="activeDashboard.dispatches" :stations="activeDashboard.stations" compact @select="selectStation" @accept="acceptDispatch" />
         </section>
-        <BriefingCard :as-of="activeMeta?.asOf || activeDashboard.meta.asOf" :horizon="horizon" :district="selectedDistrict" />
+        <BriefingCard
+          :as-of="activeMeta?.asOf || activeDashboard.meta.asOf"
+          :horizon="horizon"
+          :district="selectedDistrict"
+          :facts="activeDashboard.briefingFacts"
+          :summary="activeDashboard.summary"
+        />
         <section class="data-footnote">
           <Icon icon="solar:info-circle-outline" />
           <span>資料共 {{ activeDashboard.meta.coverage.sourceRows.toLocaleString() }} 筆站點快照；原始資料未進入前端。可借車與可還位同時為 0 的站點會標為「暫不可用」，不會誤判成雙重需求。</span>

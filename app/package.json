@@ -3,11 +3,11 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "build": "nuxt build",
+    "build": "nuxi generate && node scripts/stage-pages-static.mjs",
     "dev": "nuxt dev",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
-    "build:cloudflare": "nuxi build --preset=cloudflare_pages",
+    "build:cloudflare": "nuxi generate && node scripts/stage-pages-static.mjs",
     "postinstall": "nuxt prepare",
     "data:build": "node scripts/build-artifacts.mjs",
     "data:validate": "node scripts/validate-artifacts.mjs",

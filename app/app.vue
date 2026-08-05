@@ -1,6 +1,5 @@
 <script setup lang="ts">
-const requestUrl = useRequestURL()
-const socialImage = new URL('/og.png', requestUrl.origin).href
+const socialImage = '/og.png'
 
 useSeoMeta({
   title: 'YouBike 調度雷達',
