@@ -6,6 +6,7 @@ const props = defineProps<{
   alerts: Alert[]
   stations: StationRisk[]
   compact?: boolean
+  contextQuery?: Record<string, string>
 }>()
 
 const emit = defineEmits<{
@@ -15,6 +16,7 @@ const emit = defineEmits<{
 
 const stationLookup = computed(() => new Map(props.stations.map(station => [station.id, station])))
 const visibleAlerts = computed(() => props.compact ? props.alerts.slice(0, 5) : props.alerts)
+const allAlertsTarget = computed(() => ({ path: '/alerts', query: props.contextQuery || {} }))
 
 function stationFor(alert: Alert) {
   return stationLookup.value.get(alert.stationId)
@@ -38,7 +40,7 @@ function conditionLabel(condition: Alert['condition']) {
         <p class="section-kicker"><Icon icon="solar:bell-bing-outline" /> 告警中心</p>
         <h2>需要值班人員處理</h2>
       </div>
-      <NuxtLink v-if="compact" to="/alerts" class="text-link">查看全部 <Icon icon="solar:arrow-right-up-outline" /></NuxtLink>
+      <NuxtLink v-if="compact" :to="allAlertsTarget" class="text-link">查看全部 <Icon icon="solar:arrow-right-up-outline" /></NuxtLink>
     </div>
 
     <div v-if="visibleAlerts.length" class="alert-list">
@@ -46,7 +48,7 @@ function conditionLabel(condition: Alert['condition']) {
         <span class="severity-mark"><Icon :icon="alert.severity === 'critical' ? 'solar:danger-triangle-bold' : 'solar:bell-bing-outline'" /></span>
         <button type="button" class="alert-main" @click="emit('select', alert.stationId)">
           <strong>{{ stationFor(alert)?.name || '資料未對應站點' }}</strong>
-          <span>{{ conditionLabel(alert.condition) }} · 已持續 {{ alert.durationMinutes }} 分鐘</span>
+          <span>{{ conditionLabel(alert.condition) }} · {{ alert.durationMinutes > 0 ? `已持續 ${alert.durationMinutes} 分鐘` : '即時偵測' }}</span>
         </button>
         <div class="alert-actions">
           <small>{{ Math.round(alert.riskScore * 100) }} 分</small>

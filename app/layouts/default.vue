@@ -11,6 +11,12 @@ const navigation = [
 ]
 
 const activeLabel = computed(() => navigation.find(item => item.to === route.path)?.label || '站點資訊')
+const navigationQuery = computed(() => Object.fromEntries(
+  ['mode', 'at', 'district']
+    .map(key => [key, route.query[key]])
+    .filter((entry): entry is [string, string] => typeof entry[1] === 'string' && Boolean(entry[1])),
+))
+const navigationTarget = (path: string) => ({ path, query: navigationQuery.value })
 
 function applyTheme() {
   document.documentElement.dataset.theme = isDark.value ? 'dark' : 'light'
@@ -32,7 +38,7 @@ onMounted(() => {
 <template>
   <div class="app-shell">
     <aside class="side-nav">
-      <NuxtLink to="/" class="brand" aria-label="前往調度戰情室">
+      <NuxtLink :to="navigationTarget('/')" class="brand" aria-label="前往調度戰情室">
         <span class="brand-mark"><Icon icon="solar:wheel-angle-outline" /></span>
         <span>
           <strong>新北市 YouBike</strong>
@@ -41,7 +47,7 @@ onMounted(() => {
       </NuxtLink>
 
       <nav aria-label="主要導覽">
-        <NuxtLink v-for="item in navigation" :key="item.to" :to="item.to" class="nav-link">
+        <NuxtLink v-for="item in navigation" :key="item.to" :to="navigationTarget(item.to)" class="nav-link">
           <Icon :icon="item.icon" />
           <span>{{ item.label }}</span>
         </NuxtLink>

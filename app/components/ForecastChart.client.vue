@@ -23,8 +23,8 @@ function draw() {
   if (!root.value || !chart) return
   const isDark = document.documentElement.dataset.theme === 'dark'
   const palette = isDark
-    ? { tooltip: '#101514', text: '#b5c2bb', axis: '#62746b', split: '#2b3732' }
-    : { tooltip: '#1d2926', text: '#55635f', axis: '#a9b7af', split: '#e0e6e0' }
+    ? { tooltip: '#101514', text: '#b5c2bb', axis: '#62746b', split: '#2b3732', bikes: '#5ec9b2', docks: '#f0b85a' }
+    : { tooltip: '#1d2926', text: '#55635f', axis: '#a9b7af', split: '#e0e6e0', bikes: '#1e6f62', docks: '#8a5a09' }
   const historyLabels = props.history.map(point => new Intl.DateTimeFormat('zh-TW', {
     hour: '2-digit', minute: '2-digit', hour12: false,
   }).format(new Date(point.at)))
@@ -51,11 +51,11 @@ function draw() {
     xAxis: { type: 'category', data: labels, boundaryGap: false, axisLabel: { color: palette.text, fontSize: 16 }, axisLine: { lineStyle: { color: palette.axis } }, axisTick: { show: false } },
     yAxis: { type: 'value', min: 0, max: props.capacity || undefined, splitNumber: 3, axisLabel: { color: palette.text, fontSize: 16 }, splitLine: { lineStyle: { color: palette.split } } },
     series: [
-      { name: '可借車', type: 'line', smooth: false, symbol: 'none', lineStyle: { width: 2.5, color: '#1e6f62' }, data: historyBikes },
-      { name: '可還位', type: 'line', smooth: false, symbol: 'none', lineStyle: { width: 2.2, color: '#8a5a09' }, data: historyDocks },
+      { name: '可借車', type: 'line', smooth: false, symbol: 'none', lineStyle: { width: 2.5, color: palette.bikes }, data: historyBikes },
+      { name: '可還位', type: 'line', smooth: false, symbol: 'none', lineStyle: { width: 2.2, color: palette.docks }, data: historyDocks },
       ...(projections.length ? [
-        { name: '基線推估可借車', type: 'line', smooth: false, symbol: 'circle', symbolSize: 6, lineStyle: { width: 2, type: 'dashed', color: '#1e6f62' }, data: projectedBikes },
-        { name: '基線推估可還位', type: 'line', smooth: false, symbol: 'circle', symbolSize: 6, lineStyle: { width: 2, type: 'dashed', color: '#8a5a09' }, data: projectedDocks },
+        { name: '基線推估可借車', type: 'line', smooth: false, symbol: 'circle', symbolSize: 6, lineStyle: { width: 2, type: 'dashed', color: palette.bikes }, data: projectedBikes },
+        { name: '基線推估可還位', type: 'line', smooth: false, symbol: 'circle', symbolSize: 6, lineStyle: { width: 2, type: 'dashed', color: palette.docks }, data: projectedDocks },
       ] : []),
     ],
   }, { notMerge: true })
@@ -81,5 +81,5 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="root" class="forecast-chart" :aria-label="`${stationName} 的 24 小時庫存趨勢與歷史基線推估圖`" />
+  <div ref="root" class="forecast-chart" :aria-label="`${stationName} 的 6 小時庫存趨勢與歷史基線推估圖`" />
 </template>

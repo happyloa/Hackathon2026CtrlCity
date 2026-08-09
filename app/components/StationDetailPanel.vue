@@ -7,6 +7,7 @@ const props = defineProps<{
   history: StationHistoryPoint[]
   horizon: HorizonKey
   dataMode?: DataMode
+  contextQuery?: Record<string, string>
 }>()
 
 const emit = defineEmits<{ close: [] }>()
@@ -57,6 +58,10 @@ const chartProjections = computed(() => {
     return { label: `+${item}m`, bikes: value.predictedBikes, docks: value.predictedDocks }
   })
 })
+const detailTarget = computed(() => ({
+  path: `/stations/${props.station?.id || ''}`,
+  query: props.contextQuery || {},
+}))
 </script>
 
 <template>
@@ -79,7 +84,7 @@ const chartProjections = computed(() => {
     </div>
 
     <div v-if="!isLive" class="detail-chart-wrap">
-      <div class="mini-heading"><span>最近 24 小時＋基線推估</span><i><b />可借車 <b class="dock-key" />可還位</i></div>
+      <div class="mini-heading"><span>最近 6 小時＋基線推估</span><i><b />可借車 <b class="dock-key" />可還位</i></div>
       <ForecastChart :history="history" :station-name="station.name" :capacity="station.totalDocks" :projections="chartProjections" />
     </div>
 
@@ -88,6 +93,6 @@ const chartProjections = computed(() => {
       <span v-for="reason in forecast?.reasons" :key="reason"><Icon icon="solar:check-read-outline" /> {{ reason }}</span>
       <span v-for="flag in station.qualityFlags" :key="flag" class="quality-flag"><Icon icon="solar:info-circle-outline" /> {{ flag }}</span>
     </div>
-    <NuxtLink v-if="!isLive" :to="`/stations/${station.id}`" class="detail-link">開啟完整站點視圖 <Icon icon="solar:arrow-right-outline" /></NuxtLink>
+    <NuxtLink v-if="!isLive" :to="detailTarget" class="detail-link">開啟完整站點視圖 <Icon icon="solar:arrow-right-outline" /></NuxtLink>
   </aside>
 </template>

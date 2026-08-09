@@ -1,0 +1,79 @@
+{
+  "schemaVersion": "1.0",
+  "generatedAt": "2026-08-09T14:07:53.687Z",
+  "evidencePolicy": {
+    "forecast": "2026 年 6 月保留測試集；每筆為可評估的站點半小時快照。",
+    "dispatch": "歷史情境的即時庫存反事實試算；依建議順序，只計入可完整執行建議量且保留來源站安全庫存與目的站空位緩衝的任務。",
+    "disclaimer": "這是離線決策支援證據，不代表已在真實車隊完成派遣或產生相同營運成效。"
+  },
+  "forecastHoldout": {
+    "split": "2026-06",
+    "cohortStations": 217,
+    "horizons": {
+      "30": {
+        "leadTimeMinutes": 30,
+        "evaluatedSnapshots": 301867,
+        "issueSnapshots": 12357,
+        "correctlyFlaggedSnapshots": 6844,
+        "precision": 0.433,
+        "recall": 0.554,
+        "f1": 0.486
+      },
+      "60": {
+        "leadTimeMinutes": 60,
+        "evaluatedSnapshots": 301564,
+        "issueSnapshots": 12344,
+        "correctlyFlaggedSnapshots": 5495,
+        "precision": 0.35,
+        "recall": 0.445,
+        "f1": 0.392
+      },
+      "120": {
+        "leadTimeMinutes": 120,
+        "evaluatedSnapshots": 300958,
+        "issueSnapshots": 12323,
+        "correctlyFlaggedSnapshots": 4855,
+        "precision": 0.248,
+        "recall": 0.394,
+        "f1": 0.304
+      }
+    }
+  },
+  "dispatchSimulation": {
+    "scenarios": {
+      "2026-04-26T17:00:00+08:00": {
+        "asOf": "2026-04-26T17:00:00+08:00",
+        "label": "evening_pressure",
+        "beforeIssueStations": 211,
+        "afterIssueStations": 198,
+        "immediatelyAddressedStations": 13,
+        "reductionRate": 0.062,
+        "proposedMoves": 12,
+        "feasibleMoves": 12,
+        "bikesMoved": 45
+      },
+      "2026-04-27T09:00:00+08:00": {
+        "asOf": "2026-04-27T09:00:00+08:00",
+        "label": "morning_pressure",
+        "beforeIssueStations": 250,
+        "afterIssueStations": 237,
+        "immediatelyAddressedStations": 13,
+        "reductionRate": 0.052,
+        "proposedMoves": 12,
+        "feasibleMoves": 12,
+        "bikesMoved": 52
+      },
+      "2026-06-30T23:30:00+08:00": {
+        "asOf": "2026-06-30T23:30:00+08:00",
+        "label": "latest_coverage",
+        "beforeIssueStations": 119,
+        "afterIssueStations": 107,
+        "immediatelyAddressedStations": 12,
+        "reductionRate": 0.101,
+        "proposedMoves": 12,
+        "feasibleMoves": 12,
+        "bikesMoved": 57
+      }
+    }
+  }
+}

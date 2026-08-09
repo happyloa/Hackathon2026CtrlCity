@@ -6,12 +6,14 @@ const props = defineProps<{
   dispatches: DispatchRecommendation[]
   stations: StationRisk[]
   compact?: boolean
+  contextQuery?: Record<string, string>
 }>()
 
 const emit = defineEmits<{ accept: [dispatchId: string]; select: [stationId: string] }>()
 
 const stationLookup = computed(() => new Map(props.stations.map(station => [station.id, station])))
 const visibleDispatches = computed(() => props.compact ? props.dispatches.slice(0, 4) : props.dispatches)
+const allDispatchesTarget = computed(() => ({ path: '/dispatch', query: props.contextQuery || {} }))
 const nameFor = (id: string) => stationLookup.value.get(id)?.name || '未命名站點'
 const expandedDispatchId = ref<string | null>(null)
 const operationLabel = (dispatch: DispatchRecommendation) => dispatch.operation === 'remove_bikes' ? '移車' : '補車'
@@ -60,7 +62,7 @@ function toggleImpact(dispatchId: string) {
         <p class="section-kicker"><Icon icon="solar:routing-2-outline" /> 調度建議</p>
         <h2>先處理這些搬運任務</h2>
       </div>
-      <NuxtLink v-if="compact" to="/dispatch" class="text-link">調度工作台 <Icon icon="solar:arrow-right-up-outline" /></NuxtLink>
+      <NuxtLink v-if="compact" :to="allDispatchesTarget" class="text-link">調度工作台 <Icon icon="solar:arrow-right-up-outline" /></NuxtLink>
     </div>
 
     <div v-if="visibleDispatches.length" class="dispatch-list">
