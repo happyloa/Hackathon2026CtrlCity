@@ -10,14 +10,14 @@ build:cloudflare 現在執行以下步驟：
 
 1. nuxi generate 產生 Nuxt SPA；產製腳本將 Nuxt 的 404 fallback 改為靜態 SPA fallback，支援直接開啟站點網址。
 2. scripts/stage-pages-static.mjs 在一般靜態模式將 .output/public 複製到 dist；Cloudflare Pages 的 cloudflare-pages-static preset 則直接產出 dist，腳本會保留該產物。
-3. scripts/export-replay-static.mjs 讀取已產製的 server/data/dashboard.json，輸出三份正規化情境與 manifest 至 dist/data/replay/。
+3. scripts/export-replay-static.mjs 讀取已產製的 server/data/dashboard.json，同時輸出三份正規化回放情境至 dist/data/replay/，以及 manifest 與 48 份半小時歷史基線 shard 至 dist/data/live-profile/。
 4. dist/_routes.json 只讓 /api/* 進入 Pages Functions。
 
-歷史模式由瀏覽器按需抓取靜態情境 JSON；首頁的即時模式不會下載它們。
+歷史模式由瀏覽器按需抓取靜態情境 JSON；首頁的即時模式不下載完整情境，只讀取 manifest 與 30／60 分鐘所需的 profile shard，並在瀏覽器端結合同站即時庫存計算啟發式風險指標。
 
 ## 即時資料
 
-functions/api/v1/live-stations.ts 唯讀串流新北市官方 API 回應。它不呼叫 response.json、不迭代站點，也不保存任何資料；站點欄位轉換與畫面差異判斷在瀏覽器端完成。
+functions/api/v1/live-stations.ts 唯讀串流新北市官方 API 回應。它不呼叫 response.json、不迭代站點，也不保存任何資料；站點欄位轉換、基線對照、風險計算與畫面差異判斷都在瀏覽器端完成。靜態基線檔同樣由 CDN 提供，不經過 Function。
 
 ## 成本與限制
 

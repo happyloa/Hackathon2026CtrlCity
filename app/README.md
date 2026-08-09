@@ -14,7 +14,7 @@ npm run build:cloudflare
 build:cloudflare 會先以 nuxi generate 產出 SPA，再把內容 stage 至 dist，並產生：
 
 - dist/data/replay/manifest.json
-- 三份正規化的歷史 DashboardArtifact 情境
+- 三份正規化的歷史 DashboardArtifact 情境與按半小時分片的 live profile
 - dist/_routes.json，只允許 /api/* 觸發 Function
 
 不要把 docs/資料集/ 或建置產物加入 Git。
