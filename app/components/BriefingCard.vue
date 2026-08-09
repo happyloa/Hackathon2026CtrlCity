@@ -45,18 +45,18 @@ function generate() {
 
 <template>
   <section class="briefing-card">
-    <div class="briefing-orb"><Icon icon="solar:magic-stick-3-outline" /></div>
+    <div class="briefing-orb"><Icon icon="solar:clipboard-text-outline" /></div>
     <div class="briefing-copy">
-      <p class="section-kicker">受控規則摘要</p>
-      <h2>{{ briefing?.headline || '把已驗證的風險，整理成當班優先事項。' }}</h2>
-      <p>{{ briefing?.narrative || '只使用目前畫面的資料與調度建議；不讓摘要自行創造數字或派車量。' }}</p>
+      <p class="section-kicker">交班摘要</p>
+      <h2>{{ briefing?.headline || '整理目前已驗證的當班重點。' }}</h2>
+      <p>{{ briefing?.narrative || '只使用目前畫面的資料與調度建議；不自行建立數字或派車量。' }}</p>
       <div v-if="briefing?.citedFacts?.length" class="fact-pills">
         <span v-for="fact in briefing.citedFacts" :key="fact.label + '-' + fact.value">{{ fact.label }}：<b>{{ fact.value }}</b></span>
       </div>
     </div>
     <button type="button" class="briefing-button" :disabled="pending" @click="generate">
-      <Icon :icon="pending ? 'svg-spinners:3-dots-fade' : 'solar:stars-minimalistic-outline'" />
-      {{ pending ? '整理中' : '產生交班摘要' }}
+      <Icon :icon="pending ? 'svg-spinners:3-dots-fade' : 'solar:document-text-outline'" />
+      {{ pending ? '整理中' : '整理摘要' }}
     </button>
   </section>
 </template>

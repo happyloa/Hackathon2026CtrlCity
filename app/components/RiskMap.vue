@@ -65,11 +65,11 @@ function markerTone(station: StationRisk): MarkerTone {
 
 function markerColor(station: StationRisk) {
   const colors: Record<MarkerTone, string> = {
-    stable: '#168c80',
-    'empty-risk': '#d94045',
-    'full-risk': '#2e79b8',
-    'service-review': '#697982',
-    'inventory-only': '#c18a08',
+    stable: '#1e6f62',
+    'empty-risk': '#a93a34',
+    'full-risk': '#2f648f',
+    'service-review': '#65706b',
+    'inventory-only': '#8a5a09',
   }
   return colors[markerTone(station)]
 }
@@ -120,7 +120,7 @@ function markerOptions(station: StationRisk) {
   const gap = interventionGap(station)
   return {
     radius: Math.max(4.5, 5 + Math.min(7, Math.sqrt(gap) * 1.7)) + (selected ? 2 : 0),
-    color: selected ? '#f7fffd' : '#102c32',
+    color: selected ? '#f5f5f1' : '#1d2926',
     weight: selected ? 3 : 1.25,
     fillColor: markerColor(station),
     fillOpacity: selected ? 1 : .92,
@@ -242,7 +242,6 @@ onBeforeUnmount(() => {
 
     <div class="geographic-map" role="region" :aria-label="isLive ? '新北市即時基線風險站點地圖' : '新北市歷史預測風險站點地圖'">
       <div ref="mapElement" class="map-canvas" />
-      <p class="map-instruction"><Icon icon="solar:cursor-square-outline" /> 圓點顏色代表風險方向，大小代表預估介入缺口</p>
       <div class="map-tools" role="group" aria-label="地圖工具">
         <label class="map-search">
           <Icon icon="solar:magnifer-outline" />
@@ -250,6 +249,10 @@ onBeforeUnmount(() => {
         </label>
         <button type="button" class="map-reset" @click="fitNewTaipeiBounds"><Icon icon="solar:map-arrow-left-outline" /> 回到新北全域</button>
       </div>
+      <p v-if="!mappedStations.length" class="map-empty">目前沒有可定位的站點資料。</p>
+    </div>
+    <div class="map-caption">
+      <p class="map-instruction"><Icon icon="solar:cursor-square-outline" /> 圓點顏色代表風險方向，大小代表預估介入缺口</p>
       <div class="geographic-map-legend" aria-label="風險方向圖例">
         <span><i class="legend-dot normal" />基線穩定</span>
         <span><i class="legend-dot empty" />無車風險／目前無車</span>
@@ -257,7 +260,6 @@ onBeforeUnmount(() => {
         <span><i class="legend-dot unavailable" />疑似服務異常</span>
         <span v-if="isLive"><i class="legend-dot inventory-only" />未對照基線</span>
       </div>
-      <p v-if="!mappedStations.length" class="map-empty">目前沒有可定位的站點資料。</p>
     </div>
     <p class="map-status-summary"><Icon icon="solar:info-circle-outline" /> {{ isLive ? `目前有 ${abnormalCount} 個站點需留意；紅色為缺車、藍色為缺位、灰色需人工確認。` : `目前有 ${abnormalCount} 個風險或服務異常站點；地圖與資料皆限定新北市。` }}</p>
   </section>
@@ -268,111 +270,104 @@ onBeforeUnmount(() => {
 .geographic-map {
   position: relative;
   min-height: 510px;
-  margin: 0 11px;
+  margin: 0 14px;
   overflow: hidden;
-  background: #dbe6e6;
-  border: 1px solid #c9dbdb;
-  border-radius: 14px;
+  background: #e3e9e4;
+  border: 1px solid var(--line);
+  border-radius: 6px;
 }
 
 .map-canvas { width: 100%; min-height: 510px; }
 .map-instruction,
-.map-tools,
 .geographic-map-legend,
 .map-empty {
-  position: absolute;
-  z-index: 500;
   margin: 0;
-  color: #18373d;
-  background: rgba(255, 255, 255, .96);
-  border: 1px solid rgba(86, 126, 129, .62);
-  border-radius: 10px;
-  box-shadow: 0 4px 14px rgba(14, 42, 47, .18);
+  color: var(--muted);
+  font-size: 16px;
+  font-weight: 600;
 }
 
+.map-caption {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  padding: 11px 18px 0;
+}
 .map-instruction {
-  top: 12px;
-  left: 54px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  max-width: calc(100% - 70px);
-  padding: 8px 10px;
-  font-size: 16px;
-  font-weight: 700;
 }
 
-.map-instruction svg { color: #08756e; font-size: 19px; }
+.map-instruction svg { color: var(--teal-dark); font-size: 19px; }
 .map-tools {
+  position: absolute;
+  z-index: 500;
   top: 12px;
   right: 12px;
   display: flex;
   align-items: center;
   gap: 7px;
   padding: 7px;
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--line-strong, var(--line));
+  border-radius: 6px;
 }
 
-.map-search { display: inline-flex; align-items: center; gap: 5px; min-width: 215px; color: #18373d; }
-.map-search svg { flex: 0 0 auto; color: #08756e; font-size: 19px; }
+.map-search { display: inline-flex; align-items: center; gap: 5px; min-width: 215px; color: inherit; }
+.map-search svg { flex: 0 0 auto; color: var(--teal-dark); font-size: 19px; }
 .map-search input { width: 100%; min-width: 0; padding: 6px 4px; color: inherit; background: transparent; border: 0; outline: 0; font: inherit; }
-.map-search input::placeholder { color: #526e73; opacity: 1; }
-.map-reset { display: inline-flex; align-items: center; gap: 5px; min-height: 36px; padding: 6px 9px; color: #123f42; background: #dff5f0; border: 1px solid #6daaa0; border-radius: 7px; font: inherit; font-size: 16px; font-weight: 800; cursor: pointer; }
-.map-reset:hover, .map-reset:focus-visible { color: #082b2d; background: #c9eee5; border-color: #23766d; outline: 3px solid rgba(31, 130, 119, .28); outline-offset: 2px; }
+.map-search input::placeholder { color: var(--muted); opacity: 1; }
+.map-reset { display: inline-flex; align-items: center; gap: 5px; min-height: 36px; padding: 6px 9px; color: #fff; background: var(--teal-dark); border: 1px solid var(--teal-dark); border-radius: 5px; font: inherit; font-size: 16px; font-weight: 700; cursor: pointer; }
+.map-reset:hover, .map-reset:focus-visible { color: #fff; background: var(--teal); border-color: var(--teal); outline: 3px solid rgba(30, 111, 98, .28); outline-offset: 2px; }
 .geographic-map-legend {
-  right: 12px;
-  bottom: 12px;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 7px 13px;
-  padding: 10px 12px;
-  font-size: 16px;
-  font-weight: 700;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 13px;
 }
 
 .geographic-map-legend span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
-.legend-dot { width: 10px; height: 10px; border: 1px solid rgba(11, 42, 47, .62); border-radius: 50%; background: #168c80; }
-.legend-dot.empty { background: #d94045; }.legend-dot.full { background: #2e79b8; }.legend-dot.unavailable { background: #697982; }.legend-dot.inventory-only { background: #c18a08; }
-.map-empty { inset: 50% auto auto 50%; padding: 12px; font-size: 16px; font-weight: 700; transform: translate(-50%, -50%); }
+.legend-dot { width: 10px; height: 10px; border: 1px solid rgba(11, 42, 47, .62); border-radius: 50%; background: #1e6f62; }
+.legend-dot.empty { background: #a93a34; }.legend-dot.full { background: #2f648f; }.legend-dot.unavailable { background: #65706b; }.legend-dot.inventory-only { background: #8a5a09; }
+.map-empty { position: absolute; z-index: 500; inset: 50% auto auto 50%; padding: 12px; color: var(--ink); background: var(--panel); border: 1px solid var(--line-strong, var(--line)); border-radius: 6px; font-weight: 700; transform: translate(-50%, -50%); }
 .map-status-summary { display: flex; align-items: center; gap: 6px; margin: 10px 18px 14px; color: var(--muted); font-size: 16px; font-weight: 600; }
 .map-status-summary svg { flex: 0 0 auto; color: var(--teal-dark); font-size: 19px; }
 
 :global(.geographic-map .leaflet-container) { min-height: 510px; font-family: 'Noto Sans TC', sans-serif; }
-:global(.geographic-map .leaflet-control-zoom a) { width: 35px; height: 35px; color: #13343a; font-size: 25px; line-height: 33px; }
-:global(.geographic-map .leaflet-control-attribution) { padding: 3px 6px; color: #18373d; background: rgba(255, 255, 255, .92); font-size: 16px; }
-:global(.geographic-map .leaflet-control-attribution a) { color: #075f5a; font-weight: 700; }
-:global(.geographic-map .leaflet-tooltip) { padding: 8px 10px; color: #102c32; background: #f8fffd; border: 1px solid #4a777b; border-radius: 8px; box-shadow: 0 4px 14px rgba(8, 36, 40, .22); font-size: 16px; }
+:global(.geographic-map .leaflet-control-zoom a) { width: 35px; height: 35px; color: #1d2926; font-size: 25px; line-height: 33px; }
+:global(.geographic-map .leaflet-control-attribution) { padding: 3px 6px; color: #35433f; background: rgba(255, 255, 255, .94); font-size: 16px; }
+:global(.geographic-map .leaflet-control-attribution a) { color: #15584e; font-weight: 700; }
+:global(.geographic-map .leaflet-tooltip) { padding: 8px 10px; color: #1d2926; background: #fff; border: 1px solid #a9b7af; border-radius: 5px; box-shadow: none; font-size: 16px; }
 :global(.geographic-map .leaflet-tooltip strong), :global(.geographic-map .leaflet-tooltip span) { display: block; }
-:global(.geographic-map .leaflet-tooltip span) { margin-top: 3px; color: #4a6267; font-weight: 600; }
-:global(html[data-theme='dark'] .geographic-map) { background: #10262c; border-color: #42656a; }
+:global(.geographic-map .leaflet-tooltip span) { margin-top: 3px; color: #55635f; font-weight: 600; }
+:global(html[data-theme='dark'] .geographic-map) { background: #10262c; border-color: var(--line-strong); }
 :global(html[data-theme='dark'] .geographic-map .leaflet-tile-pane) { filter: brightness(.72) saturate(.82); }
-:global(html[data-theme='dark'] .map-instruction), :global(html[data-theme='dark'] .geographic-map-legend), :global(html[data-theme='dark'] .map-empty) { color: #effbf8; background: rgba(5, 20, 27, .95); border-color: #6a9194; box-shadow: 0 4px 14px rgba(0, 0, 0, .42); }
-:global(html[data-theme='dark'] .map-tools) { color: #effbf8; background: rgba(5, 20, 27, .95); border-color: #6a9194; box-shadow: 0 4px 14px rgba(0, 0, 0, .42); }
-:global(html[data-theme='dark'] .map-instruction svg) { color: #8af0df; }
-:global(html[data-theme='dark'] .map-search) { color: #effbf8; }
-:global(html[data-theme='dark'] .map-search svg) { color: #8af0df; }
-:global(html[data-theme='dark'] .map-search input::placeholder) { color: #bbd2d2; }
-:global(html[data-theme='dark'] .map-reset) { color: #06252a; background: #bdf4e8; border-color: #e2fff8; }
-:global(html[data-theme='dark'] .map-reset:hover), :global(html[data-theme='dark'] .map-reset:focus-visible) { color: #03181c; background: #e2fff8; border-color: #ffffff; }
+:global(html[data-theme='dark'] .map-instruction), :global(html[data-theme='dark'] .geographic-map-legend) { color: var(--muted); }
+:global(html[data-theme='dark'] .map-tools), :global(html[data-theme='dark'] .map-empty) { color: var(--ink); background: var(--panel); border-color: var(--line-strong); box-shadow: none; }
+:global(html[data-theme='dark'] .map-instruction svg), :global(html[data-theme='dark'] .map-search svg) { color: var(--teal); }
+:global(html[data-theme='dark'] .map-search) { color: var(--ink); }
+:global(html[data-theme='dark'] .map-search input::placeholder) { color: var(--muted); }
+:global(html[data-theme='dark'] .map-reset) { color: #12221e; background: #9dd4c6; border-color: #9dd4c6; }
+:global(html[data-theme='dark'] .map-reset:hover), :global(html[data-theme='dark'] .map-reset:focus-visible) { color: #12221e; background: #c4e6db; border-color: #c4e6db; }
 :global(html[data-theme='dark'] .legend-dot) { border-color: #effbf8; }
-:global(html[data-theme='dark'] .geographic-map .leaflet-control-zoom a), :global(html[data-theme='dark'] .geographic-map .leaflet-control-attribution) { color: #effbf8; background: rgba(5, 20, 27, .94); border-color: #6a9194; }
-:global(html[data-theme='dark'] .geographic-map .leaflet-control-attribution a) { color: #aaf7e8; }
-:global(html[data-theme='dark'] .geographic-map .leaflet-tooltip) { color: #effbf8; background: #0a2029; border-color: #77a0a4; }
-:global(html[data-theme='dark'] .geographic-map .leaflet-tooltip span) { color: #c4d9d8; }
+:global(html[data-theme='dark'] .geographic-map .leaflet-control-zoom a), :global(html[data-theme='dark'] .geographic-map .leaflet-control-attribution) { color: var(--ink); background: var(--panel); border-color: var(--line-strong); }
+:global(html[data-theme='dark'] .geographic-map .leaflet-control-attribution a) { color: var(--teal); }
+:global(html[data-theme='dark'] .geographic-map .leaflet-tooltip) { color: var(--ink); background: var(--panel); border-color: var(--line-strong); }
+:global(html[data-theme='dark'] .geographic-map .leaflet-tooltip span) { color: var(--muted); }
 
 @media (max-width: 1150px) { .geographic-map, .map-canvas, :global(.geographic-map .leaflet-container) { min-height: 460px; } }
 @media (max-width: 780px) {
   .geographic-map, .map-canvas, :global(.geographic-map .leaflet-container) { min-height: 390px; }
-  .map-instruction { left: 50px; max-width: calc(100% - 62px); }
   .map-tools { top: 55px; right: 8px; max-width: calc(100% - 16px); }
   .map-search { min-width: 170px; }
-  .geographic-map-legend { right: 8px; bottom: 8px; gap: 6px 9px; padding: 8px; }
+  .map-caption { gap: 7px 12px; padding: 10px 14px 0; }
 }
 @media (max-width: 480px) {
   .geographic-map, .map-canvas, :global(.geographic-map .leaflet-container) { min-height: 350px; }
-  .map-instruction { top: 8px; left: 48px; padding: 7px 8px; }
   .map-tools { top: 51px; left: 8px; right: 8px; justify-content: space-between; }
   .map-search { min-width: 0; flex: 1; }
   .map-reset { padding: 6px 7px; }
-  .geographic-map-legend { grid-template-columns: 1fr; }
 }
 </style>

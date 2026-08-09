@@ -2,15 +2,15 @@
 const socialImage = '/og.png'
 
 useSeoMeta({
-  title: 'YouBike 調度雷達',
-  description: '新北市公共自行車營運調度數據視覺化及預測模型',
-  ogTitle: 'YouBike 調度雷達',
-  ogDescription: '先看見，再派車。以歷史資料預判站點庫存失衡。',
+  title: '新北市 YouBike 調度工作台',
+  description: '新北市公共自行車站點庫存、風險與調度決策支援',
+  ogTitle: '新北市 YouBike 調度工作台',
+  ogDescription: '以即時站況與歷史回放協助檢視站點庫存風險。',
   ogImage: socialImage,
-  ogImageAlt: 'YouBike 調度雷達戰情室',
+  ogImageAlt: '新北市 YouBike 調度工作台',
   twitterCard: 'summary_large_image',
-  twitterTitle: 'YouBike 調度雷達',
-  twitterDescription: '先看見，再派車。',
+  twitterTitle: '新北市 YouBike 調度工作台',
+  twitterDescription: '新北市站點庫存與調度決策支援。',
   twitterImage: socialImage,
 })
 </script>

@@ -29,7 +29,7 @@ onMounted(() => {
 
 <template>
   <div class="subpage station-page">
-    <NuxtLink to="/" class="back-link"><Icon icon="solar:arrow-left-outline" /> 回到調度雷達</NuxtLink>
+    <NuxtLink to="/" class="back-link"><Icon icon="solar:arrow-left-outline" /> 回到營運總覽</NuxtLink>
     <div v-if="replay.pending && !record" class="loading-board"><Icon icon="svg-spinners:3-dots-fade" />正在載入站點歷史…</div>
     <section v-else-if="record" class="station-hero panel">
       <div>

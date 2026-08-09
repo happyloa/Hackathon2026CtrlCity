@@ -15,11 +15,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{ refresh: []; select: [stationId: string] }>()
 
-const stations = computed(() => props.payload?.data.stations ?? [])
-const emptyCount = computed(() => stations.value.filter(station => station.currentState === 'empty_now').length)
-const fullCount = computed(() => stations.value.filter(station => station.currentState === 'full_now').length)
-const unavailableCount = computed(() => stations.value.filter(station => station.serviceStatus !== 'operational').length)
-const highRiskCount = computed(() => props.dashboard?.summary.highRiskNext60m || 0)
 const attentionStations = computed(() => {
   const priority = (station: StationRisk) => {
     if (station.serviceStatus !== 'operational') return 0
@@ -71,9 +66,9 @@ function statusClass(station: StationRisk) {
   <section class="panel live-feed-card" :class="{ updated }" aria-label="官方即時站況">
     <div class="live-feed-heading">
       <div>
-        <p class="section-kicker"><Icon icon="solar:bolt-circle-outline" /> 官方即時站況</p>
-        <h2>來源更新時，才替換畫面資料。</h2>
-        <p>新北市政府 Open Data · 每 5 分鐘比對 · {{ district || '全新北市' }}</p>
+        <p class="section-kicker"><Icon icon="solar:refresh-circle-outline" /> 更新監測</p>
+        <h2>{{ updated ? '官方資料已同步' : '等待下一筆官方資料更新' }}</h2>
+        <p>新北市政府 Open Data · 約每 5 分鐘比對 · {{ district || '全新北市' }}</p>
       </div>
       <div class="live-feed-action">
         <span><i class="live-dot" /> {{ updated ? '已同步新資料' : sourceTime }}</span>
@@ -87,16 +82,8 @@ function statusClass(station: StationRisk) {
     <p v-if="errorMessage" class="live-feed-error"><Icon icon="solar:danger-triangle-outline" /> {{ errorMessage }}</p>
 
     <template v-else>
-      <div class="live-metric-grid">
-        <div><span>已接入站點</span><strong>{{ stations.length.toLocaleString() }}</strong></div>
-        <div><span>暫無可借車</span><strong>{{ emptyCount }}</strong></div>
-        <div><span>暫無可還位</span><strong>{{ fullCount }}</strong></div>
-        <div><span>待人工確認</span><strong>{{ unavailableCount }}</strong></div>
-        <div><span>60 分鐘高風險</span><strong>{{ highRiskCount }}</strong></div>
-      </div>
-
       <div v-if="attentionStations.length" class="live-attention-list">
-        <p>需要注意的即時與基線風險站點</p>
+        <p>優先檢視 {{ attentionStations.length }} 個站點</p>
         <div v-for="station in attentionStations" :key="station.id" class="live-attention-row">
           <span class="live-station-name"><b>{{ station.name.replace(/^YouBike2\.0_/, '') }}</b><small>{{ station.district }}</small></span>
           <span class="live-stock">車 {{ station.availableBikes }} · 位 {{ station.availableDocks }}</span>

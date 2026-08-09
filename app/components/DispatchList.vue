@@ -121,17 +121,17 @@ function toggleImpact(dispatchId: string) {
 
 <style scoped>
 .dispatch-item + .dispatch-item { border-top: 1px solid var(--line); }
-.operation-badge { flex: 0 0 auto; padding: 3px 6px; color: #0d665d; background: #ddf5ee; border: 1px solid #9edbcd; border-radius: 999px; font-size: 16px; font-weight: 800; }
-.operation-badge.remove_bikes { color: #265f96; background: #e6f0fb; border-color: #a9c9eb; }
+.operation-badge { flex: 0 0 auto; padding: 3px 6px; color: var(--teal-dark); background: var(--surface-muted); border: 1px solid var(--line-strong); border-radius: 999px; font-size: 16px; font-weight: 800; }
+.operation-badge.remove_bikes { color: var(--blue); background: #e4edf5; border-color: #a9c2d7; }
 .impact-toggle { display: inline-flex; align-items: center; gap: 5px; margin: 0 16px 11px; padding: 5px 0; color: var(--teal-dark); background: transparent; border: 0; font: inherit; font-size: 16px; font-weight: 800; cursor: pointer; }
 .impact-toggle:hover, .impact-toggle:focus-visible { color: var(--ink); text-decoration: underline; outline: 0; }
 .impact-toggle:focus-visible { text-decoration-thickness: 2px; text-underline-offset: 4px; }
 .impact-toggle svg { font-size: 18px; }
-.dispatch-impact { margin: 0 16px 14px; padding: 12px; background: var(--paper); border: 1px solid var(--line); border-radius: 10px; }
+.dispatch-impact { margin: 0 16px 14px; padding: 12px; background: var(--surface-muted); border: 1px solid var(--line); border-radius: 6px; }
 .impact-notice { display: flex; align-items: center; gap: 6px; margin: 0 0 10px; color: var(--muted); font-size: 16px; font-weight: 700; }
 .impact-notice svg { flex: 0 0 auto; color: var(--orange); font-size: 19px; }
 .impact-grid { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 10px; align-items: stretch; }
-.impact-station { padding: 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
+.impact-station { padding: 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 5px; }
 .impact-station > p { display: grid; gap: 2px; margin: 0 0 8px; color: var(--ink); font-size: 16px; font-weight: 800; }
 .impact-station > p span { color: var(--muted); font-size: 16px; font-weight: 700; }
 .impact-station dl { display: grid; gap: 4px; margin: 0; }
@@ -141,18 +141,18 @@ function toggleImpact(dispatchId: string) {
 .impact-station dd b { color: var(--muted); padding: 0 2px; }
 .impact-station dd strong { color: var(--teal-dark); }
 .impact-station small { display: flex; align-items: center; gap: 4px; margin-top: 9px; color: var(--muted); font-size: 16px; font-weight: 700; }
-.impact-station small.safe { color: #167468; }.impact-station small.unsafe { color: #a84c3f; }
+.impact-station small.safe { color: var(--teal-dark); }.impact-station small.unsafe { color: var(--red); }
 .impact-station small svg { font-size: 18px; }
 .impact-arrow { display: grid; place-content: center; gap: 3px; min-width: 76px; color: var(--teal-dark); text-align: center; font-size: 16px; font-weight: 800; }
 .impact-arrow svg { justify-self: center; font-size: 24px; }
 
-:global(html[data-theme='dark'] .dispatch-impact) { background: #0b1d25; border-color: #49666c; }
-:global(html[data-theme='dark'] .operation-badge) { color: #a7f0df; background: #123d37; border-color: #4e9d90; }
-:global(html[data-theme='dark'] .operation-badge.remove_bikes) { color: #c1dbff; background: #173452; border-color: #5b82af; }
-:global(html[data-theme='dark'] .impact-station) { background: #10252e; border-color: #42636a; }
-:global(html[data-theme='dark'] .impact-station > p), :global(html[data-theme='dark'] .impact-station dd) { color: #effbf8; }
-:global(html[data-theme='dark'] .impact-station dd strong), :global(html[data-theme='dark'] .impact-toggle), :global(html[data-theme='dark'] .impact-arrow) { color: #8ff0df; }
-:global(html[data-theme='dark'] .impact-station small.safe) { color: #9debdc; }:global(html[data-theme='dark'] .impact-station small.unsafe) { color: #ffb7ae; }
+:global(html[data-theme='dark'] .dispatch-impact) { background: var(--surface-muted); border-color: var(--line); }
+:global(html[data-theme='dark'] .operation-badge) { color: #c9f0e6; background: #29443b; border-color: #5b8d7f; }
+:global(html[data-theme='dark'] .operation-badge.remove_bikes) { color: #c3dcf1; background: #293943; border-color: #60798b; }
+:global(html[data-theme='dark'] .impact-station) { background: var(--panel); border-color: var(--line); }
+:global(html[data-theme='dark'] .impact-station > p), :global(html[data-theme='dark'] .impact-station dd) { color: var(--ink); }
+:global(html[data-theme='dark'] .impact-station dd strong), :global(html[data-theme='dark'] .impact-toggle), :global(html[data-theme='dark'] .impact-arrow) { color: var(--teal); }
+:global(html[data-theme='dark'] .impact-station small.safe) { color: #c9f0e6; }:global(html[data-theme='dark'] .impact-station small.unsafe) { color: #ffc4bd; }
 
 @media (max-width: 780px) { .impact-grid { grid-template-columns: 1fr; }.impact-arrow { grid-template-columns: auto 1fr; place-content: start; align-items: center; min-width: 0; text-align: left; }.impact-arrow svg { justify-self: start; transform: rotate(90deg); } }
 </style>

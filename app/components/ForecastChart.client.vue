@@ -23,8 +23,8 @@ function draw() {
   if (!root.value || !chart) return
   const isDark = document.documentElement.dataset.theme === 'dark'
   const palette = isDark
-    ? { tooltip: '#06151d', text: '#c4d4d7', axis: '#37515b', split: '#243a43' }
-    : { tooltip: '#071b28', text: '#71808a', axis: '#dce3e0', split: '#edf0ed' }
+    ? { tooltip: '#101514', text: '#b5c2bb', axis: '#62746b', split: '#2b3732' }
+    : { tooltip: '#1d2926', text: '#55635f', axis: '#a9b7af', split: '#e0e6e0' }
   const historyLabels = props.history.map(point => new Intl.DateTimeFormat('zh-TW', {
     hour: '2-digit', minute: '2-digit', hour12: false,
   }).format(new Date(point.at)))
@@ -51,11 +51,11 @@ function draw() {
     xAxis: { type: 'category', data: labels, boundaryGap: false, axisLabel: { color: palette.text, fontSize: 16 }, axisLine: { lineStyle: { color: palette.axis } }, axisTick: { show: false } },
     yAxis: { type: 'value', min: 0, max: props.capacity || undefined, splitNumber: 3, axisLabel: { color: palette.text, fontSize: 16 }, splitLine: { lineStyle: { color: palette.split } } },
     series: [
-      { name: '可借車', type: 'line', smooth: true, symbol: 'none', lineStyle: { width: 2.5, color: '#0f9b8e' }, areaStyle: { color: 'rgba(15,155,142,.12)' }, data: historyBikes },
-      { name: '可還位', type: 'line', smooth: true, symbol: 'none', lineStyle: { width: 2.2, color: '#f49342' }, data: historyDocks },
+      { name: '可借車', type: 'line', smooth: false, symbol: 'none', lineStyle: { width: 2.5, color: '#1e6f62' }, data: historyBikes },
+      { name: '可還位', type: 'line', smooth: false, symbol: 'none', lineStyle: { width: 2.2, color: '#8a5a09' }, data: historyDocks },
       ...(projections.length ? [
-        { name: '基線推估可借車', type: 'line', smooth: false, symbol: 'circle', symbolSize: 6, lineStyle: { width: 2, type: 'dashed', color: '#0f9b8e' }, data: projectedBikes },
-        { name: '基線推估可還位', type: 'line', smooth: false, symbol: 'circle', symbolSize: 6, lineStyle: { width: 2, type: 'dashed', color: '#f49342' }, data: projectedDocks },
+        { name: '基線推估可借車', type: 'line', smooth: false, symbol: 'circle', symbolSize: 6, lineStyle: { width: 2, type: 'dashed', color: '#1e6f62' }, data: projectedBikes },
+        { name: '基線推估可還位', type: 'line', smooth: false, symbol: 'circle', symbolSize: 6, lineStyle: { width: 2, type: 'dashed', color: '#8a5a09' }, data: projectedDocks },
       ] : []),
     ],
   }, { notMerge: true })

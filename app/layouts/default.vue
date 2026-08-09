@@ -5,12 +5,12 @@ const route = useRoute()
 const isDark = ref(false)
 
 const navigation = [
-  { to: '/', label: '調度戰情室', icon: 'solar:radar-2-outline' },
-  { to: '/alerts', label: '告警中心', icon: 'solar:danger-triangle-outline' },
-  { to: '/dispatch', label: '調度工作台', icon: 'solar:routing-2-outline' },
+  { to: '/', label: '營運總覽', icon: 'solar:radar-2-outline' },
+  { to: '/alerts', label: '告警處理', icon: 'solar:danger-triangle-outline' },
+  { to: '/dispatch', label: '調度建議', icon: 'solar:routing-2-outline' },
 ]
 
-const activeLabel = computed(() => navigation.find(item => item.to === route.path)?.label || '站點洞察')
+const activeLabel = computed(() => navigation.find(item => item.to === route.path)?.label || '站點資訊')
 
 function applyTheme() {
   document.documentElement.dataset.theme = isDark.value ? 'dark' : 'light'
@@ -35,8 +35,8 @@ onMounted(() => {
       <NuxtLink to="/" class="brand" aria-label="前往調度戰情室">
         <span class="brand-mark"><Icon icon="solar:wheel-angle-outline" /></span>
         <span>
-          <strong>YB OPS</strong>
-          <small>調度雷達</small>
+          <strong>新北市 YouBike</strong>
+          <small>調度工作台</small>
         </span>
       </NuxtLink>
 
@@ -51,11 +51,11 @@ onMounted(() => {
       <div class="side-status">
         <span class="status-dot" />
         <div>
-          <small>資料模式</small>
-          <strong>即時／歷史預測</strong>
+          <small>資料範圍</small>
+          <strong>即時站況／歷史回放</strong>
         </div>
       </div>
-      <p class="side-note">模型僅預測庫存風險；派車建議需由調度人員確認。</p>
+      <p class="side-note">庫存風險與調度建議均需由值班人員覆核。</p>
     </aside>
 
     <main class="main-canvas">
@@ -65,12 +65,11 @@ onMounted(() => {
           <h1>{{ activeLabel }}</h1>
         </div>
         <div class="topbar-meta">
+          <span class="topbar-context"><Icon icon="solar:map-point-outline" /> 新北市服務範圍</span>
           <button class="theme-toggle" type="button" :aria-pressed="isDark" :aria-label="isDark ? '切換為淺色模式' : '切換為深色模式'" @click="toggleTheme">
             <Icon :icon="isDark ? 'solar:sun-2-outline' : 'solar:moon-outline'" />
             {{ isDark ? '淺色模式' : '深色模式' }}
           </button>
-          <span class="mode-pill"><Icon icon="solar:shuffle-outline" /> 即時／歷史切換</span>
-          <span class="operator"><Icon icon="solar:user-circle-outline" /> 調度值班</span>
         </div>
       </header>
       <slot />

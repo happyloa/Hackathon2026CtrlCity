@@ -73,7 +73,7 @@ const chartProjections = computed(() => {
     </div>
 
     <div class="forecast-note">
-      <span><Icon :icon="isLive ? 'solar:bolt-circle-outline' : 'solar:magic-stick-3-outline'" /> {{ forecastHeadline }}</span>
+      <span><Icon :icon="isLive ? 'solar:bolt-circle-outline' : 'solar:chart-2-outline'" /> {{ forecastHeadline }}</span>
       <strong>{{ forecastDescription }}</strong>
       <small>{{ forecastCaption }}</small>
     </div>
