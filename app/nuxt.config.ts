@@ -1,16 +1,26 @@
-const isStaticDeployBuild = process.env.NITRO_PRESET === 'cloudflare-pages-static'
-  || process.argv.includes('generate')
+const liveFeedPath = '/api/datasets/010e5b15-3823-4b20-b401-b1cf000550c5/json?page=0&size=2000'
 
 export default defineNuxtConfig({
   ssr: false,
   srcDir: '.',
-  // Pages uses the standalone `functions/` directory. Static builds exclude
-  // the legacy Nuxt API tree so dashboard data and unused AWS code cannot be
-  // bundled into the deployment. Local `nuxt dev` still exposes that tree.
-  serverDir: isStaticDeployBuild ? '.pages-static-no-server' : 'server',
+  // Pages uses the standalone `functions/` directory. The legacy Nuxt API tree
+  // is intentionally excluded in every mode so the 14 MB build artifact is not
+  // imported into local dev or the edge bundle.
+  serverDir: '.pages-static-no-server',
   compatibilityDate: '2026-08-05',
   devtools: { enabled: true },
   css: ['leaflet/dist/leaflet.css', '~/assets/css/main.css'],
+  vite: {
+    server: {
+      proxy: {
+        '/api/v1/live-stations': {
+          target: 'https://data.ntpc.gov.tw',
+          changeOrigin: true,
+          rewrite: () => liveFeedPath,
+        },
+      },
+    },
+  },
   app: {
     head: {
       title: '新北市 YouBike 調度工作台',
