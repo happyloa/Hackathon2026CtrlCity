@@ -1,20 +1,39 @@
 # 命題需求對照
 
-範圍固定為新北市 YouBike，不擴張至台北市或全台。
+範圍固定為新北市 YouBike，不擴張至台北市或全台。本表以「目前已上線的 Demo」為準，不把研究方向、未部署程式或預期效益寫成既有能力。
 
-| 命題重點 | Demo 對應 | 實作位置 |
+| 命題重點 | 目前覆蓋 | 能力界線 | 實作位置 |
+| --- | --- | --- | --- |
+| 新北市官方公開資料 | 瀏覽器經同源唯讀代理取得新北市 Open Data。 | 代理只串流，不解析或保存資料；官方來源不可用時不會以歷史資料冒充即時資料。 | app/functions/api/v1/live-stations.ts |
+| 即時站況視覺化 | 新北市站點地圖、庫存數字、資料時間、行政區／站名搜尋、地圖定位、即時告警與待覆核任務。 | 即時告警由目前快照開始，不能回推開頁前已持續多久。 | app/components/RiskMap.vue、app/components/LiveFeedCard.vue、app/shared/live-operations.ts |
+| 即時資料更新 | 頁面約每五分鐘對齊官方更新節奏比對一次，資料簽章變動時才替換畫面並提示同步。 | 輪詢只在頁面開啟期間運作；目前沒有背景監控或來源逾時通知服務。 | app/pages/index.vue |
+| 歷史資料與風險預判 | 三個歷史回放情境提供站點庫存、30／60／120 分鐘風險、趨勢與品質旗標；即時模式另以同站歷史時段基線提供 30／60 分鐘指標。 | 上線模型是可解釋的啟發式基線，不是校準後機率、LightGBM 或 GNN；未對照到唯一站點時只顯示庫存。 | app/scripts/build-artifacts.mjs、app/scripts/export-replay-static.mjs、app/composables/useLiveRiskProfiles.ts |
+| 持續無車／無位警示 | 即時模式把當下空滿與 60 分鐘風險轉為待確認告警；歷史回放另顯示可重現的持續分鐘數。 | 即時告警只代表目前快照，不累積跨更新持續分鐘；尚未機關推播或建立正式案件。 | app/components/AlertList.vue、app/shared/live-operations.ts、app/scripts/alert-persistence.mjs |
+| 服務狀態待確認 | 官方未啟用，或可借車與可還位皆為 0 的站點，會標記為需人工確認。 | 可借、可還皆為 0 不等同已確認停運；現有資料不足以判定維修或停運成因。 | app/components/RiskMap.vue、app/components/StationDetailPanel.vue |
+| 調度決策支援 | 即時與歷史模式都提供補車／移車雙向任務、來源站、目的站、建議車數、距離、優先分數與調度前後影響試算。 | 建議保留安全庫存並限制直線距離，但不是道路行車時間或車隊路線最佳化。 | app/components/DispatchList.vue、app/shared/live-operations.ts、app/scripts/build-artifacts.mjs |
+| 人工覆核 | 即時與歷史告警的「確認」、搬運任務的「指派補車／指派移車」呈現人機分工。 | 狀態只存在目前瀏覽器工作階段，重新整理會重置；不會保存案件或發出真實營運指令。 | app/composables/useLiveDashboard.ts、app/composables/useReplayDashboard.ts |
+| 模型可驗證性 | 使用依時間切分的訓練、驗證與 2026 年 6 月保留測試；60 分鐘基線 F1 39.2%、precision 35.0%、recall 44.5%。 | 這是基線能力證據，不等同已證明營運 KPI 改善；後續模型必須用相同切分比較。 | app/scripts/evaluate-forecast.mjs、docs/MODEL_EVALUATION.md |
+| 效益反事實試算 | 早尖峰情境中，12 筆可行搬運共移動 52 台，當下空滿站由 250 降到 237；三個情境均可重現。 | 只模擬庫存與安全緩衝，不代表真實車隊已執行或保證相同成效。 | app/scripts/evaluate-operational-impact.mjs、app/components/OperationalEvidence.vue |
+| 交班摘要 | 「整理摘要」以 template 重組畫面中已驗證的事實。 | 目前沒有呼叫生成式 AI；Bedrock adapter 是未部署遷移骨架，不列為已完成 AI 能力。 | app/components/BriefingCard.vue、app/aws/ |
+
+## 對預期成果的誠實判讀
+
+| 命題預期成果 | 目前可證明的內容 | 判定 |
 | --- | --- | --- |
-| 即時站況視覺化 | 新北市站點地圖、庫存數字、異常清單、行政區篩選與地圖定位。 | app/components/RiskMap.vue、app/components/LiveFeedCard.vue |
-| 即時資料更新 | 頁面每五分鐘比對一次官方資料，只有資料簽章變動才提示更新。 | app/pages/index.vue |
-| 官方公開資料 | 瀏覽器經同源唯讀代理取得新北市 Open Data；代理只串流，不解析或保存資料。 | app/functions/api/v1/live-stations.ts |
-| 歷史資料與風險預測 | 三個歷史回放情境，含站點庫存、30／60／120 分鐘風險、趨勢圖與品質旗標；即時模式以同站歷史時段基線提供 30／60 分鐘啟發式風險指標，未對照時只顯示庫存。 | app/scripts/build-artifacts.mjs、app/scripts/export-replay-static.mjs、app/composables/useLiveRiskProfiles.ts |
-| 無車／無位／服務狀態待確認 | 歷史回放顯示風險、開始時間與持續分鐘數；官方未啟用或可借、可還皆為 0 的資料標記為需人工確認，不宣稱已確認停運。 | app/components/AlertList.vue、app/components/RiskMap.vue |
-| 調度決策支援 | 顯示補車／移車雙向任務、來源站、目的站、建議車數、距離、優先分數與調度前後影響試算；不是車隊路線最佳化。 | app/components/DispatchList.vue |
-| 人工確認 | 確認告警與接受調度是前端 Demo 狀態，重新整理即重置，不會發出真實派車。 | app/composables/useReplayDashboard.ts |
-| AI 摘要界線 | Demo 使用可追溯的 template 摘要；Bedrock adapter 僅保留為未部署遷移骨架。 | app/components/BriefingCard.vue、app/aws/ |
+| 增進預判能力 | 提供 30／60 分鐘即時歷史基線風險、30／60／120 分鐘歷史回放，以及時間外測試指標。 | 已有 Demo 與基線評估，可合理主張具備預判能力。 |
+| 提升調度反應速度 | 將全市站況收斂為高風險、告警與建議任務，並提供人工確認／指派流程。 | 流程已展示；沒有真實介入時間紀錄，尚不能宣稱已縮短多少分鐘。 |
+| 降低站點空滿率 | 三個歷史情境都有全局庫存反事實試算；早尖峰由 250 個當下空滿站降到 237 個。 | 已有可重現模擬證據；尚無真實車隊介入紀錄，不能宣稱實際達成同等改善。 |
 
-## 1102 修正與免費額度
+命題文件要求方案有效改善上述一項或多項指標。現階段最穩妥的主張是「增進預判能力」，另外兩項應描述為已建立驗證流程、仍待實際調度紀錄量化，不應寫成已達成的營運成效。
 
-歷史資料在 build 階段轉為 Pages 靜態資產，使用者切換歷史模式才載入對應情境。_routes.json 只包含 /api/*，所以首頁、地圖、回放檔與子頁都不需進入 Function。
+## 目前完成度
 
-唯一的 Function 是即時資料轉送；未建立 KV、D1、R2、Workers AI 或付費 binding。官方即時來源暫時不可用時，畫面會顯示錯誤並可切回歷史回放；最後成功的即時資料只保留於目前瀏覽器頁面。
+- 已完成 Hackathon Demo 核心：新北官方即時站況、易理解地圖、歷史風險預判、即時／歷史告警、雙向調度建議、人工覆核與離線效益證據。
+- 尚待正式營運化：跨頁面生命週期的持續監控、通知／案件保存、真實車隊介接、道路路線限制與實際營運 KPI 驗證。
+- 命題沒有要求資料庫、帳號系統、全台地圖、付費 AI、推播或實際自動派車；這些不能當作目前不合格的理由，也不能假裝已完成。
+
+## 部署與運作界線（Q&A）
+
+歷史資料在 build 階段轉為 Pages 靜態資產，使用者切換歷史模式才載入對應情境。`_routes.json` 只包含 `/api/*`，所以首頁、地圖、回放檔與子頁不需進入 Function。
+
+唯一的 Function 是即時資料轉送；未建立 KV、D1、R2、Workers AI 或付費 binding。官方即時來源暫時不可用時，畫面會顯示錯誤，使用者可切到明確標示的歷史模式；最後成功的即時資料只保留於目前瀏覽器頁面。
