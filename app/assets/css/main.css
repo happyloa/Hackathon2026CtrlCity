@@ -964,7 +964,7 @@ a {
 }
 .live-metric-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 10px;
   margin: 17px 0 14px;
 }
@@ -1044,9 +1044,17 @@ a {
   color: #a44938;
   background: #fcebe7;
 }
+.live-status.forecast-empty {
+  color: #a44938;
+  background: #fcebe7;
+}
 .live-status.full_now {
-  color: #9a6624;
-  background: #fff3dc;
+  color: #2f6597;
+  background: #e7f0fb;
+}
+.live-status.forecast-full {
+  color: #2f6597;
+  background: #e7f0fb;
 }
 .live-status.unavailable {
   color: #6e7375;
@@ -1672,9 +1680,17 @@ html[data-theme="dark"] .live-status.empty_now {
   color: #ffb5a9;
   background: #47221f;
 }
+html[data-theme="dark"] .live-status.forecast-empty {
+  color: #ffb5a9;
+  background: #47221f;
+}
 html[data-theme="dark"] .live-status.full_now {
-  color: #ffd59f;
-  background: #493116;
+  color: #bdd7ff;
+  background: #183651;
+}
+html[data-theme="dark"] .live-status.forecast-full {
+  color: #bdd7ff;
+  background: #183651;
 }
 html[data-theme="dark"] .live-status.unavailable {
   color: #c7d1d2;
@@ -1861,8 +1877,14 @@ html[data-theme="dark"] .risk-critical {
 html[data-theme="dark"] .live-status.empty_now {
   border: 1px solid #a85b52;
 }
+html[data-theme="dark"] .live-status.forecast-empty {
+  border: 1px solid #a85b52;
+}
 html[data-theme="dark"] .live-status.full_now {
-  border: 1px solid #b87931;
+  border: 1px solid #5d8fbc;
+}
+html[data-theme="dark"] .live-status.forecast-full {
+  border: 1px solid #5d8fbc;
 }
 html[data-theme="dark"] .live-status.unavailable {
   border: 1px solid #76878b;

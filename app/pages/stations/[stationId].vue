@@ -13,6 +13,14 @@ const record = computed<{ station: StationRisk; history: StationHistoryPoint[] }
   return station ? { station, history: dashboard.value?.stationHistories[station.id] || [] } : null
 })
 const forecast = computed(() => record.value?.station.forecast.horizons[horizon.value])
+const chartProjections = computed(() => {
+  const station = record.value?.station
+  if (!station) return []
+  return (['30', '60'] as HorizonKey[]).map((item) => {
+    const value = station.forecast.horizons[item]
+    return { label: `+${item}m`, bikes: value.predictedBikes, docks: value.predictedDocks }
+  })
+})
 
 onMounted(() => {
   void replay.loadScenario()
@@ -36,13 +44,13 @@ onMounted(() => {
     </section>
     <div v-if="record" class="station-insight-grid">
       <section class="panel chart-panel">
-        <div class="panel-heading"><div><p class="section-kicker">歷史庫存走勢</p><h2>最近 24 小時</h2></div></div>
-        <ForecastChart :history="record.history" :station-name="record.station.name" />
+        <div class="panel-heading"><div><p class="section-kicker">歷史庫存走勢</p><h2>最近 24 小時＋基線推估</h2></div></div>
+        <ForecastChart :history="record.history" :station-name="record.station.name" :capacity="record.station.totalDocks" :projections="chartProjections" />
       </section>
       <section class="panel forecast-panel">
         <div class="panel-heading"><div><p class="section-kicker">歷史資料推估</p><h2>風險細節</h2></div></div>
         <div class="horizon-buttons"><button v-for="item in horizonOptions" :key="item" type="button" :class="{ active: horizon === item }" @click="horizon = item">{{ item }} 分鐘</button></div>
-        <div class="forecast-score"><strong>{{ Math.round((forecast?.riskScore || 0) * 100) }}</strong><span>風險分數</span></div>
+        <div class="forecast-score"><strong>{{ Math.round((forecast?.riskScore || 0) * 100) }}</strong><span>風險指標／100（需人工覆核）</span></div>
         <dl><div><dt>預估可借車</dt><dd>{{ forecast?.predictedBikes }}</dd></div><div><dt>預估可還位</dt><dd>{{ forecast?.predictedDocks }}</dd></div></dl>
         <ul><li v-for="reason in forecast?.reasons" :key="reason"><Icon icon="solar:check-read-outline" /> {{ reason }}</li></ul>
       </section>

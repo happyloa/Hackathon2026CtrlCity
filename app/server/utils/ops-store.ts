@@ -1,4 +1,4 @@
-import rawDashboard from '../data/dashboard.json'
+import rawDashboard from '../../data/dashboard.json'
 import type {
   Alert,
   AlertStatus,
@@ -13,6 +13,7 @@ import type {
   Forecast,
   HorizonKey,
   RiskLevel,
+  ServiceStatus,
   StationHistoryPoint,
   StationRisk,
 } from '~/shared/ops'
@@ -26,6 +27,10 @@ interface RawForecast extends LooseRecord {
   fullRisk?: unknown
   unavailableRisk?: unknown
   confidence?: unknown
+  alertThreshold?: unknown
+  baselineStatus?: unknown
+  method?: unknown
+  sampleSize?: unknown
   reasons?: unknown
 }
 
@@ -41,6 +46,7 @@ interface RawStation extends LooseRecord {
   availableDocks?: unknown
   capacityGap?: unknown
   currentState?: unknown
+  serviceStatus?: unknown
   qualityFlags?: unknown
   forecast?: { horizons?: Record<string, RawForecast> }
 }
@@ -65,6 +71,8 @@ interface RawDispatch extends LooseRecord {
   suggestedBikes?: unknown
   distanceKm?: unknown
   priority?: unknown
+  priorityScore?: unknown
+  operation?: unknown
   rationale?: unknown
 }
 
@@ -122,10 +130,14 @@ function rounded(value: number, decimals = 3): number {
   return Math.round(value * factor) / factor
 }
 
-function toRiskLevel(score: number): RiskLevel {
-  if (score >= 0.75) return 'critical'
-  if (score >= 0.5) return 'high'
-  if (score >= 0.25) return 'medium'
+function alertThresholdFor(horizon: HorizonKey) {
+  return horizon === '120' ? .4 : .45
+}
+
+function toRiskLevel(score: number, threshold: number): RiskLevel {
+  if (score >= Math.min(1, threshold + .2)) return 'critical'
+  if (score >= threshold) return 'high'
+  if (score >= threshold * .65) return 'medium'
   return 'normal'
 }
 
@@ -144,22 +156,45 @@ function toCurrentState(value: unknown): CurrentState {
   }
 }
 
-function normalizeForecast(raw: RawForecast | undefined, fallback: Pick<StationRisk, 'availableBikes' | 'availableDocks'>): Forecast {
+function toServiceStatus(value: unknown, currentState: CurrentState): ServiceStatus {
+  const status = asString(value)
+  if (status === 'official_inactive') return 'official_inactive'
+  if (status === 'suspected_unavailable') return 'suspected_unavailable'
+  return currentState === 'unavailable' ? 'suspected_unavailable' : 'operational'
+}
+
+function toBaselineStatus(value: unknown): Forecast['baselineStatus'] {
+  const status = asString(value)
+  return status === 'unmatched' || status === 'not_applicable' ? status : 'matched'
+}
+
+function toForecastMethod(value: unknown): Forecast['method'] {
+  const method = asString(value)
+  return method === 'live_historical_baseline' || method === 'inventory_only' ? method : 'historical_replay'
+}
+
+function normalizeForecast(raw: RawForecast | undefined, fallback: Pick<StationRisk, 'availableBikes' | 'availableDocks'>, horizon: HorizonKey): Forecast {
   const value = raw ?? {}
   const emptyRisk = clamp(asNumber(value.emptyRisk))
   const fullRisk = clamp(asNumber(value.fullRisk))
   const unavailableRisk = clamp(asNumber(value.unavailableRisk))
-  const riskScore = rounded(Math.max(emptyRisk, fullRisk, unavailableRisk))
+  const riskScore = rounded(Math.max(emptyRisk, fullRisk))
   const confidenceValue = clamp(asNumber(value.confidence, 0.5))
+  const alertThreshold = clamp(asNumber(value.alertThreshold, alertThresholdFor(horizon)))
 
   return {
     predictedBikes: Math.max(0, Math.round(asNumber(value.predictedBikes, fallback.availableBikes))),
     predictedDocks: Math.max(0, Math.round(asNumber(value.predictedDocks, fallback.availableDocks))),
     emptyRisk,
     fullRisk,
+    unavailableRisk,
     riskScore,
-    level: toRiskLevel(riskScore),
+    level: toRiskLevel(riskScore, alertThreshold),
     confidence: confidenceValue >= 0.65 ? 'high' : confidenceValue >= 0.35 ? 'medium' : 'low',
+    alertThreshold,
+    baselineStatus: toBaselineStatus(value.baselineStatus),
+    method: toForecastMethod(value.method),
+    sampleSize: Math.max(0, Math.round(asNumber(value.sampleSize))),
     reasons: asArray<unknown>(value.reasons).map(reason => asString(reason)).filter(Boolean),
   }
 }
@@ -172,7 +207,7 @@ function normalizeStation(raw: RawStation): StationRisk {
   const rawHorizons = asRecord(raw.forecast?.horizons)
   const forecast = {
     horizons: Object.fromEntries(
-      horizonKeys.map((horizon) => [horizon, normalizeForecast(rawHorizons[horizon] as RawForecast | undefined, base)]),
+      horizonKeys.map((horizon) => [horizon, normalizeForecast(rawHorizons[horizon] as RawForecast | undefined, base, horizon)]),
     ) as Record<HorizonKey, Forecast>,
   }
 
@@ -188,6 +223,7 @@ function normalizeStation(raw: RawStation): StationRisk {
     availableDocks: base.availableDocks,
     capacityGap: Math.round(asNumber(raw.capacityGap)),
     currentState: toCurrentState(raw.currentState),
+    serviceStatus: toServiceStatus(raw.serviceStatus, toCurrentState(raw.currentState)),
     qualityFlags: asArray<unknown>(raw.qualityFlags).map(flag => asString(flag)).filter(Boolean),
     forecast,
   }
@@ -196,7 +232,7 @@ function normalizeStation(raw: RawStation): StationRisk {
 function alertCondition(raw: RawAlert, station: StationRisk | undefined): Alert['condition'] {
   const type = asString(raw.type)
   const currentState = station?.currentState ?? toCurrentState(raw.currentState)
-  if (type === 'unavailable' || currentState === 'unavailable') return 'unavailable'
+  if (type === 'unavailable' || station?.serviceStatus !== 'operational' || currentState === 'unavailable') return 'unavailable'
   if (type === 'full') return currentState === 'full_now' ? 'full_now' : 'full_forecast'
   return currentState === 'empty_now' ? 'empty_now' : 'empty_forecast'
 }
@@ -241,20 +277,26 @@ function normalizeDispatch(raw: RawDispatch, alerts: Alert[]): DispatchRecommend
   const fromStationId = asString(raw.sourceStationId)
   const toStationId = asString(raw.destinationStationId)
   const id = asString(raw.id, `dispatch_${fromStationId}_${toStationId}`)
-  const linkedAlert = alerts.find(alert => alert.stationId === toStationId && alert.condition !== 'full_now')
+  const operation = asString(raw.operation) === 'remove_bikes' ? 'remove_bikes' : 'deliver_bikes'
+  const alertStationId = operation === 'remove_bikes' ? fromStationId : toStationId
+  const linkedAlert = alerts.find((alert) => alert.stationId === alertStationId && (
+    operation === 'remove_bikes'
+      ? alert.condition === 'full_now' || alert.condition === 'full_forecast'
+      : alert.condition === 'empty_now' || alert.condition === 'empty_forecast'
+  ))
   const priority = asString(raw.priority)
   const rationale = asString(raw.rationale)
 
   return {
     id,
     alertId: linkedAlert?.id ?? null,
-    operation: 'deliver_bikes',
+    operation,
     fromStationId,
     toStationId,
     bikeCount: Math.max(1, Math.round(asNumber(raw.suggestedBikes, 1))),
     distanceKm: Math.max(0, rounded(asNumber(raw.distanceKm), 2)),
-    priorityScore: priority === 'high' ? 90 : priority === 'medium' ? 65 : 45,
-    reasons: rationale ? [rationale] : ['由鄰近可調度站補足預測短缺。'],
+    priorityScore: Math.max(0, Math.min(100, asNumber(raw.priorityScore, priority === 'high' ? 90 : priority === 'medium' ? 65 : 45))),
+    reasons: rationale ? [rationale] : [operation === 'remove_bikes' ? '由滿位風險站移出車輛，保留可還位。' : '由鄰近可調度站補足預測短缺。'],
     status: dispatchStatuses.get(id) ?? 'proposed',
     requiresOperatorReview: true,
   }
@@ -303,7 +345,7 @@ function summarize(stations: StationRisk[], alerts: Alert[], dispatches: Dispatc
     totalStations: stations.length,
     emptyNow: stations.filter(station => station.currentState === 'empty_now').length,
     fullNow: stations.filter(station => station.currentState === 'full_now').length,
-    unavailableNow: stations.filter(station => station.currentState === 'unavailable').length,
+    unavailableNow: stations.filter(station => station.serviceStatus !== 'operational').length,
     highRiskNext60m: stations.filter((station) => {
       const forecast = station.forecast.horizons['60']
       return forecast.level === 'high' || forecast.level === 'critical'

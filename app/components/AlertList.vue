@@ -24,7 +24,7 @@ function conditionLabel(condition: Alert['condition']) {
   return {
     empty_now: '已無車可借',
     full_now: '已無位可還',
-    unavailable: '站點暫不可用',
+    unavailable: '疑似服務異常（需確認）',
     empty_forecast: '預測將無車',
     full_forecast: '預測將滿位',
   }[condition]

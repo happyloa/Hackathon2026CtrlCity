@@ -1,9 +1,14 @@
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import {
+  RISK_POLICY_VERSION,
+  alertThresholdFor,
+  riskLevelFor,
+} from './risk-policy.mjs'
 
 const APP_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const SOURCE_FILE = resolve(APP_DIR, 'server', 'data', 'dashboard.json')
+const SOURCE_FILE = resolve(APP_DIR, 'data', 'dashboard.json')
 
 function record(value) {
   return value && typeof value === 'object' && !Array.isArray(value) ? value : {}
@@ -38,16 +43,30 @@ function currentState(value) {
   return 'normal'
 }
 
-function riskLevel(score) {
-  if (score >= 0.75) return 'critical'
-  if (score >= 0.5) return 'high'
-  if (score >= 0.25) return 'medium'
-  return 'normal'
-}
-
 function confidence(value) {
   const score = clamp(number(value, 0.5))
   return score >= 0.65 ? 'high' : score >= 0.35 ? 'medium' : 'low'
+}
+
+function serviceStatus(value, state) {
+  const status = text(value)
+  if (status === 'official_inactive') return 'official_inactive'
+  if (status === 'suspected_unavailable') return 'suspected_unavailable'
+  return state === 'unavailable' ? 'suspected_unavailable' : 'operational'
+}
+
+function forecastMethod(value, fallback) {
+  const method = text(value)
+  return method === 'historical_replay' || method === 'live_historical_baseline' || method === 'inventory_only'
+    ? method
+    : fallback
+}
+
+function baselineStatus(value, fallback) {
+  const status = text(value)
+  return status === 'matched' || status === 'unmatched' || status === 'not_applicable'
+    ? status
+    : fallback
 }
 
 function normalizeStation(raw) {
@@ -62,15 +81,21 @@ function normalizeStation(raw) {
     const emptyRisk = clamp(number(forecast.emptyRisk))
     const fullRisk = clamp(number(forecast.fullRisk))
     const unavailableRisk = clamp(number(forecast.unavailableRisk))
-    const score = round(Math.max(emptyRisk, fullRisk, unavailableRisk))
+    const score = round(Math.max(emptyRisk, fullRisk))
+    const alertThreshold = clamp(number(forecast.alertThreshold, alertThresholdFor(horizon)))
     horizons[horizon] = {
       predictedBikes: Math.max(0, Math.round(number(forecast.predictedBikes, availableBikes))),
       predictedDocks: Math.max(0, Math.round(number(forecast.predictedDocks, availableDocks))),
       emptyRisk,
       fullRisk,
+      unavailableRisk,
       riskScore: score,
-      level: riskLevel(score),
+      level: riskLevelFor(score, horizon),
       confidence: confidence(forecast.confidence),
+      alertThreshold,
+      baselineStatus: baselineStatus(forecast.baselineStatus, 'matched'),
+      method: forecastMethod(forecast.method, 'historical_replay'),
+      sampleSize: Math.max(0, Math.round(number(forecast.sampleSize))),
       reasons: list(forecast.reasons).map((reason) => text(reason)).filter(Boolean),
     }
   }
@@ -89,6 +114,7 @@ function normalizeStation(raw) {
     availableDocks,
     capacityGap: Math.round(number(source.capacityGap)),
     currentState: currentState(source.currentState),
+    serviceStatus: serviceStatus(source.serviceStatus, currentState(source.currentState)),
     qualityFlags: list(source.qualityFlags).map((flag) => text(flag)).filter(Boolean),
     forecast: { horizons },
   }
@@ -98,7 +124,7 @@ function alertCondition(raw, station) {
   const source = record(raw)
   const type = text(source.type)
   const state = station ? station.currentState : currentState(source.currentState)
-  if (type === 'unavailable' || state === 'unavailable') return 'unavailable'
+  if (type === 'unavailable' || station?.serviceStatus !== 'operational' || state === 'unavailable') return 'unavailable'
   if (type === 'full') return state === 'full_now' ? 'full_now' : 'full_forecast'
   return state === 'empty_now' ? 'empty_now' : 'empty_forecast'
 }
@@ -108,9 +134,12 @@ function normalizeAlert(raw, stations, asOf) {
   const stationId = text(source.stationId)
   const station = stations.get(stationId)
   const forecast = station ? station.forecast.horizons['60'] : undefined
-  const score = clamp(number(source.risk, forecast ? forecast.riskScore : 0))
-  const severity = text(source.severity)
   const condition = alertCondition(source, station)
+  const fallbackScore = condition === 'unavailable'
+    ? forecast ? forecast.unavailableRisk : 0
+    : forecast ? forecast.riskScore : 0
+  const score = clamp(number(source.risk, fallbackScore))
+  const severity = text(source.severity)
   const duration = Math.max(1, Math.round(number(source.durationMinutes, condition.endsWith('_now') ? 30 : 60)))
   const message = text(source.message)
 
@@ -118,12 +147,18 @@ function normalizeAlert(raw, stations, asOf) {
     id: text(source.id, 'alert_' + stationId),
     stationId,
     condition,
-    severity: severity === 'critical' || score >= 0.75 ? 'critical' : severity === 'high' || severity === 'warning' || score >= 0.5 ? 'high' : 'medium',
+    severity: condition === 'unavailable' || severity === 'critical'
+      ? 'critical'
+      : severity === 'high' || severity === 'warning' || riskLevelFor(score, '60') === 'high'
+        ? 'high'
+        : 'medium',
     startedAt: text(source.startedAt, asOf),
     durationMinutes: duration,
     riskScore: score,
     status: 'open',
-    reasons: message ? [message] : ['此站在回放時點呈現持續服務風險。'],
+    reasons: message ? [message] : [condition === 'unavailable'
+      ? '此站呈現疑似服務異常，需人工確認。'
+      : '此站在回放時點呈現持續庫存風險。'],
   }
 }
 
@@ -131,21 +166,29 @@ function normalizeDispatch(raw, alerts) {
   const source = record(raw)
   const fromStationId = text(source.sourceStationId)
   const toStationId = text(source.destinationStationId)
+  const operation = text(source.operation) === 'remove_bikes' ? 'remove_bikes' : 'deliver_bikes'
   const id = text(source.id, 'dispatch_' + fromStationId + '_' + toStationId)
-  const linkedAlert = alerts.find((alert) => alert.stationId === toStationId && alert.condition !== 'full_now')
+  const alertStationId = operation === 'remove_bikes' ? fromStationId : toStationId
+  const linkedAlert = alerts.find((alert) => alert.stationId === alertStationId && (
+    operation === 'remove_bikes'
+      ? alert.condition === 'full_now' || alert.condition === 'full_forecast'
+      : alert.condition === 'empty_now' || alert.condition === 'empty_forecast'
+  ))
   const priority = text(source.priority)
   const rationale = text(source.rationale)
 
   return {
     id,
     alertId: linkedAlert ? linkedAlert.id : null,
-    operation: 'deliver_bikes',
+    operation,
     fromStationId,
     toStationId,
     bikeCount: Math.max(1, Math.round(number(source.suggestedBikes, 1))),
     distanceKm: Math.max(0, round(number(source.distanceKm), 2)),
-    priorityScore: priority === 'high' ? 90 : priority === 'medium' ? 65 : 45,
-    reasons: rationale ? [rationale] : ['依據站點庫存與距離提供人工覆核用的調度建議。'],
+    priorityScore: Math.max(0, Math.min(100, number(source.priorityScore, priority === 'high' ? 90 : priority === 'medium' ? 65 : 45))),
+    reasons: rationale ? [rationale] : [operation === 'remove_bikes'
+      ? '依據滿站風險、可還位與距離提供人工覆核用的移車建議。'
+      : '依據缺車風險、可借車與距離提供人工覆核用的補車建議。'],
     status: 'proposed',
     requiresOperatorReview: true,
   }
@@ -176,6 +219,8 @@ function makeMeta(source, availableTimes, asOf, stationCount) {
   const rawMeta = record(source.meta)
   const coverage = record(rawMeta.coverage)
   const quality = record(rawMeta.quality)
+  const rawRiskPolicy = record(rawMeta.riskPolicy)
+  const rawThresholds = record(rawRiskPolicy.alertThresholds)
   const sourceRows = Math.max(0, Math.round(number(coverage.validRows, number(coverage.sourceRows))))
   const unavailableRows = Math.max(0, number(quality.unavailableRowsExcludedFromProfile))
   const flagCounts = record(quality.flagCounts)
@@ -195,11 +240,19 @@ function makeMeta(source, availableTimes, asOf, stationCount) {
         to: text(coverage.lastAt, availableTimes.at(-1) || ''),
       },
     },
+    riskPolicy: {
+      version: text(rawRiskPolicy.version, RISK_POLICY_VERSION),
+      alertThresholds: {
+        '30': clamp(number(rawThresholds['30'], alertThresholdFor('30'))),
+        '60': clamp(number(rawThresholds['60'], alertThresholdFor('60'))),
+        '120': clamp(number(rawThresholds['120'], alertThresholdFor('120'))),
+      },
+    },
     quality: {
       unavailableRate: sourceRows ? round(unavailableRows / sourceRows) : 0,
       capacityMismatchRate: sourceRows ? round(capacityGapRows / sourceRows) : 0,
       notes: [
-        '歷史資料中的服務不可用觀測會保留為品質旗標，且不會被誤判為無車或無位。',
+        '歷史資料中的零車零位觀測會標為疑似服務異常，且不會被誤判為無車或無位。',
         ...(text(rawMeta.forecastMethod) ? [text(rawMeta.forecastMethod)] : []),
       ],
     },
@@ -252,6 +305,94 @@ function makeDashboard(source, asOf, scenario, availableTimes, districts) {
   }
 }
 
+function normalizeLiveProfileStation(raw) {
+  const source = record(raw)
+  const latitude = number(source.latitude, Number.NaN)
+  const longitude = number(source.longitude, Number.NaN)
+  const slots = list(source.slots).slice(0, 48).map((value) => {
+    const profile = list(value)
+    if (profile.length !== 6) return null
+    return [
+      Math.max(0, Math.round(number(profile[0]))),
+      Math.max(0, Math.round(number(profile[1]))),
+      Math.max(0, Math.round(number(profile[2]))),
+      Math.max(0, Math.min(1000, Math.round(number(profile[3])))),
+      Math.max(0, Math.min(1000, Math.round(number(profile[4])))),
+      Math.max(0, Math.min(1000, Math.round(number(profile[5])))),
+    ]
+  })
+
+  while (slots.length < 48) slots.push(null)
+  const id = text(source.id)
+  const matchKey = text(source.matchKey)
+  return id && matchKey
+    ? {
+        id,
+        district: text(source.district, '未分類'),
+        name: text(source.name, '未命名站點'),
+        matchKey,
+        latitude: Number.isFinite(latitude) ? latitude : null,
+        longitude: Number.isFinite(longitude) ? longitude : null,
+        slots,
+      }
+    : null
+}
+
+function normalizeLiveRiskPolicy(raw) {
+  const source = record(raw)
+  const thresholds = record(source.alertThresholds)
+  return {
+    version: text(source.version, RISK_POLICY_VERSION),
+    alertThresholds: {
+      '30': clamp(number(thresholds['30'], alertThresholdFor('30'))),
+      '60': clamp(number(thresholds['60'], alertThresholdFor('60'))),
+      '120': clamp(number(thresholds['120'], alertThresholdFor('120'))),
+    },
+  }
+}
+
+async function exportLiveProfiles(source, outputDir) {
+  const rawProfiles = record(source.liveProfiles)
+  const stations = list(rawProfiles.stations)
+    .map(normalizeLiveProfileStation)
+    .filter(Boolean)
+    .sort((left, right) => left.id.localeCompare(right.id))
+  if (!stations.length) {
+    throw new Error('dashboard.json does not contain a valid liveProfiles artifact. Run npm run data:build before building Pages output.')
+  }
+
+  const directory = resolve(outputDir, 'data', 'live-profile')
+  await rm(directory, { recursive: true, force: true })
+  await mkdir(directory, { recursive: true })
+
+  const paths = {}
+  for (let slot = 0; slot < 48; slot += 1) {
+    const name = `slot-${String(slot).padStart(2, '0')}.json`
+    const profiles = Object.fromEntries(stations
+      .map((station) => [station.id, station.slots[slot]])
+      .filter((entry) => entry[1]))
+    paths[String(slot)] = '/data/live-profile/' + name
+    await writeFile(resolve(directory, name), JSON.stringify({
+      schemaVersion: '1.0',
+      slot,
+      profiles,
+    }), 'utf8')
+  }
+
+  const manifest = {
+    schemaVersion: text(rawProfiles.schemaVersion, '1.0'),
+    modelVersion: text(rawProfiles.modelVersion, 'historical-profile-heuristic-v1'),
+    timezone: text(rawProfiles.timezone, 'Asia/Taipei'),
+    riskPolicy: normalizeLiveRiskPolicy(rawProfiles.riskPolicy),
+    profileValueFormat: list(rawProfiles.profileValueFormat).map((value) => text(value)).filter(Boolean),
+    stations: stations.map(({ slots, ...station }) => station),
+    slots: paths,
+  }
+  await writeFile(resolve(directory, 'manifest.json'), JSON.stringify(manifest), 'utf8')
+
+  return { stations: stations.length, output: directory }
+}
+
 function fileName(asOf, index) {
   return 'scenario-' + String(index + 1).padStart(2, '0') + '-' + asOf.replace(/[^0-9]/g, '') + '.json'
 }
@@ -283,11 +424,13 @@ export async function exportReplayStatic(outputDir) {
     scenarios: scenarioPaths,
   }
   await writeFile(resolve(replayDir, 'manifest.json'), JSON.stringify(manifest), 'utf8')
+  const liveProfiles = await exportLiveProfiles(source, outputDir)
 
   return {
     scenarios: keys.length,
     defaultAsOf: manifest.defaultAsOf,
     output: replayDir,
+    liveProfiles,
   }
 }
 

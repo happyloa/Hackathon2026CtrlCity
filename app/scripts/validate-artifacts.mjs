@@ -3,11 +3,12 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url))
-const DASHBOARD_FILE = resolve(SCRIPT_DIR, '..', 'server', 'data', 'dashboard.json')
-const MAX_SIZE_BYTES = 12 * 1024 * 1024
+const DASHBOARD_FILE = resolve(SCRIPT_DIR, '..', 'data', 'dashboard.json')
+const MAX_SIZE_BYTES = 16 * 1024 * 1024
 const ISO_LOCAL_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:00\+08:00$/
 const STATE_VALUES = new Set(['normal', 'low_bikes', 'low_docks', 'empty', 'full', 'unavailable'])
 const SEVERITY_VALUES = new Set(['normal', 'warning', 'critical'])
+const SERVICE_STATUS_VALUES = new Set(['operational', 'official_inactive', 'suspected_unavailable'])
 
 function assert(condition, message) {
   if (!condition) throw new Error(message)
@@ -37,6 +38,7 @@ function validateStation(station, scenarioAt, history) {
     'availableDocks',
     'capacityGap',
     'currentState',
+    'serviceStatus',
     'qualityFlags',
     'forecast',
   ]) {
@@ -50,6 +52,7 @@ function validateStation(station, scenarioAt, history) {
   assert(station.latitude === null || isFiniteNumber(station.latitude), `${base} has invalid latitude`)
   assert(station.longitude === null || isFiniteNumber(station.longitude), `${base} has invalid longitude`)
   assert(STATE_VALUES.has(station.currentState), `${base} has an invalid currentState`)
+  assert(SERVICE_STATUS_VALUES.has(station.serviceStatus), `${base} has an invalid serviceStatus`)
   assert(SEVERITY_VALUES.has(station.severity), `${base} has an invalid severity`)
   assert(Array.isArray(station.qualityFlags), `${base} has invalid qualityFlags`)
 
@@ -73,6 +76,10 @@ function validateStation(station, scenarioAt, history) {
     assert(isFiniteNumber(forecast.predictedBikes) && forecast.predictedBikes >= 0, `${base} has invalid predictedBikes`)
     assert(isFiniteNumber(forecast.predictedDocks) && forecast.predictedDocks >= 0, `${base} has invalid predictedDocks`)
     assertRisk(forecast.confidence, `${base} ${horizon}-minute confidence`)
+    assertRisk(forecast.alertThreshold, `${base} ${horizon}-minute alertThreshold`)
+    assert(Number.isInteger(forecast.sampleSize) && forecast.sampleSize >= 0, `${base} ${horizon}-minute sampleSize is invalid`)
+    assert(['matched', 'unmatched', 'not_applicable'].includes(forecast.baselineStatus), `${base} ${horizon}-minute baselineStatus is invalid`)
+    assert(['historical_replay', 'live_historical_baseline', 'inventory_only'].includes(forecast.method), `${base} ${horizon}-minute method is invalid`)
     assert(Array.isArray(forecast.reasons) && forecast.reasons.length > 0, `${base} ${horizon}-minute reasons are missing`)
   }
 
@@ -123,6 +130,32 @@ function validateScenario(at, scenario, availableTimes) {
     assert(stationIds.has(dispatch.destinationStationId), `scenario ${at} dispatch destination is missing`)
     assert(dispatch.sourceStationId !== dispatch.destinationStationId, `scenario ${at} dispatch cannot loop to the same station`)
     assert(isFiniteNumber(dispatch.suggestedBikes) && dispatch.suggestedBikes > 0, `scenario ${at} dispatch has invalid bike count`)
+    assert(dispatch.operation === 'deliver_bikes' || dispatch.operation === 'remove_bikes', `scenario ${at} dispatch has an invalid operation`)
+  }
+}
+
+function validateLiveProfiles(liveProfiles) {
+  assert(liveProfiles && typeof liveProfiles === 'object', 'liveProfiles is missing')
+  assert(liveProfiles.schemaVersion === '1.0', 'liveProfiles schemaVersion is invalid')
+  assert(liveProfiles.timezone === 'Asia/Taipei', 'liveProfiles timezone must be Asia/Taipei')
+  assert(Array.isArray(liveProfiles.stations) && liveProfiles.stations.length > 1000, 'liveProfiles stations are incomplete')
+  assert(liveProfiles.riskPolicy?.version, 'liveProfiles risk policy is missing')
+  for (const horizon of ['30', '60', '120']) {
+    assertRisk(liveProfiles.riskPolicy.alertThresholds?.[horizon], `liveProfiles ${horizon}-minute alert threshold`)
+  }
+  const ids = new Set()
+  for (const station of liveProfiles.stations) {
+    assert(typeof station.id === 'string' && station.id.startsWith('st_'), 'liveProfiles has an invalid station id')
+    assert(!ids.has(station.id), `liveProfiles duplicates ${station.id}`)
+    ids.add(station.id)
+    assert(typeof station.matchKey === 'string' && station.matchKey.includes('|'), `liveProfiles ${station.id} has invalid matchKey`)
+    assert(Array.isArray(station.slots) && station.slots.length === 48, `liveProfiles ${station.id} must have 48 slots`)
+    for (const profile of station.slots) {
+      if (profile === null) continue
+      assert(Array.isArray(profile) && profile.length === 6, `liveProfiles ${station.id} has invalid compact profile`)
+      assert(profile.every((value) => Number.isInteger(value) && value >= 0), `liveProfiles ${station.id} has non-integer profile values`)
+      assert(profile.slice(3).every((value) => value <= 1000), `liveProfiles ${station.id} has invalid permille risk`)
+    }
   }
 }
 
@@ -141,6 +174,7 @@ async function main() {
     'dispatches',
     'briefingFacts',
     'stationHistories',
+    'liveProfiles',
     'scenarios',
   ]) {
     assert(Object.hasOwn(dashboard, field), `dashboard is missing top-level ${field}`)
@@ -150,6 +184,10 @@ async function main() {
   assert(typeof dashboard.meta.generatedAt === 'string' && !Number.isNaN(Date.parse(dashboard.meta.generatedAt)), 'meta.generatedAt is invalid')
   assert(dashboard.meta.dataMode === 'historical_replay', 'meta.dataMode must be historical_replay')
   assert(typeof dashboard.meta.modelVersion === 'string' && dashboard.meta.modelVersion.length > 0, 'meta.modelVersion is missing')
+  assert(dashboard.meta.riskPolicy?.version, 'meta.riskPolicy is missing')
+  for (const horizon of ['30', '60', '120']) {
+    assertRisk(dashboard.meta.riskPolicy.alertThresholds?.[horizon], `meta.riskPolicy ${horizon}-minute threshold`)
+  }
   assert(dashboard.meta.coverage?.rawRows > 1_000_000, 'coverage.rawRows is unexpectedly small')
   assert(dashboard.meta.coverage?.validRows > 1_000_000, 'coverage.validRows is unexpectedly small')
   assert(dashboard.meta.quality?.unavailableRowsExcludedFromProfile > 0, 'unavailable rows were not recorded as excluded')
@@ -175,6 +213,7 @@ async function main() {
   assert(dashboard.summary.at === defaultScenario.summary.at, 'top-level summary is not the default scenario')
   assert(dashboard.stations.length === defaultScenario.stations.length, 'top-level stations are not the default scenario')
   assert(dashboard.alerts.length === defaultScenario.alerts.length, 'top-level alerts are not the default scenario')
+  validateLiveProfiles(dashboard.liveProfiles)
 
   console.log(`Artifact validation passed: ${(fileStats.size / 1024 / 1024).toFixed(2)} MiB, ${dashboard.availableTimes.length} time slots, ${scenarioEntries.length} scenarios, ${dashboard.stations.length} default stations.`)
 }

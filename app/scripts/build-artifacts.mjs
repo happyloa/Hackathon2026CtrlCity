@@ -8,18 +8,27 @@ import { parse } from 'csv-parse'
 import iconv from 'iconv-lite'
 
 import { deriveStatePersistence } from './alert-persistence.mjs'
+import {
+  ALERT_THRESHOLDS,
+  HORIZON_MINUTES,
+  RISK_POLICY_VERSION,
+  alertSeverityFor,
+  alertThresholdFor,
+} from './risk-policy.mjs'
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url))
 const APP_DIR = resolve(SCRIPT_DIR, '..')
 const REPO_DIR = resolve(APP_DIR, '..')
 const SOURCE_DIR = resolve(REPO_DIR, 'docs', '資料集')
-const OUTPUT_FILE = resolve(APP_DIR, 'server', 'data', 'dashboard.json')
+const OUTPUT_FILE = resolve(APP_DIR, 'data', 'dashboard.json')
 const ALIAS_FILE = resolve(SCRIPT_DIR, 'station-aliases.json')
 
 const HALF_HOUR_MS = 30 * 60 * 1000
 const HISTORY_POINTS = 12
 const MAX_ALERTS = 18
 const MAX_DISPATCHES = 12
+const SAFE_INVENTORY_RATIO = 0.35
+const MAX_MOVE_BIKES = 8
 
 const HEADER_MAP = new Map([
   ['日期', 'observedAt'],
@@ -60,6 +69,16 @@ function normalizeText(value) {
     .replace(/^\uFEFF/, '')
     .trim()
     .replace(/\s+/g, ' ')
+}
+
+function normalizeStationName(value) {
+  return normalizeText(value)
+    .replace(/^YouBike\s*2(?:\.0)?[_\s-]*/i, '')
+    .replace(/^YouBike[_\s-]*/i, '')
+}
+
+function liveMatchKey(district, name) {
+  return `${normalizeText(district)}|${normalizeStationName(name)}`
 }
 
 function pad(value) {
@@ -183,7 +202,9 @@ function calculateQualityFlags({
   if (!district) flags.push('missing_district')
   if (latitude === null || longitude === null) flags.push('missing_coordinates')
   if (totalDocks !== availableBikes + availableDocks) flags.push('capacity_gap')
-  if (currentState === 'unavailable') flags.push('station_unavailable')
+  if (currentState === 'unavailable') {
+    flags.push('zero_inventory_snapshot', 'service_status_inferred')
+  }
   return flags
 }
 
@@ -199,10 +220,11 @@ function safeDistrict(district) {
 
 function detectCriticality(station) {
   const horizon = station.forecast.horizons['60']
-  const risk = Math.max(horizon.emptyRisk, horizon.fullRisk, horizon.unavailableRisk)
-  if (station.currentState === 'unavailable' || risk >= 0.65) return 'critical'
-  if (station.currentState === 'empty' || station.currentState === 'full' || risk >= 0.35) return 'warning'
-  return 'normal'
+  if (station.serviceStatus !== 'operational') return 'critical'
+  const risk = Math.max(horizon.emptyRisk, horizon.fullRisk)
+  return alertSeverityFor(risk, '60', {
+    currentFailure: station.currentState === 'empty' || station.currentState === 'full',
+  })
 }
 
 function haversineKm(a, b) {
@@ -338,8 +360,14 @@ function toSnapshot(row, source, aliases, stationIndex, quality, districts) {
       city,
       district,
       identityKey,
+      matchKey: liveMatchKey(district, canonicalName),
+      latitude,
+      longitude,
     }
     stationIndex.set(identityKey, station)
+  } else if (latitude !== null && longitude !== null) {
+    station.latitude = latitude
+    station.longitude = longitude
   }
 
   if (district) districts.add(district)
@@ -371,6 +399,7 @@ function toSnapshot(row, source, aliases, stationIndex, quality, districts) {
     availableDocks,
     capacityGap: totalDocks - availableBikes - availableDocks,
     currentState,
+    serviceStatus: currentState === 'unavailable' ? 'suspected_unavailable' : 'operational',
     qualityFlags,
     sourceFile: source.fileName,
     sourceRow: source.sourceRow,
@@ -481,7 +510,7 @@ function profileFor(profileStats, stationId, epoch) {
 
 function makeForecast(snapshot, history, profileStats) {
   const horizons = {}
-  for (const minutes of [30, 60, 120]) {
+  for (const minutes of HORIZON_MINUTES) {
     const targetEpoch = snapshot.epoch + minutes * 60 * 1000
     const profile = profileFor(profileStats, snapshot.id, targetEpoch)
     const observations = profile?.observations ?? 0
@@ -520,7 +549,7 @@ function makeForecast(snapshot, history, profileStats) {
     const predictedBikes = Math.max(0, Math.round(snapshot.availableBikes * (1 - weight) + profileBikes * weight))
     const predictedDocks = Math.max(0, Math.round(snapshot.availableDocks * (1 - weight) + profileDocks * weight))
     const reasons = []
-    if (snapshot.currentState === 'unavailable') reasons.push('場站同時無車與無可還位，列為服務不可用狀態')
+    if (snapshot.currentState === 'unavailable') reasons.push('場站同時無車與無可還位，屬疑似服務異常，需人工確認')
     if (snapshot.currentState === 'empty') reasons.push('目前已無可借車')
     if (snapshot.currentState === 'full') reasons.push('目前已無可還位')
     if (snapshot.availableBikes <= lowThreshold && snapshot.currentState !== 'empty') reasons.push('目前可借車低於預警門檻')
@@ -537,6 +566,10 @@ function makeForecast(snapshot, history, profileStats) {
       predictedBikes,
       predictedDocks,
       confidence: round(Math.min(1, observations / 12)),
+      sampleSize: observations,
+      alertThreshold: alertThresholdFor(minutes),
+      baselineStatus: 'matched',
+      method: 'historical_replay',
       reasons: reasons.slice(0, 3),
     }
   }
@@ -562,6 +595,7 @@ function makeStation(snapshot, history, profileStats) {
     availableDocks: snapshot.availableDocks,
     capacityGap: snapshot.capacityGap,
     currentState: snapshot.currentState,
+    serviceStatus: snapshot.serviceStatus,
     qualityFlags: snapshot.qualityFlags,
     forecast: makeForecast(snapshot, orderedHistory, profileStats),
   }
@@ -578,21 +612,21 @@ function makeAlerts(stations, persistenceByStation, scenarioAt) {
   return stations
     .map((station) => {
       const horizon = station.forecast.horizons['60']
-      const risk = Math.max(horizon.emptyRisk, horizon.fullRisk, horizon.unavailableRisk)
+      const inventoryRisk = Math.max(horizon.emptyRisk, horizon.fullRisk)
+      const isServiceReview = station.serviceStatus !== 'operational'
+      const risk = isServiceReview ? horizon.unavailableRisk : inventoryRisk
       const type =
-        station.currentState === 'unavailable'
+        isServiceReview
           ? 'unavailable'
           : station.currentState === 'empty'
             ? 'empty'
             : station.currentState === 'full'
               ? 'full'
-              : horizon.unavailableRisk >= Math.max(horizon.emptyRisk, horizon.fullRisk)
-                ? 'unavailable'
-                : horizon.emptyRisk >= horizon.fullRisk
-                  ? 'empty'
-                  : 'full'
+              : horizon.emptyRisk >= horizon.fullRisk
+                ? 'empty'
+                : 'full'
       const persistence = persistenceByStation.get(station.id)
-      const isCurrentInventoryFailure = station.currentState === 'empty' || station.currentState === 'full' || station.currentState === 'unavailable'
+      const isCurrentInventoryFailure = station.currentState === 'empty' || station.currentState === 'full' || isServiceReview
       return {
         id: `alert_${station.id}`,
         stationId: station.id,
@@ -606,7 +640,7 @@ function makeAlerts(stations, persistenceByStation, scenarioAt) {
         durationMinutes: persistence?.durationMinutes ?? (isCurrentInventoryFailure ? 30 : 60),
         message:
           type === 'unavailable'
-            ? '站點同時無車與無可還位，需先確認設備或營運狀態。'
+            ? '站點呈現疑似服務異常，需先確認設備或營運狀態。'
             : type === 'empty'
               ? '未來 60 分鐘可借車不足風險偏高。'
               : '未來 60 分鐘可還位不足風險偏高。',
@@ -620,67 +654,118 @@ function makeAlerts(stations, persistenceByStation, scenarioAt) {
     .slice(0, MAX_ALERTS)
 }
 
-function makeDispatches(stations) {
-  const supply = new Map()
-  const sources = stations
-    .filter((station) => station.currentState !== 'unavailable')
-    .map((station) => {
-      const target = Math.ceil(station.totalDocks * 0.35)
-      const transferable = Math.max(0, station.availableBikes - target)
-      supply.set(station.id, transferable)
-      return { station, transferable }
-    })
-    .filter(({ transferable }) => transferable >= 3)
-    .sort((left, right) => {
-      const leftRisk = left.station.forecast.horizons['60'].fullRisk
-      const rightRisk = right.station.forecast.horizons['60'].fullRisk
-      return rightRisk - leftRisk || right.transferable - left.transferable
-    })
+function safeInventory(station) {
+  return Math.max(2, Math.ceil(station.totalDocks * SAFE_INVENTORY_RATIO))
+}
 
-  const destinations = stations
-    .filter((station) => station.currentState !== 'unavailable')
-    .map((station) => {
-      const target = Math.ceil(station.totalDocks * 0.35)
-      const predicted = station.forecast.horizons['60'].predictedBikes
-      return {
+function dispatchPriority({ risk, gap, currentFailure, distanceKm }) {
+  const value = risk * 68 + Math.min(18, gap * 3) + (currentFailure ? 16 : 0) - Math.min(12, distanceKm * 1.5)
+  return round(Math.max(0, Math.min(100, value)), 1)
+}
+
+function dispatchLabel(operation) {
+  return operation === 'remove_bikes' ? '移出滿站車輛' : '補入缺車站點'
+}
+
+function makeDispatches(stations) {
+  const operational = stations.filter((station) => station.currentState !== 'unavailable')
+  const bikeSupply = new Map(operational.map((station) => [
+    station.id,
+    Math.max(0, station.availableBikes - safeInventory(station)),
+  ]))
+  const dockSupply = new Map(operational.map((station) => [
+    station.id,
+    Math.max(0, station.availableDocks - safeInventory(station)),
+  ]))
+  const horizonKey = '60'
+  const threshold = alertThresholdFor(horizonKey)
+  const tasks = []
+
+  for (const station of operational) {
+    const forecast = station.forecast.horizons[horizonKey]
+    const emptyCurrent = station.currentState === 'empty'
+    const fullCurrent = station.currentState === 'full'
+    const emptyGap = Math.max(0, safeInventory(station) - Math.min(station.availableBikes, forecast.predictedBikes))
+    const fullGap = Math.max(0, safeInventory(station) - Math.min(station.availableDocks, forecast.predictedDocks))
+
+    if (emptyGap >= 2 && (emptyCurrent || forecast.emptyRisk >= threshold)) {
+      tasks.push({
+        operation: 'deliver_bikes',
         station,
-        deficit: Math.max(0, target - predicted),
-        risk: station.forecast.horizons['60'].emptyRisk,
-      }
-    })
-    .filter(({ deficit, risk }) => deficit >= 2 && risk >= 0.25)
-    .sort((left, right) => right.risk - left.risk || right.deficit - left.deficit)
+        gap: emptyGap,
+        risk: forecast.emptyRisk,
+        currentFailure: emptyCurrent,
+      })
+    }
+    if (fullGap >= 2 && (fullCurrent || forecast.fullRisk >= threshold)) {
+      tasks.push({
+        operation: 'remove_bikes',
+        station,
+        gap: fullGap,
+        risk: forecast.fullRisk,
+        currentFailure: fullCurrent,
+      })
+    }
+  }
+
+  tasks.sort((left, right) =>
+    Number(right.currentFailure) - Number(left.currentFailure) || right.risk - left.risk || right.gap - left.gap,
+  )
 
   const dispatches = []
-  for (const destination of destinations) {
+  for (const task of tasks) {
     if (dispatches.length >= MAX_DISPATCHES) break
     let best = null
-    for (const candidate of sources) {
-      const remaining = supply.get(candidate.station.id) ?? 0
-      if (remaining < 2 || candidate.station.id === destination.station.id) continue
-      const distanceKm = haversineKm(candidate.station, destination.station)
+
+    for (const candidate of operational) {
+      if (candidate.id === task.station.id) continue
+      const candidateForecast = candidate.forecast.horizons[horizonKey]
+      const remaining = task.operation === 'deliver_bikes'
+        ? bikeSupply.get(candidate.id) ?? 0
+        : dockSupply.get(candidate.id) ?? 0
+      const competingRisk = task.operation === 'deliver_bikes'
+        ? candidateForecast.emptyRisk
+        : candidateForecast.fullRisk
+      if (remaining < 2 || competingRisk >= threshold) continue
+
+      const distanceKm = haversineKm(candidate, task.station)
       if (distanceKm === null) continue
-      const score = distanceKm - candidate.station.forecast.horizons['60'].fullRisk * 2
+      const score = distanceKm + competingRisk * 3
       if (!best || score < best.score) best = { candidate, distanceKm, score, remaining }
     }
     if (!best) continue
 
-    const suggestedBikes = Math.max(1, Math.min(destination.deficit, best.remaining, 8))
-    supply.set(best.candidate.station.id, best.remaining - suggestedBikes)
+    const suggestedBikes = Math.max(1, Math.min(task.gap, best.remaining, MAX_MOVE_BIKES))
+    if (task.operation === 'deliver_bikes') {
+      bikeSupply.set(best.candidate.id, best.remaining - suggestedBikes)
+    } else {
+      dockSupply.set(best.candidate.id, best.remaining - suggestedBikes)
+    }
+
+    const source = task.operation === 'deliver_bikes' ? best.candidate : task.station
+    const destination = task.operation === 'deliver_bikes' ? task.station : best.candidate
+    const priorityScore = dispatchPriority({
+      risk: task.risk,
+      gap: task.gap,
+      currentFailure: task.currentFailure,
+      distanceKm: best.distanceKm,
+    })
     dispatches.push({
-      id: `dispatch_${best.candidate.station.id}_${destination.station.id}`,
-      sourceStationId: best.candidate.station.id,
-      sourceStationName: best.candidate.station.name,
-      destinationStationId: destination.station.id,
-      destinationStationName: destination.station.name,
+      id: `dispatch_${task.operation}_${source.id}_${destination.id}`,
+      operation: task.operation,
+      sourceStationId: source.id,
+      sourceStationName: source.name,
+      destinationStationId: destination.id,
+      destinationStationName: destination.name,
       suggestedBikes,
       distanceKm: round(best.distanceKm, 2),
-      priority: destination.risk >= 0.55 ? 'high' : 'medium',
-      rationale: `目的站 60 分鐘無車風險 ${Math.round(destination.risk * 100)}%，優先由鄰近高庫存站補車。`,
+      priorityScore,
+      priority: priorityScore >= 70 ? 'high' : 'medium',
+      rationale: `${dispatchLabel(task.operation)}：${task.operation === 'deliver_bikes' ? '目的站無車' : '來源站無位'}風險 ${Math.round(task.risk * 100)}，預估缺口 ${task.gap}，採用 ${best.distanceKm.toFixed(1)} km 的鄰近站點。`,
     })
   }
 
-  return dispatches
+  return dispatches.sort((left, right) => right.priorityScore - left.priorityScore || left.distanceKm - right.distanceKm)
 }
 
 function makeSummary({ scenario, stations, alerts, dispatches }) {
@@ -716,17 +801,63 @@ function makeSummary({ scenario, stations, alerts, dispatches }) {
   }
 }
 
+function compactProfile(profile) {
+  if (!profile) return null
+  const observations = Math.max(0, profile.observations)
+  const totalObservations = observations + Math.max(0, profile.unavailable)
+  return [
+    observations,
+    observations ? Math.round(profile.bikesSum / observations) : 0,
+    observations ? Math.round(profile.docksSum / observations) : 0,
+    observations ? Math.round((profile.empty / observations) * 1000) : 0,
+    observations ? Math.round((profile.full / observations) * 1000) : 0,
+    totalObservations ? Math.round((profile.unavailable / totalObservations) * 1000) : 0,
+  ]
+}
+
+function makeLiveProfiles(stationIndex, profileStats) {
+  const stations = [...stationIndex.values()]
+    .map((station) => ({
+      id: station.id,
+      city: station.city,
+      district: safeDistrict(station.district),
+      name: station.name,
+      matchKey: station.matchKey,
+      latitude: station.latitude,
+      longitude: station.longitude,
+      slots: Array.from({ length: 48 }, (_, slot) => compactProfile(profileStats.get(profileKey(station.id, slot)))),
+    }))
+    .sort((left, right) => left.id.localeCompare(right.id))
+
+  return {
+    schemaVersion: '1.0',
+    modelVersion: 'historical-profile-heuristic-v1',
+    timezone: 'Asia/Taipei',
+    riskPolicy: {
+      version: RISK_POLICY_VERSION,
+      alertThresholds: ALERT_THRESHOLDS,
+    },
+    // Array values are [sample count, mean bikes, mean docks, empty risk,
+    // full risk, inferred service-review rate]. Risk rates use per mille
+    // integers to keep the artifact small and static-CDN friendly.
+    profileValueFormat: ['sampleCount', 'meanBikes', 'meanDocks', 'emptyRiskPermille', 'fullRiskPermille', 'serviceReviewPermille'],
+    stations,
+  }
+}
+
 function makeBriefingFacts(summary, alerts, dispatches) {
+  const deliveryCount = dispatches.filter((dispatch) => dispatch.operation === 'deliver_bikes').length
+  const removalCount = dispatches.filter((dispatch) => dispatch.operation === 'remove_bikes').length
   const facts = [
     `回放時點 ${summary.at}，共覆蓋 ${summary.totalStations} 個場站。`,
-    `目前無車 ${summary.emptyStations} 站、無位 ${summary.fullStations} 站、服務不可用 ${summary.unavailableStations} 站。`,
-    `已依 60 分鐘風險產生 ${summary.dispatchRecommendations} 筆可執行的補車建議。`,
+    `目前無車 ${summary.emptyStations} 站、無位 ${summary.fullStations} 站、疑似服務異常 ${summary.unavailableStations} 站。`,
+    `已依 60 分鐘風險產生 ${summary.dispatchRecommendations} 筆人工覆核調度建議（補車 ${deliveryCount}、移車 ${removalCount}）。`,
   ]
   if (alerts[0]) {
-    facts.push(`最高優先告警為 ${alerts[0].stationName}（${alerts[0].district}），風險 ${Math.round(alerts[0].risk * 100)}%。`)
+    facts.push(`最高優先告警為 ${alerts[0].stationName}（${alerts[0].district}），風險指標 ${Math.round(alerts[0].risk * 100)}／100。`)
   }
   if (dispatches[0]) {
-    facts.push(`優先調度可由 ${dispatches[0].sourceStationName} 向 ${dispatches[0].destinationStationName} 補 ${dispatches[0].suggestedBikes} 車。`)
+    facts.push(`優先調度建議由 ${dispatches[0].sourceStationName} 向 ${dispatches[0].destinationStationName} 搬運 ${dispatches[0].suggestedBikes} 車。`)
   }
   return facts
 }
@@ -748,8 +879,8 @@ function buildScenario(scenario, captured, profileStats) {
 
   stations.sort((left, right) => {
     const severityOrder = { critical: 2, warning: 1, normal: 0 }
-    const leftRisk = Math.max(...Object.values(left.forecast.horizons).map((horizon) => Math.max(horizon.emptyRisk, horizon.fullRisk, horizon.unavailableRisk)))
-    const rightRisk = Math.max(...Object.values(right.forecast.horizons).map((horizon) => Math.max(horizon.emptyRisk, horizon.fullRisk, horizon.unavailableRisk)))
+    const leftRisk = Math.max(...Object.values(left.forecast.horizons).map((horizon) => Math.max(horizon.emptyRisk, horizon.fullRisk)))
+    const rightRisk = Math.max(...Object.values(right.forecast.horizons).map((horizon) => Math.max(horizon.emptyRisk, horizon.fullRisk)))
     return severityOrder[right.severity] - severityOrder[left.severity] || rightRisk - leftRisk || left.name.localeCompare(right.name, 'zh-Hant')
   })
 
@@ -869,8 +1000,14 @@ async function main() {
     scenarioArtifacts[scenario.at] = buildScenario(capture, capture, profileStats)
   }
 
-  const defaultScenario = scenarios.at(-1)
+  // Prefer a real scenario with both directions so the default historical
+  // demo can explain replenishment and removal without manufacturing a task.
+  const defaultScenario = scenarios.find((scenario) => {
+    const operations = new Set(scenarioArtifacts[scenario.at].dispatches.map((dispatch) => dispatch.operation))
+    return operations.has('deliver_bikes') && operations.has('remove_bikes')
+  }) || scenarios.at(-1)
   const defaultArtifact = scenarioArtifacts[defaultScenario.at]
+  const liveProfiles = makeLiveProfiles(stationIndex, profileStats)
   const availableTimes = [...bucketStats.values()]
     .sort((left, right) => left.epoch - right.epoch)
     .map((bucket) => bucket.at)
@@ -889,7 +1026,11 @@ async function main() {
       generatedAt: new Date().toISOString(),
       dataMode: 'historical_replay',
       modelVersion: 'historical-profile-heuristic-v1',
-      forecastMethod: 'Current inventory plus station half-hour historical profile; unavailable observations are excluded from empty/full risk profiles.',
+      forecastMethod: 'Current inventory plus station half-hour historical profile; zero-inventory observations are excluded from empty/full risk profiles and remain an inferred service-status flag.',
+      riskPolicy: {
+        version: RISK_POLICY_VERSION,
+        alertThresholds: ALERT_THRESHOLDS,
+      },
       coverage,
       quality,
     },
@@ -901,6 +1042,7 @@ async function main() {
     dispatches: defaultArtifact.dispatches,
     briefingFacts: defaultArtifact.briefingFacts,
     stationHistories: defaultArtifact.stationHistories,
+    liveProfiles,
     scenarios: scenarioArtifacts,
   }
 

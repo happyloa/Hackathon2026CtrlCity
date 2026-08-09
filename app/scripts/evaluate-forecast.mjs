@@ -12,7 +12,7 @@ const APP_DIR = resolve(SCRIPT_DIR, '..')
 const REPO_DIR = resolve(APP_DIR, '..')
 const SOURCE_DIR = resolve(REPO_DIR, 'docs', '資料集')
 const ALIAS_FILE = resolve(SCRIPT_DIR, 'station-aliases.json')
-const OUTPUT_DIR = resolve(APP_DIR, 'server', 'data')
+const OUTPUT_DIR = resolve(APP_DIR, 'data')
 const OUTPUT_FILE = resolve(OUTPUT_DIR, 'forecast-evaluation.json')
 const MARKDOWN_FILE = resolve(REPO_DIR, 'docs', 'MODEL_EVALUATION.md')
 
@@ -487,7 +487,7 @@ function markdownFor(evaluation) {
 
 - 模型：\`${evaluation.model.version}\`。以當前站點庫存、前一個 30 分鐘桶的動量，以及「站點 × 半小時槽」的訓練期歷史空車／滿位率產生風險分數。
 - 時間切分：訓練為 ${SPLITS.train.period}；閾值僅用 ${SPLITS.validation.period} 選擇；${SPLITS.test.period} 完全保留至最後測試。
-- 評估事件：預測未來 30／60／120 分鐘後，站點是否為「空車或滿位」。目前或目標時點同時無車且無位的服務不可用紀錄不納入此二元庫存事件評分，會另列排除量。
+- 評估事件：預測未來 30／60／120 分鐘後，站點是否為「空車或滿位」。目前或目標時點同時無車且無位的疑似服務異常快照不納入此二元庫存事件評分，會另列排除量；現有歷史資料不足以確認其為停運。
 - 評估樣本：以站點規格化鍵的 SHA-256 取模固定抽樣，\`hash mod ${COHORT_MODULUS} = ${COHORT_REMAINDER}\`；本次涵蓋 ${evaluation.cohort.stationCount.toLocaleString()} 個站點。抽樣規則固定，重跑可重現。
 
 ## 驗證集：閾值選擇
@@ -632,7 +632,7 @@ async function main() {
     },
     limitations: [
       '固定站點抽樣用於控制本機記憶體，並非全站點離線評估。',
-      '服務不可用（同時無車與無可還位）不納入空車／滿位二元事件指標。',
+      '同時無車與無可還位的疑似服務異常快照不納入空車／滿位二元事件指標。',
       '未使用天氣、活動、交通、調度或即時事件資料；結果是啟發式基線而非可校準機率模型。',
       '每次重跑會更新 generatedAt，但資料切分、特徵、閾值候選與抽樣規則固定。',
     ],

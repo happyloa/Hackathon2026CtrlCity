@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
-import type { DataMode, HorizonKey, RiskLevel, StationRisk } from '~/shared/ops'
+import type { DataMode, HorizonKey, StationRisk } from '~/shared/ops'
 
 const props = defineProps<{
   stations: StationRisk[]
@@ -26,9 +26,10 @@ const mappedStations = computed(() => {
   if (!query) return allMappedStations.value
   return allMappedStations.value.filter(station => `${station.name} ${station.district}`.toLocaleLowerCase('zh-TW').includes(query))
 })
-const abnormalCount = computed(() => isLive.value
-  ? mappedStations.value.filter(station => station.currentState !== 'normal').length
-  : mappedStations.value.filter(station => ['high', 'critical'].includes(markerTone(station))).length)
+const abnormalCount = computed(() => mappedStations.value.filter((station) => {
+  const tone = markerTone(station)
+  return tone === 'empty-risk' || tone === 'full-risk' || tone === 'service-review'
+}).length)
 
 let leaflet: LeafletModule | null = null
 let leafletMap: LeafletMap | null = null
@@ -44,49 +45,57 @@ const htmlEntities: Record<string, string> = {
   '"': '&quot;',
 }
 
-function markerTone(station: StationRisk): RiskLevel | 'empty' | 'full' | 'unavailable' {
-  if (station.currentState === 'unavailable') return 'unavailable'
-  if (isLive.value) {
-    if (station.currentState === 'empty_now') return 'empty'
-    if (station.currentState === 'full_now') return 'full'
-    return 'normal'
-  }
-  if (station.currentState === 'empty_now' || station.currentState === 'full_now') return 'critical'
-  return station.forecast.horizons[props.horizon].level
+type MarkerTone = 'stable' | 'empty-risk' | 'full-risk' | 'service-review' | 'inventory-only'
+
+function forecastFor(station: StationRisk) {
+  return station.forecast.horizons[props.horizon]
+}
+
+function markerTone(station: StationRisk): MarkerTone {
+  if (station.serviceStatus !== 'operational') return 'service-review'
+  if (station.currentState === 'empty_now') return 'empty-risk'
+  if (station.currentState === 'full_now') return 'full-risk'
+
+  const forecast = forecastFor(station)
+  if (isLive.value && forecast.baselineStatus !== 'matched') return 'inventory-only'
+  if (forecast.emptyRisk >= forecast.alertThreshold && forecast.emptyRisk >= forecast.fullRisk) return 'empty-risk'
+  if (forecast.fullRisk >= forecast.alertThreshold) return 'full-risk'
+  return 'stable'
 }
 
 function markerColor(station: StationRisk) {
-  const colors = {
-    normal: '#168c80',
-    medium: '#c18a08',
-    high: '#dd761a',
-    critical: '#d94045',
-    empty: '#d94045',
-    full: '#dd761a',
-    unavailable: '#697982',
-  } as const
+  const colors: Record<MarkerTone, string> = {
+    stable: '#168c80',
+    'empty-risk': '#d94045',
+    'full-risk': '#2e79b8',
+    'service-review': '#697982',
+    'inventory-only': '#c18a08',
+  }
   return colors[markerTone(station)]
 }
 
 function markerStatus(station: StationRisk) {
-  if (isLive.value) {
-    if (station.currentState === 'empty_now') return '無車可借'
-    if (station.currentState === 'full_now') return '無位可還'
-    if (station.currentState === 'unavailable') return '暫停／異常'
-    return '可借可還'
+  const tone = markerTone(station)
+  if (tone === 'service-review') {
+    return station.serviceStatus === 'official_inactive'
+      ? '官方未啟用（需確認）'
+      : '疑似服務異常（需確認）'
   }
+  if (tone === 'inventory-only') return '僅顯示即時庫存'
+  if (station.currentState === 'empty_now') return '目前無車可借'
+  if (station.currentState === 'full_now') return '目前無位可還'
+  if (tone === 'empty-risk') return '預測缺車風險'
+  if (tone === 'full-risk') return '預測缺位風險'
+  return isLive.value ? '即時庫存與基線穩定' : '預測風險低'
+}
 
-  const level = markerTone(station)
-  const labels: Record<RiskLevel | 'empty' | 'full' | 'unavailable', string> = {
-    normal: '風險低',
-    medium: '中風險',
-    high: '高風險',
-    critical: '需優先處理',
-    empty: '目前無車',
-    full: '目前無位',
-    unavailable: '暫停／異常',
-  }
-  return labels[level]
+function interventionGap(station: StationRisk) {
+  const forecast = forecastFor(station)
+  const buffer = Math.max(2, Math.ceil(station.totalDocks * .35))
+  const tone = markerTone(station)
+  if (tone === 'empty-risk') return Math.max(1, buffer - Math.min(station.availableBikes, forecast.predictedBikes))
+  if (tone === 'full-risk') return Math.max(1, buffer - Math.min(station.availableDocks, forecast.predictedDocks))
+  return tone === 'service-review' ? 2 : 0
 }
 
 function escapeHtml(value: string) {
@@ -94,16 +103,23 @@ function escapeHtml(value: string) {
 }
 
 function tooltipContent(station: StationRisk) {
-  const inventory = isLive.value
-    ? `可借 ${station.availableBikes}・可還 ${station.availableDocks}`
-    : `${props.horizon} 分鐘 ${markerStatus(station)}`
-  return `<strong>${escapeHtml(station.name)}</strong><span>${escapeHtml(station.district || '新北市')}・${inventory}</span>`
+  const forecast = forecastFor(station)
+  const tone = markerTone(station)
+  const inventory = `可借 ${station.availableBikes}・可還 ${station.availableDocks}`
+  const direction = tone === 'empty-risk' ? `無車風險指標 ${Math.round(forecast.emptyRisk * 100)}／100，建議補車` : tone === 'full-risk'
+    ? `無位風險指標 ${Math.round(forecast.fullRisk * 100)}／100，建議移車`
+    : markerStatus(station)
+  const context = forecast.baselineStatus === 'matched'
+    ? `${props.horizon} 分鐘 · ${direction}`
+    : direction
+  return `<strong>${escapeHtml(station.name)}</strong><span>${escapeHtml(station.district || '新北市')}・${inventory}</span><span>${escapeHtml(context)}</span>`
 }
 
 function markerOptions(station: StationRisk) {
   const selected = station.id === props.selectedId
+  const gap = interventionGap(station)
   return {
-    radius: selected ? 7.5 : 5,
+    radius: Math.max(4.5, 5 + Math.min(7, Math.sqrt(gap) * 1.7)) + (selected ? 2 : 0),
     color: selected ? '#f7fffd' : '#102c32',
     weight: selected ? 3 : 1.25,
     fillColor: markerColor(station),
@@ -192,7 +208,10 @@ async function initialiseMap() {
 }
 
 const stationSignature = computed(() => mappedStations.value
-  .map(station => `${station.id}:${station.latitude}:${station.longitude}:${station.availableBikes}:${station.availableDocks}:${station.currentState}:${station.forecast.horizons[props.horizon].level}`)
+  .map((station) => {
+    const forecast = forecastFor(station)
+    return `${station.id}:${station.latitude}:${station.longitude}:${station.availableBikes}:${station.availableDocks}:${station.currentState}:${station.serviceStatus}:${forecast.emptyRisk}:${forecast.fullRisk}:${forecast.predictedBikes}:${forecast.predictedDocks}:${forecast.baselineStatus}`
+  })
   .join('|'))
 
 watch(stationSignature, () => renderMarkers())
@@ -216,14 +235,14 @@ onBeforeUnmount(() => {
     <div class="panel-heading map-heading">
       <div>
         <p class="section-kicker"><Icon :icon="isLive ? 'solar:bolt-circle-outline' : 'solar:map-point-wave-outline'" /> 新北市實景地圖</p>
-        <h2>{{ isLive ? '新北市全域即時站點分布' : `新北市 ${horizon} 分鐘預測風險分布` }}</h2>
+        <h2>{{ isLive ? `新北市 ${horizon} 分鐘即時基線風險` : `新北市 ${horizon} 分鐘預測風險分布` }}</h2>
       </div>
       <span class="risk-summary"><b>{{ mappedStations.length }}</b> {{ stationQuery ? '個搜尋結果' : (isLive ? '個即時站點' : '個預測站點') }}</span>
     </div>
 
-    <div class="geographic-map" role="region" :aria-label="isLive ? '新北市全域即時公共自行車站點地圖' : '新北市歷史預測風險站點地圖'">
+    <div class="geographic-map" role="region" :aria-label="isLive ? '新北市即時基線風險站點地圖' : '新北市歷史預測風險站點地圖'">
       <div ref="mapElement" class="map-canvas" />
-      <p class="map-instruction"><Icon icon="solar:cursor-square-outline" /> {{ isLive ? '圓點代表即時庫存，點選查看站點詳情' : '圓點代表預測風險，點選查看站點詳情' }}</p>
+      <p class="map-instruction"><Icon icon="solar:cursor-square-outline" /> 圓點顏色代表風險方向，大小代表預估介入缺口</p>
       <div class="map-tools" role="group" aria-label="地圖工具">
         <label class="map-search">
           <Icon icon="solar:magnifer-outline" />
@@ -231,23 +250,16 @@ onBeforeUnmount(() => {
         </label>
         <button type="button" class="map-reset" @click="fitNewTaipeiBounds"><Icon icon="solar:map-arrow-left-outline" /> 回到新北全域</button>
       </div>
-      <div class="geographic-map-legend" :aria-label="isLive ? '即時站況圖例' : '預測風險圖例'">
-        <template v-if="isLive">
-          <span><i class="legend-dot normal" />可借可還</span>
-          <span><i class="legend-dot empty" />無車可借</span>
-          <span><i class="legend-dot full" />無位可還</span>
-          <span><i class="legend-dot unavailable" />暫停／異常</span>
-        </template>
-        <template v-else>
-          <span><i class="legend-dot normal" />風險低</span>
-          <span><i class="legend-dot medium" />中風險</span>
-          <span><i class="legend-dot high" />高風險</span>
-          <span><i class="legend-dot critical" />需優先處理</span>
-        </template>
+      <div class="geographic-map-legend" aria-label="風險方向圖例">
+        <span><i class="legend-dot normal" />基線穩定</span>
+        <span><i class="legend-dot empty" />無車風險／目前無車</span>
+        <span><i class="legend-dot full" />無位風險／目前無位</span>
+        <span><i class="legend-dot unavailable" />疑似服務異常</span>
+        <span v-if="isLive"><i class="legend-dot inventory-only" />未對照基線</span>
       </div>
       <p v-if="!mappedStations.length" class="map-empty">目前沒有可定位的站點資料。</p>
     </div>
-    <p class="map-status-summary"><Icon icon="solar:info-circle-outline" /> {{ isLive ? `目前有 ${abnormalCount} 個站點需要留意；地圖範圍與資料皆限定新北市。` : `目前有 ${abnormalCount} 個高風險站點；預測模型與歷史資料皆限定新北市。` }}</p>
+    <p class="map-status-summary"><Icon icon="solar:info-circle-outline" /> {{ isLive ? `目前有 ${abnormalCount} 個站點需留意；紅色為缺車、藍色為缺位、灰色需人工確認。` : `目前有 ${abnormalCount} 個風險或服務異常站點；地圖與資料皆限定新北市。` }}</p>
   </section>
 </template>
 
@@ -319,7 +331,7 @@ onBeforeUnmount(() => {
 
 .geographic-map-legend span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 .legend-dot { width: 10px; height: 10px; border: 1px solid rgba(11, 42, 47, .62); border-radius: 50%; background: #168c80; }
-.legend-dot.medium { background: #c18a08; }.legend-dot.high, .legend-dot.full { background: #dd761a; }.legend-dot.critical, .legend-dot.empty { background: #d94045; }.legend-dot.unavailable { background: #697982; }
+.legend-dot.empty { background: #d94045; }.legend-dot.full { background: #2e79b8; }.legend-dot.unavailable { background: #697982; }.legend-dot.inventory-only { background: #c18a08; }
 .map-empty { inset: 50% auto auto 50%; padding: 12px; font-size: 16px; font-weight: 700; transform: translate(-50%, -50%); }
 .map-status-summary { display: flex; align-items: center; gap: 6px; margin: 10px 18px 14px; color: var(--muted); font-size: 16px; font-weight: 600; }
 .map-status-summary svg { flex: 0 0 auto; color: var(--teal-dark); font-size: 19px; }

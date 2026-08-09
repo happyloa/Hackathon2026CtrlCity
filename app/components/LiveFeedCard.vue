@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
-import type { ApiEnvelope, LiveStation, LiveStationsPayload } from '~/shared/ops'
+import type { ApiEnvelope, DashboardArtifact, LiveStation, LiveStationsPayload, StationRisk } from '~/shared/ops'
 
 type LiveResponse = ApiEnvelope<LiveStationsPayload>
 
 const props = defineProps<{
   district?: string
   payload: LiveResponse | null
+  dashboard?: DashboardArtifact | null
   pending?: boolean
   errorMessage?: string
   updated?: boolean
@@ -17,17 +18,19 @@ const emit = defineEmits<{ refresh: []; select: [stationId: string] }>()
 const stations = computed(() => props.payload?.data.stations ?? [])
 const emptyCount = computed(() => stations.value.filter(station => station.currentState === 'empty_now').length)
 const fullCount = computed(() => stations.value.filter(station => station.currentState === 'full_now').length)
-const unavailableCount = computed(() => stations.value.filter(station => station.currentState === 'unavailable').length)
+const unavailableCount = computed(() => stations.value.filter(station => station.serviceStatus !== 'operational').length)
+const highRiskCount = computed(() => props.dashboard?.summary.highRiskNext60m || 0)
 const attentionStations = computed(() => {
-  const priority: Record<LiveStation['currentState'], number> = {
-    unavailable: 0,
-    empty_now: 1,
-    full_now: 2,
-    normal: 3,
+  const priority = (station: StationRisk) => {
+    if (station.serviceStatus !== 'operational') return 0
+    if (station.currentState === 'empty_now') return 1
+    if (station.currentState === 'full_now') return 2
+    const forecast = station.forecast.horizons['60']
+    return forecast.level === 'critical' ? 3 : forecast.level === 'high' ? 4 : 5
   }
-  return [...stations.value]
-    .filter(station => station.currentState !== 'normal')
-    .sort((left, right) => priority[left.currentState] - priority[right.currentState] || left.availableBikes - right.availableBikes || left.availableDocks - right.availableDocks)
+  return [...(props.dashboard?.stations || [])]
+    .filter((station) => station.serviceStatus !== 'operational' || station.currentState !== 'normal' || ['high', 'critical'].includes(station.forecast.horizons['60'].level))
+    .sort((left, right) => priority(left) - priority(right) || right.forecast.horizons['60'].riskScore - left.forecast.horizons['60'].riskScore)
     .slice(0, 5)
 })
 
@@ -39,11 +42,28 @@ const sourceTime = computed(() => {
   }).format(new Date(value))
 })
 
-function statusLabel(station: LiveStation) {
-  if (station.currentState === 'unavailable') return '暫停／無資料'
+function statusLabel(station: Pick<LiveStation, 'currentState' | 'serviceStatus'>) {
+  if (station.serviceStatus === 'official_inactive') return '官方未啟用'
+  if (station.serviceStatus === 'suspected_unavailable') return '疑似服務異常'
   if (station.currentState === 'empty_now') return '暫無可借車'
   if (station.currentState === 'full_now') return '暫無可還位'
   return '正常'
+}
+
+function riskLabel(station: StationRisk) {
+  const forecast = station.forecast.horizons['60']
+  if (station.serviceStatus !== 'operational') return statusLabel(station)
+  if (station.currentState === 'empty_now' || forecast.emptyRisk >= forecast.alertThreshold) return `+60m 無車指標 ${Math.round(forecast.emptyRisk * 100)}／100`
+  if (station.currentState === 'full_now' || forecast.fullRisk >= forecast.alertThreshold) return `+60m 無位指標 ${Math.round(forecast.fullRisk * 100)}／100`
+  return '基線穩定'
+}
+
+function statusClass(station: StationRisk) {
+  const forecast = station.forecast.horizons['60']
+  if (station.serviceStatus !== 'operational') return 'unavailable'
+  if (station.currentState === 'empty_now' || forecast.emptyRisk >= forecast.alertThreshold) return 'forecast-empty'
+  if (station.currentState === 'full_now' || forecast.fullRisk >= forecast.alertThreshold) return 'forecast-full'
+  return 'normal'
 }
 </script>
 
@@ -71,15 +91,16 @@ function statusLabel(station: LiveStation) {
         <div><span>已接入站點</span><strong>{{ stations.length.toLocaleString() }}</strong></div>
         <div><span>暫無可借車</span><strong>{{ emptyCount }}</strong></div>
         <div><span>暫無可還位</span><strong>{{ fullCount }}</strong></div>
-        <div><span>暫停／無資料</span><strong>{{ unavailableCount }}</strong></div>
+        <div><span>待人工確認</span><strong>{{ unavailableCount }}</strong></div>
+        <div><span>60 分鐘高風險</span><strong>{{ highRiskCount }}</strong></div>
       </div>
 
       <div v-if="attentionStations.length" class="live-attention-list">
-        <p>需要注意的即時站點</p>
+        <p>需要注意的即時與基線風險站點</p>
         <div v-for="station in attentionStations" :key="station.id" class="live-attention-row">
           <span class="live-station-name"><b>{{ station.name.replace(/^YouBike2\.0_/, '') }}</b><small>{{ station.district }}</small></span>
           <span class="live-stock">車 {{ station.availableBikes }} · 位 {{ station.availableDocks }}</span>
-          <span class="live-status" :class="station.currentState">{{ statusLabel(station) }}</span>
+          <span class="live-status" :class="statusClass(station)">{{ riskLabel(station) }}</span>
           <button type="button" class="text-link" :aria-label="`在地圖定位 ${station.name}`" @click="emit('select', station.id)">地圖定位 <Icon icon="solar:map-point-outline" /></button>
         </div>
       </div>

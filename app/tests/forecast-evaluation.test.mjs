@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { stat, readFile } from 'node:fs/promises'
 import test from 'node:test'
 
-const evaluationUrl = new URL('../server/data/forecast-evaluation.json', import.meta.url)
+const evaluationUrl = new URL('../data/forecast-evaluation.json', import.meta.url)
 const evaluation = JSON.parse(await readFile(evaluationUrl, 'utf8'))
 const HORIZONS = ['30', '60', '120']
 

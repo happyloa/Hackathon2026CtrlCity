@@ -1,5 +1,5 @@
 import { createError } from 'h3'
-import type { CurrentState, LiveStation } from '~/shared/ops'
+import type { CurrentState, LiveStation, ServiceStatus } from '~/shared/ops'
 
 const DEFAULT_NTPC_LIVE_STATIONS_URL = 'https://data.ntpc.gov.tw/api/datasets/010e5b15-3823-4b20-b401-b1cf000550c5/json?page=0&size=2000'
 const FETCH_TIMEOUT_MS = 8_000
@@ -35,6 +35,12 @@ function currentState(active: boolean, bikes: number, docks: number): CurrentSta
   return 'normal'
 }
 
+function serviceStatus(active: boolean, bikes: number, docks: number): ServiceStatus {
+  if (!active) return 'official_inactive'
+  if (bikes === 0 && docks === 0) return 'suspected_unavailable'
+  return 'operational'
+}
+
 function mapLiveStation(value: unknown): LiveStation | null {
   const record = asRecord(value)
   const id = asString(record.sno)
@@ -59,6 +65,7 @@ function mapLiveStation(value: unknown): LiveStation | null {
     longitude: Number.isFinite(longitude) ? longitude : null,
     active,
     currentState: currentState(active, availableBikes, availableDocks),
+    serviceStatus: serviceStatus(active, availableBikes, availableDocks),
     sourceUpdatedAt: asString(record.mday),
     youbike2Bikes: Math.max(0, Math.round(asNumber(record.yb2_quantity))),
     eBikeBikes: Math.max(0, Math.round(asNumber(record.eyb_quantity))),

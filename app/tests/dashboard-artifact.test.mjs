@@ -2,8 +2,10 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 
-const artifactUrl = new URL('../server/data/dashboard.json', import.meta.url)
+const artifactUrl = new URL('../data/dashboard.json', import.meta.url)
+const evaluationUrl = new URL('../data/forecast-evaluation.json', import.meta.url)
 const dashboard = JSON.parse(await readFile(artifactUrl, 'utf8'))
+const evaluation = JSON.parse(await readFile(evaluationUrl, 'utf8'))
 
 const HORIZONS = ['30', '60', '120']
 const RISK_FIELDS = ['emptyRisk', 'fullRisk', 'unavailableRisk', 'confidence']
@@ -78,6 +80,7 @@ test('every replay scenario has a coherent station inventory and bounded forecas
       assert.ok(Number.isFinite(station.availableBikes) && station.availableBikes >= 0, `station ${station.id} has invalid availableBikes`)
       assert.ok(Number.isFinite(station.availableDocks) && station.availableDocks >= 0, `station ${station.id} has invalid availableDocks`)
       assert.ok(Number.isFinite(station.totalDocks) && station.totalDocks >= 0, `station ${station.id} has invalid totalDocks`)
+      assert.ok(['operational', 'official_inactive', 'suspected_unavailable'].includes(station.serviceStatus), `station ${station.id} has invalid serviceStatus`)
 
       for (const horizon of HORIZONS) {
         const forecast = station.forecast?.horizons?.[horizon]
@@ -87,6 +90,10 @@ test('every replay scenario has a coherent station inventory and bounded forecas
         }
         assert.ok(Number.isFinite(forecast.predictedBikes) && forecast.predictedBikes >= 0, `station ${station.id} ${horizon}-minute predictedBikes is invalid`)
         assert.ok(Number.isFinite(forecast.predictedDocks) && forecast.predictedDocks >= 0, `station ${station.id} ${horizon}-minute predictedDocks is invalid`)
+        assert.equal(forecast.alertThreshold, evaluation.thresholdSelection.selected[horizon].threshold, `station ${station.id} ${horizon}-minute alert threshold must match validation policy`)
+        assert.ok(Number.isInteger(forecast.sampleSize) && forecast.sampleSize >= 0, `station ${station.id} ${horizon}-minute sampleSize is invalid`)
+        assert.equal(forecast.baselineStatus, 'matched', `historical replay station ${station.id} must have a matched baseline`)
+        assert.equal(forecast.method, 'historical_replay', `historical replay station ${station.id} must declare its method`)
       }
     }
 
@@ -124,10 +131,36 @@ test('alerts and dispatches only reference stations present in their scenario', 
       assert.ok(stationIds.has(dispatch.destinationStationId), `scenario ${at} dispatch ${dispatch.id} references an unknown destination station`)
       assert.notEqual(dispatch.sourceStationId, dispatch.destinationStationId, `scenario ${at} dispatch ${dispatch.id} cannot use the same source and destination`)
       assert.ok(Number.isFinite(dispatch.suggestedBikes) && dispatch.suggestedBikes > 0, `scenario ${at} dispatch ${dispatch.id} must move at least one bike`)
+      assert.ok(['deliver_bikes', 'remove_bikes'].includes(dispatch.operation), `scenario ${at} dispatch ${dispatch.id} has an invalid operation`)
 
       if (dispatch.alertId != null) {
         assert.ok(alertIds.has(dispatch.alertId), `scenario ${at} dispatch ${dispatch.id} references an unknown alert`)
       }
     }
   }
+})
+
+test('risk policy and compact live profiles remain deployable without source CSV files', () => {
+  assert.equal(dashboard.meta.riskPolicy?.version, 'event-risk-policy-v1')
+  for (const horizon of HORIZONS) {
+    assert.equal(dashboard.meta.riskPolicy.alertThresholds[horizon], evaluation.thresholdSelection.selected[horizon].threshold)
+    assert.equal(dashboard.liveProfiles.riskPolicy.alertThresholds[horizon], evaluation.thresholdSelection.selected[horizon].threshold)
+  }
+
+  assert.equal(dashboard.liveProfiles.schemaVersion, '1.0')
+  assert.equal(dashboard.liveProfiles.timezone, 'Asia/Taipei')
+  assert.ok(dashboard.liveProfiles.stations.length >= MIN_EXPECTED_STATIONS)
+  for (const station of dashboard.liveProfiles.stations) {
+    assert.equal(station.slots.length, 48, `live profile ${station.id} must have 48 half-hour slots`)
+    assert.match(station.matchKey, /\|/, `live profile ${station.id} must have a strict name match key`)
+  }
+
+  const dispatchOperations = new Set(Object.values(dashboard.scenarios).flatMap(scenario => scenario.dispatches.map(dispatch => dispatch.operation)))
+  assert.ok(dispatchOperations.has('deliver_bikes'), 'demo scenarios need a bike delivery example')
+  assert.ok(dispatchOperations.has('remove_bikes'), 'demo scenarios need a full-station bike removal example')
+
+  const defaultScenario = dashboard.scenarios[dashboard.meta.asOf]
+  const defaultOperations = new Set(defaultScenario.dispatches.map(dispatch => dispatch.operation))
+  assert.ok(defaultOperations.has('deliver_bikes'), 'default demo scenario needs a bike delivery example')
+  assert.ok(defaultOperations.has('remove_bikes'), 'default demo scenario needs a full-station bike removal example')
 })

@@ -44,4 +44,4 @@ try {
   if (error && error.code !== 'ENOENT') throw error
 }
 
-console.log('Staged static Pages output with ' + result.scenarios + ' replay scenarios.')
+console.log('Staged static Pages output with ' + result.scenarios + ' replay scenarios and ' + result.liveProfiles.stations + ' live profile stations.')

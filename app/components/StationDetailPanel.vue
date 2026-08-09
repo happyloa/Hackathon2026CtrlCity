@@ -13,19 +13,56 @@ const emit = defineEmits<{ close: [] }>()
 
 const isLive = computed(() => props.dataMode === 'live')
 const forecast = computed(() => props.station?.forecast.horizons[props.horizon])
+const hasMatchedBaseline = computed(() => forecast.value?.baselineStatus === 'matched')
 const riskLabel = computed(() => {
+  const serviceStatus = props.station?.serviceStatus
+  if (serviceStatus === 'official_inactive') return '官方未啟用'
+  if (serviceStatus === 'suspected_unavailable') return '需人工確認'
   if (isLive.value) {
     const state = props.station?.currentState
-    return state === 'empty_now' ? '無車可借' : state === 'full_now' ? '無位可還' : state === 'unavailable' ? '暫停' : '庫存正常'
+    if (state === 'empty_now') return '目前無車'
+    if (state === 'full_now') return '目前無位'
+    if (forecast.value?.baselineStatus !== 'matched') return '僅即時庫存'
   }
   return ({ normal: '穩定', medium: '觀察', high: '高風險', critical: '立即處理' }[forecast.value?.level || 'normal'])
+})
+
+const forecastHeadline = computed(() => {
+  if (!isLive.value) return `${props.horizon} 分鐘後`
+  if (props.station?.serviceStatus !== 'operational') return '服務狀態待人工確認'
+  if (!hasMatchedBaseline.value) return '未對照歷史基線'
+  return `${props.horizon} 分鐘歷史基線推估`
+})
+
+const forecastDescription = computed(() => {
+  if (!isLive.value) return `預測 ${forecast.value?.predictedBikes} 車／${forecast.value?.predictedDocks} 位`
+  if (props.station?.serviceStatus !== 'operational') return `現況 ${props.station?.availableBikes} 車／${props.station?.availableDocks} 位`
+  if (!hasMatchedBaseline.value) return `現況 ${props.station?.availableBikes} 車／${props.station?.availableDocks} 位`
+  return `推估 ${forecast.value?.predictedBikes} 車／${forecast.value?.predictedDocks} 位`
+})
+
+const forecastCaption = computed(() => {
+  if (props.station?.serviceStatus !== 'operational') return '此狀態不等同已確認停運，請依現場或官方資訊覆核。'
+  if (isLive.value && !hasMatchedBaseline.value) return '未對照到唯一歷史站點；系統不假造未來風險。'
+  const score = Math.round((forecast.value?.riskScore || 0) * 100)
+  const sample = forecast.value?.sampleSize || 0
+  return `風險指標 ${score}／100 · 歷史樣本 ${sample} 筆 · 需人工覆核`
+})
+
+const chartProjections = computed(() => {
+  const station = props.station
+  if (!station) return []
+  return (['30', '60'] as HorizonKey[]).map((item) => {
+    const value = station.forecast.horizons[item]
+    return { label: `+${item}m`, bikes: value.predictedBikes, docks: value.predictedDocks }
+  })
 })
 </script>
 
 <template>
   <aside v-if="station" class="station-detail" aria-label="站點詳情">
     <button type="button" class="close-button" aria-label="關閉站點詳情" @click="emit('close')"><Icon icon="solar:close-circle-outline" /></button>
-    <div class="detail-topline"><span>{{ isLive ? '官方即時庫存' : '站點風險卡' }}</span><span :class="`risk-badge risk-${forecast?.level}`">{{ riskLabel }}</span></div>
+    <div class="detail-topline"><span>{{ isLive ? '即時庫存＋歷史基線' : '站點風險卡' }}</span><span :class="`risk-badge risk-${forecast?.level}`">{{ riskLabel }}</span></div>
     <h3>{{ station.name }}</h3>
     <p class="station-location"><Icon icon="solar:map-point-outline" /> {{ station.district || '行政區待確認' }} · {{ station.city }}</p>
 
@@ -36,18 +73,18 @@ const riskLabel = computed(() => {
     </div>
 
     <div class="forecast-note">
-      <span><Icon :icon="isLive ? 'solar:bolt-circle-outline' : 'solar:magic-stick-3-outline'" /> {{ isLive ? '目前官方即時庫存' : `${horizon} 分鐘後` }}</span>
-      <strong>{{ isLive ? `現況 ${station.availableBikes} 車／${station.availableDocks} 位` : `預測 ${forecast?.predictedBikes} 車／${forecast?.predictedDocks} 位` }}</strong>
-      <small>{{ isLive ? '即時資料不推估未來；切換到歷史預測可查看模型判讀。' : `風險分數 ${Math.round((forecast?.riskScore || 0) * 100)} · ${forecast?.confidence === 'high' ? '資料信心高' : '請人工覆核'}` }}</small>
+      <span><Icon :icon="isLive ? 'solar:bolt-circle-outline' : 'solar:magic-stick-3-outline'" /> {{ forecastHeadline }}</span>
+      <strong>{{ forecastDescription }}</strong>
+      <small>{{ forecastCaption }}</small>
     </div>
 
     <div v-if="!isLive" class="detail-chart-wrap">
-      <div class="mini-heading"><span>最近 24 小時庫存</span><i><b />可借車 <b class="dock-key" />可還位</i></div>
-      <ForecastChart :history="history" :station-name="station.name" />
+      <div class="mini-heading"><span>最近 24 小時＋基線推估</span><i><b />可借車 <b class="dock-key" />可還位</i></div>
+      <ForecastChart :history="history" :station-name="station.name" :capacity="station.totalDocks" :projections="chartProjections" />
     </div>
 
     <div class="reason-list">
-      <p>{{ isLive ? '即時資料說明' : '模型判讀依據' }}</p>
+      <p>{{ isLive ? '即時與基線判讀' : '模型判讀依據' }}</p>
       <span v-for="reason in forecast?.reasons" :key="reason"><Icon icon="solar:check-read-outline" /> {{ reason }}</span>
       <span v-for="flag in station.qualityFlags" :key="flag" class="quality-flag"><Icon icon="solar:info-circle-outline" /> {{ flag }}</span>
     </div>

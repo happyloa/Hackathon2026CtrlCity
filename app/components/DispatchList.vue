@@ -14,6 +14,11 @@ const stationLookup = computed(() => new Map(props.stations.map(station => [stat
 const visibleDispatches = computed(() => props.compact ? props.dispatches.slice(0, 4) : props.dispatches)
 const nameFor = (id: string) => stationLookup.value.get(id)?.name || '未命名站點'
 const expandedDispatchId = ref<string | null>(null)
+const operationLabel = (dispatch: DispatchRecommendation) => dispatch.operation === 'remove_bikes' ? '移車' : '補車'
+const sourceRole = (dispatch: DispatchRecommendation) => dispatch.operation === 'remove_bikes' ? '待疏散滿位站' : '供給站'
+const destinationRole = (dispatch: DispatchRecommendation) => dispatch.operation === 'remove_bikes' ? '接收空位站' : '缺車站'
+const sourceSafetyLabel = (dispatch: DispatchRecommendation) => dispatch.operation === 'remove_bikes' ? '移出後保留可借車' : '調出後安全庫存'
+const destinationSafetyLabel = () => '調度後保留可還位'
 
 function impactFor(dispatch: DispatchRecommendation) {
   const from = stationLookup.value.get(dispatch.fromStationId)
@@ -62,6 +67,7 @@ function toggleImpact(dispatchId: string) {
       <article v-for="dispatch in visibleDispatches" :key="dispatch.id" class="dispatch-item">
         <div class="dispatch-row">
           <div class="dispatch-route">
+            <span class="operation-badge" :class="dispatch.operation">{{ operationLabel(dispatch) }}</span>
             <button type="button" @click="emit('select', dispatch.fromStationId)">{{ nameFor(dispatch.fromStationId) }}</button>
             <span><Icon icon="solar:arrow-right-outline" /></span>
             <button type="button" @click="emit('select', dispatch.toStationId)">{{ nameFor(dispatch.toStationId) }}</button>
@@ -77,7 +83,7 @@ function toggleImpact(dispatchId: string) {
             :disabled="dispatch.status !== 'proposed'"
             @click="emit('accept', dispatch.id)"
           >
-            {{ dispatch.status === 'proposed' ? '指派任務' : '已指派' }}
+            {{ dispatch.status === 'proposed' ? `指派${operationLabel(dispatch)}` : '已指派' }}
           </button>
         </div>
         <button type="button" class="impact-toggle" :aria-expanded="expandedDispatchId === dispatch.id" @click="toggleImpact(dispatch.id)">
@@ -89,21 +95,21 @@ function toggleImpact(dispatchId: string) {
           <p class="impact-notice"><Icon icon="solar:shield-warning-outline" /> 模擬結果，不改寫預測；指派前仍需人工覆核。</p>
           <div class="impact-grid">
             <div class="impact-station">
-              <p><span>取車站</span>{{ impactFor(dispatch)?.from.name }}</p>
+              <p><span>{{ sourceRole(dispatch) }}</span>{{ impactFor(dispatch)?.from.name }}</p>
               <dl>
                 <div><dt>可借車</dt><dd>{{ impactFor(dispatch)?.from.availableBikes }} <b>→</b> <strong>{{ impactFor(dispatch)?.fromAfterBikes }}</strong></dd></div>
                 <div><dt>可還位</dt><dd>{{ impactFor(dispatch)?.from.availableDocks }} <b>→</b> <strong>{{ impactFor(dispatch)?.fromAfterDocks }}</strong></dd></div>
               </dl>
-              <small :class="{ safe: impactFor(dispatch)?.donorSafe, unsafe: !impactFor(dispatch)?.donorSafe }"><Icon :icon="impactFor(dispatch)?.donorSafe ? 'solar:check-circle-outline' : 'solar:danger-triangle-outline'" /> 調出後安全庫存：{{ impactFor(dispatch)?.donorSafetyStock }} 台</small>
+              <small :class="{ safe: impactFor(dispatch)?.donorSafe, unsafe: !impactFor(dispatch)?.donorSafe }"><Icon :icon="impactFor(dispatch)?.donorSafe ? 'solar:check-circle-outline' : 'solar:danger-triangle-outline'" /> {{ sourceSafetyLabel(dispatch) }}：{{ impactFor(dispatch)?.donorSafetyStock }} 台</small>
             </div>
             <div class="impact-arrow"><Icon icon="solar:round-arrow-right-outline" /><span>搬運 {{ impactFor(dispatch)?.movableBikes }} 台</span></div>
             <div class="impact-station">
-              <p><span>送達站</span>{{ impactFor(dispatch)?.to.name }}</p>
+              <p><span>{{ destinationRole(dispatch) }}</span>{{ impactFor(dispatch)?.to.name }}</p>
               <dl>
                 <div><dt>可借車</dt><dd>{{ impactFor(dispatch)?.to.availableBikes }} <b>→</b> <strong>{{ impactFor(dispatch)?.toAfterBikes }}</strong></dd></div>
                 <div><dt>可還位</dt><dd>{{ impactFor(dispatch)?.to.availableDocks }} <b>→</b> <strong>{{ impactFor(dispatch)?.toAfterDocks }}</strong></dd></div>
               </dl>
-              <small :class="{ safe: impactFor(dispatch)?.receiverSafe, unsafe: !impactFor(dispatch)?.receiverSafe }"><Icon :icon="impactFor(dispatch)?.receiverSafe ? 'solar:check-circle-outline' : 'solar:danger-triangle-outline'" /> 調度後保留可還位：{{ impactFor(dispatch)?.receiverDockBuffer }} 位</small>
+              <small :class="{ safe: impactFor(dispatch)?.receiverSafe, unsafe: !impactFor(dispatch)?.receiverSafe }"><Icon :icon="impactFor(dispatch)?.receiverSafe ? 'solar:check-circle-outline' : 'solar:danger-triangle-outline'" /> {{ destinationSafetyLabel() }}：{{ impactFor(dispatch)?.receiverDockBuffer }} 位</small>
             </div>
           </div>
         </section>
@@ -115,6 +121,8 @@ function toggleImpact(dispatchId: string) {
 
 <style scoped>
 .dispatch-item + .dispatch-item { border-top: 1px solid var(--line); }
+.operation-badge { flex: 0 0 auto; padding: 3px 6px; color: #0d665d; background: #ddf5ee; border: 1px solid #9edbcd; border-radius: 999px; font-size: 16px; font-weight: 800; }
+.operation-badge.remove_bikes { color: #265f96; background: #e6f0fb; border-color: #a9c9eb; }
 .impact-toggle { display: inline-flex; align-items: center; gap: 5px; margin: 0 16px 11px; padding: 5px 0; color: var(--teal-dark); background: transparent; border: 0; font: inherit; font-size: 16px; font-weight: 800; cursor: pointer; }
 .impact-toggle:hover, .impact-toggle:focus-visible { color: var(--ink); text-decoration: underline; outline: 0; }
 .impact-toggle:focus-visible { text-decoration-thickness: 2px; text-underline-offset: 4px; }
@@ -139,6 +147,8 @@ function toggleImpact(dispatchId: string) {
 .impact-arrow svg { justify-self: center; font-size: 24px; }
 
 :global(html[data-theme='dark'] .dispatch-impact) { background: #0b1d25; border-color: #49666c; }
+:global(html[data-theme='dark'] .operation-badge) { color: #a7f0df; background: #123d37; border-color: #4e9d90; }
+:global(html[data-theme='dark'] .operation-badge.remove_bikes) { color: #c1dbff; background: #173452; border-color: #5b82af; }
 :global(html[data-theme='dark'] .impact-station) { background: #10252e; border-color: #42636a; }
 :global(html[data-theme='dark'] .impact-station > p), :global(html[data-theme='dark'] .impact-station dd) { color: #effbf8; }
 :global(html[data-theme='dark'] .impact-station dd strong), :global(html[data-theme='dark'] .impact-toggle), :global(html[data-theme='dark'] .impact-arrow) { color: #8ff0df; }

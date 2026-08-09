@@ -1,6 +1,7 @@
 export type DataMode = 'historical_replay' | 'live'
 export type RiskLevel = 'normal' | 'medium' | 'high' | 'critical'
 export type CurrentState = 'normal' | 'empty_now' | 'full_now' | 'unavailable'
+export type ServiceStatus = 'operational' | 'official_inactive' | 'suspected_unavailable'
 export type AlertStatus = 'open' | 'acknowledged' | 'resolved'
 export type HorizonKey = '30' | '60' | '120'
 
@@ -9,9 +10,14 @@ export interface Forecast {
   predictedDocks: number
   emptyRisk: number
   fullRisk: number
+  unavailableRisk: number
   riskScore: number
   level: RiskLevel
   confidence: 'low' | 'medium' | 'high'
+  alertThreshold: number
+  baselineStatus: 'matched' | 'unmatched' | 'not_applicable'
+  method: 'historical_replay' | 'live_historical_baseline' | 'inventory_only'
+  sampleSize: number
   reasons: string[]
 }
 
@@ -27,6 +33,7 @@ export interface StationRisk {
   availableDocks: number
   capacityGap: number
   currentState: CurrentState
+  serviceStatus: ServiceStatus
   qualityFlags: string[]
   forecast: {
     horizons: Record<HorizonKey, Forecast>
@@ -87,6 +94,7 @@ export interface LiveStation {
   longitude: number | null
   active: boolean
   currentState: CurrentState
+  serviceStatus: ServiceStatus
   sourceUpdatedAt: string
   youbike2Bikes: number
   eBikeBikes: number
@@ -119,6 +127,10 @@ export interface DashboardArtifact {
       sourceFiles: number
       stationCount: number
       dateRange: { from: string; to: string }
+    }
+    riskPolicy?: {
+      version: string
+      alertThresholds: Record<HorizonKey, number>
     }
     quality: {
       unavailableRate: number
