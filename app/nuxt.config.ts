@@ -1,6 +1,13 @@
+const isStaticDeployBuild = process.env.NITRO_PRESET === 'cloudflare-pages-static'
+  || process.argv.includes('generate')
+
 export default defineNuxtConfig({
   ssr: false,
   srcDir: '.',
+  // Pages uses the standalone `functions/` directory. Static builds exclude
+  // the legacy Nuxt API tree so dashboard data and unused AWS code cannot be
+  // bundled into the deployment. Local `nuxt dev` still exposes that tree.
+  serverDir: isStaticDeployBuild ? '.pages-static-no-server' : 'server',
   compatibilityDate: '2026-08-05',
   devtools: { enabled: true },
   css: ['leaflet/dist/leaflet.css', '~/assets/css/main.css'],
