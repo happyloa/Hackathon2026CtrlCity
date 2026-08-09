@@ -11,6 +11,7 @@ export interface ReplayManifest {
   availableTimes: string[]
   districts: string[]
   scenarios: Record<string, string>
+  labels: Record<string, string>
 }
 
 type ReplayActionState = {
@@ -19,6 +20,11 @@ type ReplayActionState = {
 }
 
 const scenarioCache = new Map<string, DashboardArtifact>()
+let latestScenarioRequest = 0
+
+function actionKey(asOf: string, id: string) {
+  return `${asOf}:${id}`
+}
 
 function asManifest(value: unknown): ReplayManifest | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
@@ -33,6 +39,7 @@ function asManifest(value: unknown): ReplayManifest | null {
     availableTimes: record.availableTimes.filter((value): value is string => typeof value === 'string'),
     districts: record.districts.filter((value): value is string => typeof value === 'string'),
     scenarios: Object.fromEntries(Object.entries(scenarios).filter((entry): entry is [string, string] => typeof entry[1] === 'string')),
+    labels: Object.fromEntries(Object.entries(record.labels && typeof record.labels === 'object' && !Array.isArray(record.labels) ? record.labels : {}).filter((entry): entry is [string, string] => typeof entry[1] === 'string')),
   }
 }
 
@@ -53,15 +60,15 @@ function normalizeArtifact(value: DashboardArtifact, manifest: ReplayManifest): 
   }
 }
 
-function statusWithClientActions(alert: Alert, actions: ReplayActionState): Alert {
-  if (alert.status === 'open' && actions.acknowledgedAlertIds.includes(alert.id)) {
+function statusWithClientActions(alert: Alert, asOf: string, actions: ReplayActionState): Alert {
+  if (alert.status === 'open' && actions.acknowledgedAlertIds.includes(actionKey(asOf, alert.id))) {
     return { ...alert, status: 'acknowledged' }
   }
   return alert
 }
 
-function dispatchWithClientActions(dispatch: DispatchRecommendation, actions: ReplayActionState): DispatchRecommendation {
-  if (dispatch.status === 'proposed' && actions.acceptedDispatchIds.includes(dispatch.id)) {
+function dispatchWithClientActions(dispatch: DispatchRecommendation, asOf: string, actions: ReplayActionState): DispatchRecommendation {
+  if (dispatch.status === 'proposed' && actions.acceptedDispatchIds.includes(actionKey(asOf, dispatch.id))) {
     return { ...dispatch, status: 'assigned' }
   }
   return dispatch
@@ -98,10 +105,10 @@ export function filterReplayDashboard(
   const stationIds = new Set(stations.map(station => station.id))
   const alerts = dashboard.alerts
     .filter(alert => !district || stationIds.has(alert.stationId))
-    .map(alert => statusWithClientActions(alert, actions))
+    .map(alert => statusWithClientActions(alert, dashboard.meta.asOf, actions))
   const dispatches = dashboard.dispatches
-    .filter(dispatch => !district || stationIds.has(dispatch.fromStationId) || stationIds.has(dispatch.toStationId))
-    .map(dispatch => dispatchWithClientActions(dispatch, actions))
+    .filter(dispatch => !district || (stationIds.has(dispatch.fromStationId) && stationIds.has(dispatch.toStationId)))
+    .map(dispatch => dispatchWithClientActions(dispatch, dashboard.meta.asOf, actions))
   const stationHistories = Object.fromEntries(stations.map(station => [station.id, dashboard.stationHistories[station.id] || []]))
 
   return {
@@ -119,6 +126,7 @@ export function useReplayDashboard() {
   const dashboard = useState<DashboardArtifact | null>('replay-dashboard-artifact', () => null)
   const pending = useState('replay-dashboard-pending', () => false)
   const error = useState('replay-dashboard-error', () => '')
+  const selectedAsOf = useState('replay-dashboard-selected-as-of', () => '')
   const acknowledgedAlertIds = useState<string[]>('replay-dashboard-acknowledged-alerts', () => [])
   const acceptedDispatchIds = useState<string[]>('replay-dashboard-accepted-dispatches', () => [])
 
@@ -138,13 +146,15 @@ export function useReplayDashboard() {
   }
 
   async function loadScenario(requestedAsOf?: string): Promise<DashboardArtifact | null> {
+    const requestId = ++latestScenarioRequest
     pending.value = true
     error.value = ''
 
     try {
       const nextManifest = await loadManifest()
-      const targetAsOf = requestedAsOf && nextManifest.scenarios[requestedAsOf]
-        ? requestedAsOf
+      const preferredAsOf = requestedAsOf || selectedAsOf.value
+      const targetAsOf = preferredAsOf && nextManifest.scenarios[preferredAsOf]
+        ? preferredAsOf
         : nextManifest.defaultAsOf
       const scenarioUrl = nextManifest.scenarios[targetAsOf]
       if (!scenarioUrl) throw new Error('找不到指定的歷史回放情境。')
@@ -152,27 +162,34 @@ export function useReplayDashboard() {
       const cached = scenarioCache.get(scenarioUrl)
       const rawArtifact = cached ?? await $fetch<DashboardArtifact>(scenarioUrl)
       const normalized = normalizeArtifact(rawArtifact, nextManifest)
+      if (requestId !== latestScenarioRequest) return null
+      if (cached) scenarioCache.delete(scenarioUrl)
       scenarioCache.set(scenarioUrl, normalized)
+      while (scenarioCache.size > 2) scenarioCache.delete(scenarioCache.keys().next().value as string)
       dashboard.value = normalized
+      selectedAsOf.value = targetAsOf
       return normalized
     } catch (caught) {
+      if (requestId !== latestScenarioRequest) return null
       dashboard.value = null
       error.value = caught instanceof Error ? caught.message : '無法載入歷史回放資料。'
       return null
     } finally {
-      pending.value = false
+      if (requestId === latestScenarioRequest) pending.value = false
     }
   }
 
   function acknowledge(alertId: string) {
-    if (!acknowledgedAlertIds.value.includes(alertId)) {
-      acknowledgedAlertIds.value = [...acknowledgedAlertIds.value, alertId]
+    const key = actionKey(dashboard.value?.meta.asOf || selectedAsOf.value, alertId)
+    if (!acknowledgedAlertIds.value.includes(key)) {
+      acknowledgedAlertIds.value = [...acknowledgedAlertIds.value, key]
     }
   }
 
   function acceptDispatch(dispatchId: string) {
-    if (!acceptedDispatchIds.value.includes(dispatchId)) {
-      acceptedDispatchIds.value = [...acceptedDispatchIds.value, dispatchId]
+    const key = actionKey(dashboard.value?.meta.asOf || selectedAsOf.value, dispatchId)
+    if (!acceptedDispatchIds.value.includes(key)) {
+      acceptedDispatchIds.value = [...acceptedDispatchIds.value, key]
     }
   }
 
@@ -183,6 +200,7 @@ export function useReplayDashboard() {
   return {
     manifest,
     dashboard,
+    selectedAsOf,
     pending,
     error,
     actions,

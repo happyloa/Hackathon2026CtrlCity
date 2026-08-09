@@ -397,6 +397,15 @@ function fileName(asOf, index) {
   return 'scenario-' + String(index + 1).padStart(2, '0') + '-' + asOf.replace(/[^0-9]/g, '') + '.json'
 }
 
+function scenarioLabel(rawScenario) {
+  const label = text(record(record(rawScenario).summary).scenarioLabel)
+  return {
+    morning_pressure: '早尖峰缺車壓力',
+    evening_pressure: '晚間雙向供需壓力',
+    latest_coverage: '資料末端覆蓋驗證',
+  }[label] || '歷史營運情境'
+}
+
 export async function exportReplayStatic(outputDir) {
   const source = JSON.parse(await readFile(SOURCE_FILE, 'utf8'))
   const scenarios = record(source.scenarios)
@@ -409,9 +418,11 @@ export async function exportReplayStatic(outputDir) {
   await mkdir(replayDir, { recursive: true })
 
   const scenarioPaths = {}
+  const scenarioLabels = {}
   for (const [index, asOf] of keys.entries()) {
     const name = fileName(asOf, index)
     scenarioPaths[asOf] = '/data/replay/' + name
+    scenarioLabels[asOf] = scenarioLabel(scenarios[asOf])
     const dashboard = makeDashboard(source, asOf, scenarios[asOf], availableTimes, list(source.districts).map((value) => text(value)).filter(Boolean))
     await writeFile(resolve(replayDir, name), JSON.stringify(dashboard), 'utf8')
   }
@@ -422,6 +433,7 @@ export async function exportReplayStatic(outputDir) {
     availableTimes,
     districts: list(source.districts).map((value) => text(value)).filter(Boolean),
     scenarios: scenarioPaths,
+    labels: scenarioLabels,
   }
   await writeFile(resolve(replayDir, 'manifest.json'), JSON.stringify(manifest), 'utf8')
   const liveProfiles = await exportLiveProfiles(source, outputDir)

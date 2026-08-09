@@ -23,6 +23,10 @@ test('static export preserves dual-direction dispatches and shards live profiles
     assert.ok(Object.keys(slot.profiles).length >= 1_000)
     assert.ok((await stat(join(outputDir, 'data', 'live-profile', 'slot-18.json'))).size < 1_024 * 1_024)
 
+    const replayManifest = JSON.parse(await readFile(join(outputDir, 'data', 'replay', 'manifest.json'), 'utf8'))
+    assert.equal(Object.keys(replayManifest.labels).length, 3)
+    assert.equal(replayManifest.labels['2026-04-26T17:00:00+08:00'], '晚間雙向供需壓力')
+
     const replay = JSON.parse(await readFile(join(outputDir, 'data', 'replay', 'scenario-01-202604261700000800.json'), 'utf8'))
     const operations = new Set(replay.dispatches.map(dispatch => dispatch.operation))
     assert.ok(operations.has('deliver_bikes'))

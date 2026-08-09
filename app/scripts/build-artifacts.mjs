@@ -9,6 +9,12 @@ import iconv from 'iconv-lite'
 
 import { deriveStatePersistence } from './alert-persistence.mjs'
 import {
+  createScenarioProfileStats,
+  profileKey,
+  updateProfile,
+  updateScenarioProfileStats,
+} from './scenario-profile-cutoff.mjs'
+import {
   ALERT_THRESHOLDS,
   HORIZON_MINUTES,
   RISK_POLICY_VERSION,
@@ -168,10 +174,6 @@ function round(value, decimals = 3) {
 
 function stableId(identityKey) {
   return `st_${createHash('sha256').update(identityKey).digest('hex').slice(0, 14)}`
-}
-
-function profileKey(stationId, slot) {
-  return `${stationId}:${slot}`
 }
 
 function stateForSnapshot(totalDocks, availableBikes, availableDocks) {
@@ -430,33 +432,6 @@ function getBucket(bucketStats, snapshot) {
     bucketStats.set(snapshot.epoch, bucket)
   }
   return bucket
-}
-
-function updateProfile(profileStats, snapshot) {
-  const key = profileKey(snapshot.id, snapshot.slot)
-  let profile = profileStats.get(key)
-  if (!profile) {
-    profile = {
-      observations: 0,
-      bikesSum: 0,
-      docksSum: 0,
-      empty: 0,
-      full: 0,
-      unavailable: 0,
-    }
-    profileStats.set(key, profile)
-  }
-
-  if (snapshot.currentState === 'unavailable') {
-    profile.unavailable += 1
-    return
-  }
-
-  profile.observations += 1
-  profile.bikesSum += snapshot.availableBikes
-  profile.docksSum += snapshot.availableDocks
-  if (snapshot.currentState === 'empty') profile.empty += 1
-  if (snapshot.currentState === 'full') profile.full += 1
 }
 
 function bucketRiskScore(bucket) {
@@ -951,6 +926,13 @@ async function main() {
       { ...scenario, recordsByStation: new Map() },
     ]),
   )
+  const scenarioProfileStats = createScenarioProfileStats(scenarios)
+  const replayParseQuality = {
+    invalidTimestampRows: 0,
+    invalidNumericRows: 0,
+    flagCounts: {},
+  }
+  const replayDistricts = new Set()
   const windowTargets = new Map()
   for (const scenario of scenarios) {
     for (let point = 0; point <= HISTORY_POINTS; point += 1) {
@@ -961,24 +943,29 @@ async function main() {
     }
   }
 
-  console.log(`Capturing ${scenarios.length} actual replay scenarios in a second streaming pass...`)
+  console.log(`Building ${scenarios.length} as-of profile sets and capturing actual replay scenarios in a second streaming pass...`)
   for (const filePath of sourceFiles) {
     const fileName = filePath.slice(filePath.lastIndexOf('\\') + 1)
     await streamRows(filePath, async (row, source) => {
       const timestamp = parseLocalTimestamp(row.observedAt)
-      if (!timestamp || !windowTargets.has(timestamp.bucketEpoch)) return
+      if (!timestamp) return
+      const captureTargets = windowTargets.get(timestamp.bucketEpoch) ?? []
+      const contributesToProfile = scenarios.some((scenario) => timestamp.bucketEpoch < scenario.epoch)
+      if (!captureTargets.length && !contributesToProfile) return
 
       const snapshot = toSnapshot(
         row,
         { ...source, fileName },
         aliases,
         stationIndex,
-        { ...quality, flagCounts: {} },
-        new Set(),
+        replayParseQuality,
+        replayDistricts,
       )
       if (!snapshot) return
 
-      for (const scenarioEpoch of windowTargets.get(snapshot.epoch)) {
+      updateScenarioProfileStats(scenarioProfileStats, scenarios, snapshot)
+
+      for (const scenarioEpoch of captureTargets) {
         const capture = scenarioCaptures.get(scenarioEpoch)
         let historyByAt = capture.recordsByStation.get(snapshot.id)
         if (!historyByAt) {
@@ -997,7 +984,8 @@ async function main() {
   const scenarioArtifacts = {}
   for (const scenario of scenarios) {
     const capture = scenarioCaptures.get(scenario.epoch)
-    scenarioArtifacts[scenario.at] = buildScenario(capture, capture, profileStats)
+    const asOfProfileStats = scenarioProfileStats.get(scenario.epoch)
+    scenarioArtifacts[scenario.at] = buildScenario(capture, capture, asOfProfileStats)
   }
 
   // Prefer a real scenario with both directions so the default historical
@@ -1026,7 +1014,7 @@ async function main() {
       generatedAt: new Date().toISOString(),
       dataMode: 'historical_replay',
       modelVersion: 'historical-profile-heuristic-v1',
-      forecastMethod: 'Current inventory plus station half-hour historical profile; zero-inventory observations are excluded from empty/full risk profiles and remain an inferred service-status flag.',
+      forecastMethod: 'Current inventory plus an as-of station half-hour historical profile built only from buckets strictly earlier than each replay scenario; zero-inventory observations are excluded from empty/full risk profiles and remain an inferred service-status flag.',
       riskPolicy: {
         version: RISK_POLICY_VERSION,
         alertThresholds: ALERT_THRESHOLDS,
