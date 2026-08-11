@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
-import type { DataMode, HorizonKey, StationHistoryPoint, StationRisk } from '~/shared/ops'
+import { displayStationName, type DataMode, type HorizonKey, type StationHistoryPoint, type StationRisk } from '~/shared/ops'
 
 const props = defineProps<{
   station: StationRisk | null
@@ -13,6 +13,7 @@ const props = defineProps<{
 const emit = defineEmits<{ close: [] }>()
 
 const isLive = computed(() => props.dataMode === 'live')
+const stationName = computed(() => displayStationName(props.station?.name || ''))
 const forecast = computed(() => props.station?.forecast.horizons[props.horizon])
 const hasMatchedBaseline = computed(() => forecast.value?.baselineStatus === 'matched')
 const riskLabel = computed(() => {
@@ -68,7 +69,7 @@ const detailTarget = computed(() => ({
   <aside v-if="station" class="station-detail" aria-label="站點詳情">
     <button type="button" class="close-button" aria-label="關閉站點詳情" @click="emit('close')"><Icon icon="solar:close-circle-outline" /></button>
     <div class="detail-topline"><span>{{ isLive ? '即時庫存＋歷史基線' : '站點風險卡' }}</span><span :class="`risk-badge risk-${forecast?.level}`">{{ riskLabel }}</span></div>
-    <h3>{{ station.name }}</h3>
+    <h3>{{ stationName }}</h3>
     <p class="station-location"><Icon icon="solar:map-point-outline" /> {{ station.district || '行政區待確認' }} · {{ station.city }}</p>
 
     <div class="stock-cells">
@@ -85,7 +86,7 @@ const detailTarget = computed(() => ({
 
     <div v-if="!isLive" class="detail-chart-wrap">
       <div class="mini-heading"><span>最近 6 小時＋基線推估</span><i><b />可借車 <b class="dock-key" />可還位</i></div>
-      <ForecastChart :history="history" :station-name="station.name" :capacity="station.totalDocks" :projections="chartProjections" />
+      <ForecastChart :history="history" :station-name="stationName" :capacity="station.totalDocks" :projections="chartProjections" />
     </div>
 
     <div class="reason-list">

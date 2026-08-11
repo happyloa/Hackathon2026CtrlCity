@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
-import type { ApiEnvelope, DashboardArtifact, LiveStation, LiveStationsPayload, StationRisk } from '~/shared/ops'
+import { displayStationName, type ApiEnvelope, type DashboardArtifact, type LiveStation, type LiveStationsPayload, type StationRisk } from '~/shared/ops'
 
 type LiveResponse = ApiEnvelope<LiveStationsPayload>
 
@@ -68,7 +68,7 @@ function statusClass(station: StationRisk) {
       <div>
         <p class="section-kicker"><Icon icon="solar:refresh-circle-outline" /> 更新監測</p>
         <h2>{{ updated ? '官方資料已同步' : '等待下一筆官方資料更新' }}</h2>
-        <p>新北市政府 Open Data · 約每 5 分鐘比對 · {{ district || '全新北市' }}</p>
+        <p>新北市政府 Open Data · {{ district || '全新北市' }}</p>
       </div>
       <div class="live-feed-action">
         <span><i class="live-dot" /> {{ updated ? '已同步新資料' : sourceTime }}</span>
@@ -85,10 +85,10 @@ function statusClass(station: StationRisk) {
       <div v-if="attentionStations.length" class="live-attention-list">
         <p>優先檢視 {{ attentionStations.length }} 個站點</p>
         <div v-for="station in attentionStations" :key="station.id" class="live-attention-row">
-          <span class="live-station-name"><b>{{ station.name.replace(/^YouBike2\.0_/, '') }}</b><small>{{ station.district }}</small></span>
+          <span class="live-station-name"><b>{{ displayStationName(station.name) }}</b><small>{{ station.district }}</small></span>
           <span class="live-stock">車 {{ station.availableBikes }} · 位 {{ station.availableDocks }}</span>
           <span class="live-status" :class="statusClass(station)">{{ riskLabel(station) }}</span>
-          <button type="button" class="text-link" :aria-label="`在地圖定位 ${station.name}`" @click="emit('select', station.id)">地圖定位 <Icon icon="solar:map-point-outline" /></button>
+          <button type="button" class="text-link" :aria-label="`在地圖定位 ${displayStationName(station.name)}`" @click="emit('select', station.id)">地圖定位 <Icon icon="solar:map-point-outline" /></button>
         </div>
       </div>
       <p v-else-if="!pending" class="live-feed-empty">目前沒有需要優先處理的即時站點。</p>

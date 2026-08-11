@@ -38,7 +38,7 @@ onMounted(() => {
 <template>
   <div class="app-shell">
     <aside class="side-nav">
-      <NuxtLink :to="navigationTarget('/')" class="brand" aria-label="前往調度戰情室">
+      <NuxtLink :to="navigationTarget('/')" class="brand" aria-label="前往營運總覽">
         <span class="brand-mark"><Icon icon="solar:wheel-angle-outline" /></span>
         <span>
           <strong>新北市 YouBike</strong>
@@ -67,7 +67,7 @@ onMounted(() => {
     <main class="main-canvas">
       <header class="topbar">
         <div>
-          <p class="eyebrow">新北市公共自行車營運調度</p>
+          <p class="eyebrow">公共自行車營運調度</p>
           <h1>{{ activeLabel }}</h1>
         </div>
         <div class="topbar-meta">

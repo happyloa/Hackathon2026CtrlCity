@@ -34,7 +34,7 @@ function generate() {
       provider: 'template',
       headline: place + '未來 ' + props.horizon + ' 分鐘調度重點',
       narrative: highRisk
-        ? '目前有 ' + highRisk + ' 個高風險站點，建議先由調度人員覆核 ' + dispatches + ' 筆補車建議，再依現場車況執行。'
+        ? '目前有 ' + highRisk + ' 個高風險站點，建議先由調度人員覆核 ' + dispatches + ' 筆搬運任務，再依現場車況執行。'
         : '目前沒有高風險站點；請持續監控即時庫存與下一個來源更新時點。',
       citedFacts,
     }

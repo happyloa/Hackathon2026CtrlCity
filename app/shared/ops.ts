@@ -5,6 +5,18 @@ export type ServiceStatus = 'operational' | 'official_inactive' | 'suspected_una
 export type AlertStatus = 'open' | 'acknowledged' | 'resolved'
 export type HorizonKey = '30' | '60' | '120'
 
+/** Keeps the official station identifier in data while removing its repeated UI prefix. */
+export function displayStationName(name: string, fallback = '未命名站點'): string {
+  const source = name.trim()
+  if (!source) return fallback
+
+  const display = source
+    .replace(/^YouBike\s*2[.．]0(?:\s*[_＿－—–\-:：]\s*|\s+)?/i, '')
+    .trim()
+
+  return display || source
+}
+
 export interface Forecast {
   predictedBikes: number
   predictedDocks: number

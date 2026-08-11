@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
-import type { DispatchRecommendation, StationRisk } from '~/shared/ops'
+import { displayStationName, type DispatchRecommendation, type StationRisk } from '~/shared/ops'
 
 const props = defineProps<{
   dispatches: DispatchRecommendation[]
@@ -14,7 +14,7 @@ const emit = defineEmits<{ accept: [dispatchId: string]; select: [stationId: str
 const stationLookup = computed(() => new Map(props.stations.map(station => [station.id, station])))
 const visibleDispatches = computed(() => props.compact ? props.dispatches.slice(0, 4) : props.dispatches)
 const allDispatchesTarget = computed(() => ({ path: '/dispatch', query: props.contextQuery || {} }))
-const nameFor = (id: string) => stationLookup.value.get(id)?.name || '未命名站點'
+const nameFor = (id: string) => displayStationName(stationLookup.value.get(id)?.name || '')
 const expandedDispatchId = ref<string | null>(null)
 const operationLabel = (dispatch: DispatchRecommendation) => dispatch.operation === 'remove_bikes' ? '移車' : '補車'
 const sourceRole = (dispatch: DispatchRecommendation) => dispatch.operation === 'remove_bikes' ? '待疏散滿位站' : '供給站'
@@ -71,7 +71,7 @@ function toggleImpact(dispatchId: string) {
           <div class="dispatch-route">
             <span class="operation-badge" :class="dispatch.operation">{{ operationLabel(dispatch) }}</span>
             <button type="button" @click="emit('select', dispatch.fromStationId)">{{ nameFor(dispatch.fromStationId) }}</button>
-            <span><Icon icon="solar:arrow-right-outline" /></span>
+            <span class="dispatch-route-arrow" aria-hidden="true"><Icon icon="solar:arrow-right-outline" /></span>
             <button type="button" @click="emit('select', dispatch.toStationId)">{{ nameFor(dispatch.toStationId) }}</button>
           </div>
           <div class="dispatch-meta">
@@ -97,7 +97,7 @@ function toggleImpact(dispatchId: string) {
           <p class="impact-notice"><Icon icon="solar:shield-warning-outline" /> 模擬結果，不改寫預測；指派前仍需人工覆核。</p>
           <div class="impact-grid">
             <div class="impact-station">
-              <p><span>{{ sourceRole(dispatch) }}</span>{{ impactFor(dispatch)?.from.name }}</p>
+              <p><span>{{ sourceRole(dispatch) }}</span>{{ displayStationName(impactFor(dispatch)?.from.name || '') }}</p>
               <dl>
                 <div><dt>可借車</dt><dd>{{ impactFor(dispatch)?.from.availableBikes }} <b>→</b> <strong>{{ impactFor(dispatch)?.fromAfterBikes }}</strong></dd></div>
                 <div><dt>可還位</dt><dd>{{ impactFor(dispatch)?.from.availableDocks }} <b>→</b> <strong>{{ impactFor(dispatch)?.fromAfterDocks }}</strong></dd></div>
@@ -106,7 +106,7 @@ function toggleImpact(dispatchId: string) {
             </div>
             <div class="impact-arrow"><Icon icon="solar:round-arrow-right-outline" /><span>搬運 {{ impactFor(dispatch)?.movableBikes }} 台</span></div>
             <div class="impact-station">
-              <p><span>{{ destinationRole(dispatch) }}</span>{{ impactFor(dispatch)?.to.name }}</p>
+              <p><span>{{ destinationRole(dispatch) }}</span>{{ displayStationName(impactFor(dispatch)?.to.name || '') }}</p>
               <dl>
                 <div><dt>可借車</dt><dd>{{ impactFor(dispatch)?.to.availableBikes }} <b>→</b> <strong>{{ impactFor(dispatch)?.toAfterBikes }}</strong></dd></div>
                 <div><dt>可還位</dt><dd>{{ impactFor(dispatch)?.to.availableDocks }} <b>→</b> <strong>{{ impactFor(dispatch)?.toAfterDocks }}</strong></dd></div>
@@ -122,6 +122,7 @@ function toggleImpact(dispatchId: string) {
 </template>
 
 <style scoped>
+.dispatch-panel { container-type: inline-size; }
 .dispatch-item + .dispatch-item { border-top: 1px solid var(--line); }
 .operation-badge { flex: 0 0 auto; padding: 3px 6px; color: var(--teal-dark); background: var(--surface-muted); border: 1px solid var(--line-strong); border-radius: 999px; font-size: 16px; font-weight: 800; }
 .operation-badge.remove_bikes { color: var(--blue); background: #e4edf5; border-color: #a9c2d7; }
@@ -147,6 +148,20 @@ function toggleImpact(dispatchId: string) {
 .impact-station small svg { font-size: 18px; }
 .impact-arrow { display: grid; place-content: center; gap: 3px; min-width: 76px; color: var(--teal-dark); text-align: center; font-size: 16px; font-weight: 800; }
 .impact-arrow svg { justify-self: center; font-size: 24px; }
+
+@container (max-width: 620px) {
+  .dispatch-row { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'route route' 'meta assign'; gap: 8px 12px; align-items: center; }
+  .dispatch-route { grid-area: route; display: grid; grid-template-columns: auto minmax(0, 1fr) auto minmax(0, 1fr); width: 100%; gap: 6px; }
+  .dispatch-route button { min-width: 0; overflow: visible; line-height: 1.35; text-overflow: clip; white-space: normal; overflow-wrap: anywhere; }
+  .dispatch-meta { grid-area: meta; display: flex; align-items: baseline; gap: 8px; min-width: 0; text-align: left; }
+  .dispatch-meta span, .dispatch-meta small { display: inline; white-space: normal; }
+  .assign-button { grid-area: assign; }
+}
+
+@container (max-width: 390px) {
+  .dispatch-route { gap: 4px; }
+  .dispatch-meta { gap: 6px; }
+}
 
 :global(html[data-theme='dark'] .dispatch-impact) { background: var(--surface-muted); border-color: var(--line); }
 :global(html[data-theme='dark'] .operation-badge) { color: #c9f0e6; background: #29443b; border-color: #5b8d7f; }

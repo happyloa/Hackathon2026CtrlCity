@@ -1,10 +1,11 @@
-import type {
-  Alert,
-  DispatchRecommendation,
-  Forecast,
-  HorizonKey,
-  StationRisk,
-} from './ops'
+import {
+  displayStationName,
+  type Alert,
+  type DispatchRecommendation,
+  type Forecast,
+  type HorizonKey,
+  type StationRisk,
+} from './ops.ts'
 
 export interface LiveOperationPolicy {
   horizon: HorizonKey
@@ -344,7 +345,7 @@ function dispatchReasons(
     : `接收站調度後仍保留至少 ${candidateSafetyStock} 個可還位。`
 
   return [
-    `建議將 ${bikeCount} 輛由「${source.name}」移至「${destination.name}」，處理「${task.station.name}」的 ${task.alert.condition} 告警。`,
+    `建議將 ${bikeCount} 輛由「${displayStationName(source.name)}」移至「${displayStationName(destination.name)}」，處理「${displayStationName(task.station.name)}」的 ${task.alert.condition} 告警。`,
     inventoryReason,
     `兩站直線距離約 ${rounded(candidate.distanceKm, 1)} 公里；執行前仍需人工確認道路、載運與現場狀態。`,
   ]

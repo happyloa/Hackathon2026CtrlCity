@@ -128,10 +128,10 @@ const metricCards = computed(() => {
   ]
 })
 
-const modeTitle = computed(() => sourceMode.value === 'live' ? '新北市站點供需總覽' : '新北市歷史調度回放')
+const modeTitle = computed(() => sourceMode.value === 'live' ? '站點供需總覽' : '歷史調度回放')
 const modeDescription = computed(() => sourceMode.value === 'live'
-  ? '官方資料更新後，以同站、同時段歷史基線標示 30／60 分鐘風險，並轉成待確認告警與人工覆核搬運建議。'
-  : '選擇一個歷史時點，回看庫存、告警與補車／移車建議；所有建議均需由值班人員覆核。')
+  ? '資料更新後，以同站、同時段歷史基線標示 30／60 分鐘風險，轉成待確認告警與待覆核搬運任務。'
+  : '選擇一個時點，回看庫存、告警與補車／移車建議；皆需由值班人員覆核。')
 
 function acknowledge(alertId: string) {
   if (sourceMode.value === 'live') liveOperations.acknowledge(alertId)
@@ -153,14 +153,14 @@ function selectStation(stationId: string) {
   <div class="dashboard-page" :class="{ 'live-update-flash': sourceMode === 'live' && liveUpdateState === 'updated' }">
     <section class="command-intro">
       <div>
-        <p class="eyebrow"><span class="live-dot" /> {{ sourceMode === 'live' ? '新北市官方即時資料' : '歷史資料風險回放' }}</p>
+        <p class="eyebrow"><span class="live-dot" /> {{ sourceMode === 'live' ? '官方即時資料' : '歷史資料回放' }}</p>
         <h2>{{ modeTitle }}</h2>
         <p>{{ modeDescription }}</p>
       </div>
       <div class="intro-data-note">
         <span><Icon icon="solar:calendar-date-outline" /> 資料時間</span>
         <strong>{{ asOfLabel }}</strong>
-        <small>{{ sourceMode === 'live' ? '官方約每 5 分鐘更新；資料變更才替換畫面' : `歷史回放 · ${activeDashboard?.meta.modelVersion || '尚未載入'}` }}</small>
+        <small v-if="sourceMode === 'historical_replay'">歷史回放 · {{ activeDashboard?.meta.modelVersion || '尚未載入' }}</small>
       </div>
     </section>
 

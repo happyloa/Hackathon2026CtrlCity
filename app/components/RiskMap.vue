@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
-import type { DataMode, HorizonKey, StationRisk } from '~/shared/ops'
+import { displayStationName, type DataMode, type HorizonKey, type StationRisk } from '~/shared/ops'
 
 const props = defineProps<{
   stations: StationRisk[]
@@ -112,7 +112,7 @@ function tooltipContent(station: StationRisk) {
   const context = forecast.baselineStatus === 'matched'
     ? `${props.horizon} 分鐘 · ${direction}`
     : direction
-  return `<strong>${escapeHtml(station.name)}</strong><span>${escapeHtml(station.district || '新北市')}・${inventory}</span><span>${escapeHtml(context)}</span>`
+  return `<strong>${escapeHtml(displayStationName(station.name))}</strong><span>${escapeHtml(station.district || '新北市')}・${inventory}</span><span>${escapeHtml(context)}</span>`
 }
 
 function markerOptions(station: StationRisk) {
@@ -234,8 +234,8 @@ onBeforeUnmount(() => {
   <section class="panel map-panel geographic-map-panel" :class="{ 'live-map-panel': isLive }">
     <div class="panel-heading map-heading">
       <div>
-        <p class="section-kicker"><Icon :icon="isLive ? 'solar:bolt-circle-outline' : 'solar:map-point-wave-outline'" /> 新北市實景地圖</p>
-        <h2>{{ isLive ? `新北市 ${horizon} 分鐘即時基線風險` : `新北市 ${horizon} 分鐘預測風險分布` }}</h2>
+        <p class="section-kicker"><Icon :icon="isLive ? 'solar:bolt-circle-outline' : 'solar:map-point-wave-outline'" /> 站點地圖</p>
+        <h2>{{ isLive ? `${horizon} 分鐘即時基線風險` : `${horizon} 分鐘預測風險分布` }}</h2>
       </div>
       <span class="risk-summary"><b>{{ mappedStations.length }}</b> {{ stationQuery ? '個搜尋結果' : (isLive ? '個即時站點' : '個預測站點') }}</span>
     </div>
@@ -261,7 +261,7 @@ onBeforeUnmount(() => {
         <span v-if="isLive"><i class="legend-dot inventory-only" />未對照基線</span>
       </div>
     </div>
-    <p class="map-status-summary"><Icon icon="solar:info-circle-outline" /> {{ isLive ? `目前有 ${abnormalCount} 個站點需留意；紅色為缺車、藍色為缺位、灰色需人工確認。` : `目前有 ${abnormalCount} 個風險或服務異常站點；地圖與資料皆限定新北市。` }}</p>
+    <p class="map-status-summary"><Icon icon="solar:info-circle-outline" /> {{ isLive ? `目前有 ${abnormalCount} 個站點需留意；請依圖例判讀風險類型。` : `目前有 ${abnormalCount} 個風險或服務異常站點。` }}</p>
   </section>
 </template>
 

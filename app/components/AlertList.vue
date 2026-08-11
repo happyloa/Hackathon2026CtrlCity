@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
-import type { Alert, StationRisk } from '~/shared/ops'
+import { displayStationName, type Alert, type StationRisk } from '~/shared/ops'
 
 const props = defineProps<{
   alerts: Alert[]
@@ -20,6 +20,11 @@ const allAlertsTarget = computed(() => ({ path: '/alerts', query: props.contextQ
 
 function stationFor(alert: Alert) {
   return stationLookup.value.get(alert.stationId)
+}
+
+function stationNameFor(alert: Alert) {
+  const station = stationFor(alert)
+  return station ? displayStationName(station.name) : '資料未對應站點'
 }
 
 function conditionLabel(condition: Alert['condition']) {
@@ -47,7 +52,7 @@ function conditionLabel(condition: Alert['condition']) {
       <article v-for="alert in visibleAlerts" :key="alert.id" class="alert-row" :class="`severity-${alert.severity}`">
         <span class="severity-mark"><Icon :icon="alert.severity === 'critical' ? 'solar:danger-triangle-bold' : 'solar:bell-bing-outline'" /></span>
         <button type="button" class="alert-main" @click="emit('select', alert.stationId)">
-          <strong>{{ stationFor(alert)?.name || '資料未對應站點' }}</strong>
+          <strong>{{ stationNameFor(alert) }}</strong>
           <span>{{ conditionLabel(alert.condition) }} · {{ alert.durationMinutes > 0 ? `已持續 ${alert.durationMinutes} 分鐘` : '即時偵測' }}</span>
         </button>
         <div class="alert-actions">

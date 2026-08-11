@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
-import type { HorizonKey, StationHistoryPoint, StationRisk } from '~/shared/ops'
+import { displayStationName, type HorizonKey, type StationHistoryPoint, type StationRisk } from '~/shared/ops'
 
 const route = useRoute()
 const replay = useReplayDashboard()
@@ -22,6 +22,7 @@ const record = computed<{ station: StationRisk; history: StationHistoryPoint[] }
   return station ? { station, history: dashboard.value?.stationHistories[station.id] || [] } : null
 })
 const forecast = computed(() => record.value?.station.forecast.horizons[horizon.value])
+const stationName = computed(() => displayStationName(record.value?.station.name || ''))
 const contextQuery = computed(() => Object.fromEntries(
   ['mode', 'at', 'district']
     .map(key => [key, route.query[key]])
@@ -49,7 +50,7 @@ watch([mode, requestedAsOf], ([nextMode, nextAsOf]) => {
     <section v-else-if="record" class="station-hero panel">
       <div>
         <p class="section-kicker"><Icon icon="solar:map-point-outline" /> {{ record.station.district || '未分類' }} ・ {{ record.station.city }}</p>
-        <h2>{{ record.station.name }}</h2>
+        <h2>{{ stationName }}</h2>
         <p>{{ mode === 'live' ? '這是最新官方庫存結合同站歷史基線的風險資料，可用來覆核即時調度優先順序。' : '這是歷史回放時點的庫存與風險資料，可用來解釋調度優先順序。' }}</p>
       </div>
       <div class="station-hero-stock">
@@ -60,7 +61,7 @@ watch([mode, requestedAsOf], ([nextMode, nextAsOf]) => {
     <div v-if="record" class="station-insight-grid">
       <section v-if="mode === 'historical_replay'" class="panel chart-panel">
         <div class="panel-heading"><div><p class="section-kicker">歷史庫存走勢</p><h2>最近 6 小時＋基線推估</h2></div></div>
-        <ForecastChart :history="record.history" :station-name="record.station.name" :capacity="record.station.totalDocks" :projections="chartProjections" />
+        <ForecastChart :history="record.history" :station-name="stationName" :capacity="record.station.totalDocks" :projections="chartProjections" />
       </section>
       <section class="panel forecast-panel">
         <div class="panel-heading"><div><p class="section-kicker">{{ mode === 'live' ? '即時歷史基線' : '歷史資料推估' }}</p><h2>風險細節</h2></div></div>
