@@ -177,6 +177,41 @@ test('pairs empty and full demand with separate nearby supply while preserving s
   assert.deepEqual(plan.dispatches.map(item => item.id), reversed.dispatches.map(item => item.id))
 })
 
+test('allocates one stable source across multiple urgent stations before it is exhausted', () => {
+  const firstEmpty = station({
+    id: 'empty-a',
+    availableBikes: 0,
+    availableDocks: 20,
+    latitude: 25,
+    currentState: 'empty_now',
+    stationForecast: forecast({ predictedBikes: 0, predictedDocks: 20, emptyRisk: 0.9, level: 'critical' }),
+  })
+  const secondEmpty = station({
+    id: 'empty-b',
+    availableBikes: 0,
+    availableDocks: 20,
+    latitude: 25.002,
+    currentState: 'empty_now',
+    stationForecast: forecast({ predictedBikes: 0, predictedDocks: 20, emptyRisk: 0.9, level: 'critical' }),
+  })
+  const sharedSource = station({
+    id: 'shared-source',
+    availableBikes: 15,
+    availableDocks: 5,
+    latitude: 25.001,
+  })
+
+  const plan = buildLiveOperations([firstEmpty, secondEmpty, sharedSource], OBSERVED_AT, { maximumDistanceKm: 5 })
+  const deliveries = plan.dispatches.filter(item => item.operation === 'deliver_bikes')
+  const bikesMoved = deliveries.reduce((total, item) => total + item.bikeCount, 0)
+
+  assert.equal(deliveries.length, 2)
+  assert.ok(deliveries.every(item => item.fromStationId === 'shared-source'))
+  assert.equal(bikesMoved, 6)
+  assert.ok(sharedSource.availableBikes - bikesMoved >= safetyStockFor(sharedSource))
+  assert.equal(new Set(deliveries.map(item => item.toStationId)).size, 2)
+})
+
 test('keeps the alert but creates no dispatch when no source can preserve safety stock', () => {
   const empty = station({
     id: 'isolated-empty',

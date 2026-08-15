@@ -12,7 +12,7 @@ const props = defineProps<{
 const emit = defineEmits<{ accept: [dispatchId: string]; select: [stationId: string] }>()
 
 const stationLookup = computed(() => new Map(props.stations.map(station => [station.id, station])))
-const visibleDispatches = computed(() => props.compact ? props.dispatches.slice(0, 4) : props.dispatches)
+const visibleDispatches = computed(() => props.compact ? props.dispatches.slice(0, 3) : props.dispatches)
 const allDispatchesTarget = computed(() => ({ path: '/dispatch', query: props.contextQuery || {} }))
 const nameFor = (id: string) => displayStationName(stationLookup.value.get(id)?.name || '')
 const expandedDispatchId = ref<string | null>(null)
@@ -59,7 +59,7 @@ function toggleImpact(dispatchId: string) {
   <section class="panel dispatch-panel">
     <div class="panel-heading">
       <div>
-        <p class="section-kicker"><Icon icon="solar:routing-2-outline" /> 調度建議</p>
+        <p class="section-kicker"><Icon icon="solar:routing-2-outline" /> 全域調度分配</p>
         <h2>先處理這些搬運任務</h2>
       </div>
       <NuxtLink v-if="compact" :to="allDispatchesTarget" class="text-link">調度工作台 <Icon icon="solar:arrow-right-up-outline" /></NuxtLink>

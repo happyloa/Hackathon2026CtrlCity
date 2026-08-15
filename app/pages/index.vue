@@ -70,9 +70,7 @@ watch(() => route.query, (query) => {
 watch(activeDashboard, (value) => {
   if (!value) return
   if (sourceMode.value === 'historical_replay' && !selectedAt.value) selectedAt.value = value.meta.asOf
-  if (!selectedStationId.value || !value.stations.some(station => station.id === selectedStationId.value)) {
-    selectedStationId.value = value.stations[0]?.id || ''
-  }
+  if (selectedStationId.value && !value.stations.some(station => station.id === selectedStationId.value)) selectedStationId.value = ''
 }, { immediate: true })
 
 watch(sourceMode, (mode) => {
@@ -217,20 +215,29 @@ function selectStation(stationId: string) {
         <div class="operation-rail">
           <AlertList :alerts="activeDashboard.alerts" :stations="activeDashboard.stations" :context-query="contextQuery" compact @select="selectStation" @acknowledge="acknowledge" />
           <DispatchList :dispatches="activeDashboard.dispatches" :stations="activeDashboard.stations" :context-query="contextQuery" compact @select="selectStation" @accept="acceptDispatch" />
-          <StationDetailPanel :station="selectedStation" :history="selectedHistory" :horizon="horizon" :data-mode="sourceMode" :context-query="contextQuery" @close="selectedStationId = ''" />
-          <LiveFeedCard
-            v-if="sourceMode === 'live'"
-            :district="selectedDistrict"
-            :payload="livePayload"
-            :dashboard="activeDashboard"
-            :pending="livePending"
-            :error-message="liveError"
-            :updated="liveUpdateState === 'updated'"
-            @refresh="refreshLive({ manual: true })"
-            @select="selectStation"
-          />
+          <StationDetailPanel :station="selectedStation" :stations="activeDashboard.stations" :history="selectedHistory" :horizon="horizon" :data-mode="sourceMode" :context-query="contextQuery" @close="selectedStationId = ''" @select="selectStation" />
         </div>
       </section>
+
+      <details v-if="sourceMode === 'live'" class="live-monitor panel">
+        <summary>
+          <span><Icon icon="solar:refresh-circle-outline" /> 更新監測</span>
+          <small>{{ liveUpdateState === 'updated' ? '新資料已同步' : '查看官方來源與優先站點' }}</small>
+          <Icon class="live-monitor-arrow" icon="solar:alt-arrow-down-outline" />
+        </summary>
+        <LiveFeedCard
+          embedded
+          compact
+          :district="selectedDistrict"
+          :payload="livePayload"
+          :dashboard="activeDashboard"
+          :pending="livePending"
+          :error-message="liveError"
+          :updated="liveUpdateState === 'updated'"
+          @refresh="refreshLive({ manual: true })"
+          @select="selectStation"
+        />
+      </details>
 
       <OperationalEvidence :as-of="activeDashboard.meta.asOf" :data-mode="sourceMode" />
 
@@ -256,3 +263,11 @@ function selectStation(stationId: string) {
     </template>
   </div>
 </template>
+
+<style scoped>
+.live-monitor { margin-top: 14px; overflow: hidden; }
+.live-monitor summary { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 9px; padding: 12px 15px; color: var(--ink); cursor: pointer; list-style: none; }
+.live-monitor summary::-webkit-details-marker { display: none; }
+.live-monitor summary > span { display: inline-flex; align-items: center; gap: 6px; font-size: 16px; font-weight: 800; }.live-monitor summary > span svg { color: var(--teal-dark); font-size: 19px; }.live-monitor summary small { color: var(--muted); font-size: 16px; font-weight: 650; }.live-monitor-arrow { color: var(--teal-dark); font-size: 18px; transition: transform 150ms ease; }.live-monitor[open] summary { border-bottom: 1px solid var(--line); }.live-monitor[open] .live-monitor-arrow { transform: rotate(180deg); }
+@media (max-width: 560px) { .live-monitor summary { grid-template-columns: minmax(0, 1fr) auto; }.live-monitor summary small { grid-column: 1; }.live-monitor-arrow { grid-column: 2; grid-row: 1; } }
+</style>

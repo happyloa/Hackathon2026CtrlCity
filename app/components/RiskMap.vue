@@ -252,7 +252,7 @@ onBeforeUnmount(() => {
       <p v-if="!mappedStations.length" class="map-empty">目前沒有可定位的站點資料。</p>
     </div>
     <div class="map-caption">
-      <p class="map-instruction"><Icon icon="solar:cursor-square-outline" /> 圓點顏色代表風險方向，大小代表預估介入缺口</p>
+      <p class="map-instruction"><Icon icon="solar:cursor-square-outline" /> 點選站點查看風險與替代還車引導</p>
       <div class="geographic-map-legend" aria-label="風險方向圖例">
         <span><i class="legend-dot normal" />基線穩定</span>
         <span><i class="legend-dot empty" />無車風險／目前無車</span>
@@ -269,7 +269,7 @@ onBeforeUnmount(() => {
 .geographic-map-panel { overflow: hidden; }
 .geographic-map {
   position: relative;
-  min-height: 510px;
+  min-height: 440px;
   margin: 0 14px;
   overflow: hidden;
   background: #e3e9e4;
@@ -277,7 +277,7 @@ onBeforeUnmount(() => {
   border-radius: 6px;
 }
 
-.map-canvas { width: 100%; min-height: 510px; }
+.map-canvas { width: 100%; min-height: 440px; }
 .map-instruction,
 .geographic-map-legend,
 .map-empty {
@@ -335,7 +335,7 @@ onBeforeUnmount(() => {
 .map-status-summary { display: flex; align-items: center; gap: 6px; margin: 10px 18px 14px; color: var(--muted); font-size: 16px; font-weight: 600; }
 .map-status-summary svg { flex: 0 0 auto; color: var(--teal-dark); font-size: 19px; }
 
-:global(.geographic-map .leaflet-container) { min-height: 510px; font-family: 'Noto Sans TC', sans-serif; }
+:global(.geographic-map .leaflet-container) { min-height: 440px; font-family: 'Noto Sans TC', sans-serif; }
 :global(.geographic-map .leaflet-control-zoom a) { width: 35px; height: 35px; color: #1d2926; font-size: 25px; line-height: 33px; }
 :global(.geographic-map .leaflet-control-attribution) { padding: 3px 6px; color: #35433f; background: rgba(255, 255, 255, .94); font-size: 16px; }
 :global(.geographic-map .leaflet-control-attribution a) { color: #15584e; font-weight: 700; }
@@ -357,15 +357,15 @@ onBeforeUnmount(() => {
 :global(html[data-theme='dark'] .geographic-map .leaflet-tooltip) { color: var(--ink); background: var(--panel); border-color: var(--line-strong); }
 :global(html[data-theme='dark'] .geographic-map .leaflet-tooltip span) { color: var(--muted); }
 
-@media (max-width: 1150px) { .geographic-map, .map-canvas, :global(.geographic-map .leaflet-container) { min-height: 460px; } }
+@media (max-width: 1150px) { .geographic-map, .map-canvas, :global(.geographic-map .leaflet-container) { min-height: 400px; } }
 @media (max-width: 780px) {
-  .geographic-map, .map-canvas, :global(.geographic-map .leaflet-container) { min-height: 390px; }
+  .geographic-map, .map-canvas, :global(.geographic-map .leaflet-container) { min-height: 350px; }
   .map-tools { top: 55px; right: 8px; max-width: calc(100% - 16px); }
   .map-search { min-width: 170px; }
   .map-caption { gap: 7px 12px; padding: 10px 14px 0; }
 }
 @media (max-width: 480px) {
-  .geographic-map, .map-canvas, :global(.geographic-map .leaflet-container) { min-height: 350px; }
+  .geographic-map, .map-canvas, :global(.geographic-map .leaflet-container) { min-height: 320px; }
   .map-tools { top: 51px; left: 8px; right: 8px; justify-content: space-between; }
   .map-search { min-width: 0; flex: 1; }
   .map-reset { padding: 6px 7px; }

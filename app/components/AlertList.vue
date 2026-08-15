@@ -15,7 +15,7 @@ const emit = defineEmits<{
 }>()
 
 const stationLookup = computed(() => new Map(props.stations.map(station => [station.id, station])))
-const visibleAlerts = computed(() => props.compact ? props.alerts.slice(0, 5) : props.alerts)
+const visibleAlerts = computed(() => props.compact ? props.alerts.slice(0, 3) : props.alerts)
 const allAlertsTarget = computed(() => ({ path: '/alerts', query: props.contextQuery || {} }))
 
 function stationFor(alert: Alert) {

@@ -1,3 +1,4 @@
+import { buildLiveOperations } from '~/shared/live-operations'
 import type {
   Alert,
   DashboardArtifact,
@@ -103,11 +104,12 @@ export function filterReplayDashboard(
     ? dashboard.stations.filter(station => station.district === district)
     : dashboard.stations
   const stationIds = new Set(stations.map(station => station.id))
-  const alerts = dashboard.alerts
-    .filter(alert => !district || stationIds.has(alert.stationId))
+  const operations = buildLiveOperations(stations, dashboard.meta.asOf)
+  const alerts = operations.alerts
+    .filter(alert => stationIds.has(alert.stationId))
     .map(alert => statusWithClientActions(alert, dashboard.meta.asOf, actions))
-  const dispatches = dashboard.dispatches
-    .filter(dispatch => !district || (stationIds.has(dispatch.fromStationId) && stationIds.has(dispatch.toStationId)))
+  const dispatches = operations.dispatches
+    .filter(dispatch => stationIds.has(dispatch.fromStationId) && stationIds.has(dispatch.toStationId))
     .map(dispatch => dispatchWithClientActions(dispatch, dashboard.meta.asOf, actions))
   const stationHistories = Object.fromEntries(stations.map(station => [station.id, dashboard.stationHistories[station.id] || []]))
 

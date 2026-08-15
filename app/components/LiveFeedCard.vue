@@ -11,6 +11,8 @@ const props = defineProps<{
   pending?: boolean
   errorMessage?: string
   updated?: boolean
+  compact?: boolean
+  embedded?: boolean
 }>()
 
 const emit = defineEmits<{ refresh: []; select: [stationId: string] }>()
@@ -26,7 +28,7 @@ const attentionStations = computed(() => {
   return [...(props.dashboard?.stations || [])]
     .filter((station) => station.serviceStatus !== 'operational' || station.currentState !== 'normal' || ['high', 'critical'].includes(station.forecast.horizons['60'].level))
     .sort((left, right) => priority(left) - priority(right) || right.forecast.horizons['60'].riskScore - left.forecast.horizons['60'].riskScore)
-    .slice(0, 5)
+    .slice(0, props.compact ? 3 : 5)
 })
 
 const sourceTime = computed(() => {
@@ -63,7 +65,7 @@ function statusClass(station: StationRisk) {
 </script>
 
 <template>
-  <section class="panel live-feed-card" :class="{ updated }" aria-label="官方即時站況">
+  <section :class="['live-feed-card', { panel: !embedded, updated, 'is-embedded': embedded }]" aria-label="官方即時站況">
     <div class="live-feed-heading">
       <div>
         <p class="section-kicker"><Icon icon="solar:refresh-circle-outline" /> 更新監測</p>
@@ -95,3 +97,7 @@ function statusClass(station: StationRisk) {
     </template>
   </section>
 </template>
+
+<style scoped>
+.live-feed-card.is-embedded { margin: 0; padding: 14px 16px 16px; border: 0; border-radius: 0; }
+</style>
