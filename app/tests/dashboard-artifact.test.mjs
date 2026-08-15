@@ -51,13 +51,12 @@ function expectedPersistence(station, history, scenarioAt) {
 
 test('dashboard artifact contains the three selected historical replay scenarios', () => {
   assert.equal(dashboard.meta?.dataMode, 'historical_replay')
-  assert.ok(Array.isArray(dashboard.availableTimes), 'availableTimes must be an array')
 
   const scenarios = scenarioEntries()
   assert.equal(scenarios.length, 3, 'the demo artifact must expose exactly three replay scenarios')
 
   for (const [at, scenario] of scenarios) {
-    assert.ok(dashboard.availableTimes.includes(at), `scenario ${at} must be selectable`)
+    assert.match(at, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:00\+08:00$/, `scenario ${at} must use a replay timestamp`)
     assert.equal(scenario.summary?.at, at, `scenario ${at} summary must use its key time`)
     assert.ok(Array.isArray(scenario.stations), `scenario ${at} must contain stations`)
     assert.equal(scenario.summary.totalStations, scenario.stations.length, `scenario ${at} station total must reconcile`)

@@ -95,8 +95,8 @@ function validateStation(station, scenarioAt, history) {
   }
 }
 
-function validateScenario(at, scenario, availableTimes) {
-  assert(availableTimes.has(at), `scenario ${at} is absent from availableTimes`)
+function validateScenario(at, scenario) {
+  assertAt(at, `scenario ${at} key`)
   for (const field of ['summary', 'stations', 'alerts', 'dispatches', 'briefingFacts', 'stationHistories']) {
     assert(Object.hasOwn(scenario, field), `scenario ${at} is missing ${field}`)
   }
@@ -166,14 +166,7 @@ async function main() {
   const dashboard = JSON.parse(await readFile(DASHBOARD_FILE, 'utf8'))
   for (const field of [
     'meta',
-    'availableTimes',
     'districts',
-    'summary',
-    'stations',
-    'alerts',
-    'dispatches',
-    'briefingFacts',
-    'stationHistories',
     'liveProfiles',
     'scenarios',
   ]) {
@@ -190,32 +183,23 @@ async function main() {
   }
   assert(dashboard.meta.coverage?.rawRows > 1_000_000, 'coverage.rawRows is unexpectedly small')
   assert(dashboard.meta.coverage?.validRows > 1_000_000, 'coverage.validRows is unexpectedly small')
+  assert(dashboard.meta.coverage?.availableTimeCount > 1_000, 'coverage.availableTimeCount is unexpectedly small')
+  assertAt(dashboard.meta.coverage?.firstAt, 'coverage.firstAt')
+  assertAt(dashboard.meta.coverage?.lastAt, 'coverage.lastAt')
+  assert(dashboard.meta.coverage.firstAt < dashboard.meta.coverage.lastAt, 'coverage time range is invalid')
   assert(dashboard.meta.quality?.unavailableRowsExcludedFromProfile > 0, 'unavailable rows were not recorded as excluded')
-
-  assert(Array.isArray(dashboard.availableTimes) && dashboard.availableTimes.length > 1000, 'availableTimes is incomplete')
-  const availableTimes = new Set()
-  let previousAt = ''
-  for (const at of dashboard.availableTimes) {
-    assertAt(at, 'availableTimes entry')
-    assert(at > previousAt, 'availableTimes must be sorted and unique')
-    availableTimes.add(at)
-    previousAt = at
-  }
 
   const scenarioEntries = Object.entries(dashboard.scenarios)
   assert(scenarioEntries.length >= 3 && scenarioEntries.length <= 6, 'dashboard must contain 3 to 6 replay scenarios')
   for (const [at, scenario] of scenarioEntries) {
-    validateScenario(at, scenario, availableTimes)
+    validateScenario(at, scenario)
   }
 
   const defaultScenario = dashboard.scenarios[dashboard.meta.asOf]
   assert(defaultScenario, 'default meta.asOf scenario is missing')
-  assert(dashboard.summary.at === defaultScenario.summary.at, 'top-level summary is not the default scenario')
-  assert(dashboard.stations.length === defaultScenario.stations.length, 'top-level stations are not the default scenario')
-  assert(dashboard.alerts.length === defaultScenario.alerts.length, 'top-level alerts are not the default scenario')
   validateLiveProfiles(dashboard.liveProfiles)
 
-  console.log(`Artifact validation passed: ${(fileStats.size / 1024 / 1024).toFixed(2)} MiB, ${dashboard.availableTimes.length} time slots, ${scenarioEntries.length} scenarios, ${dashboard.stations.length} default stations.`)
+  console.log(`Artifact validation passed: ${(fileStats.size / 1024 / 1024).toFixed(2)} MiB, ${dashboard.meta.coverage.availableTimeCount} time slots, ${scenarioEntries.length} scenarios, ${defaultScenario.stations.length} default stations.`)
 }
 
 main().catch((error) => {

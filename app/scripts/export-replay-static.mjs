@@ -367,25 +367,23 @@ async function exportLiveProfiles(source, outputDir) {
 
   const paths = {}
   for (let slot = 0; slot < 48; slot += 1) {
-    const name = `slot-${String(slot).padStart(2, '0')}.json`
-    const profiles = Object.fromEntries(stations
-      .map((station) => [station.id, station.slots[slot]])
-      .filter((entry) => entry[1]))
+    const name = `slot-v2-${String(slot).padStart(2, '0')}.json`
     paths[String(slot)] = '/data/live-profile/' + name
+    // Profiles are positionally aligned with manifest.matchKeys. Keeping the
+    // station key once in the manifest removes a repeated `st_*` identifier
+    // from every half-hour shard while preserving deterministic lookups.
     await writeFile(resolve(directory, name), JSON.stringify({
-      schemaVersion: '1.0',
       slot,
-      profiles,
+      profiles: stations.map((station) => station.slots[slot]),
     }), 'utf8')
   }
 
   const manifest = {
-    schemaVersion: text(rawProfiles.schemaVersion, '1.0'),
+    schemaVersion: '2.0',
     modelVersion: text(rawProfiles.modelVersion, 'historical-profile-heuristic-v1'),
     timezone: text(rawProfiles.timezone, 'Asia/Taipei'),
     riskPolicy: normalizeLiveRiskPolicy(rawProfiles.riskPolicy),
-    profileValueFormat: list(rawProfiles.profileValueFormat).map((value) => text(value)).filter(Boolean),
-    stations: stations.map(({ slots, ...station }) => station),
+    matchKeys: stations.map((station) => station.matchKey),
     slots: paths,
   }
   await writeFile(resolve(directory, 'manifest.json'), JSON.stringify(manifest), 'utf8')

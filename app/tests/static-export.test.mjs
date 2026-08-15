@@ -14,14 +14,20 @@ test('static export preserves dual-direction dispatches and shards live profiles
     assert.ok(result.liveProfiles.stations >= 1_500)
 
     const manifest = JSON.parse(await readFile(join(outputDir, 'data', 'live-profile', 'manifest.json'), 'utf8'))
+    assert.equal(manifest.schemaVersion, '2.0')
     assert.equal(manifest.timezone, 'Asia/Taipei')
     assert.equal(Object.keys(manifest.slots).length, 48)
     assert.equal(manifest.riskPolicy.alertThresholds['60'], .45)
+    assert.ok(Array.isArray(manifest.matchKeys))
+    assert.equal(manifest.matchKeys.length, result.liveProfiles.stations)
+    assert.equal('stations' in manifest, false)
 
-    const slot = JSON.parse(await readFile(join(outputDir, 'data', 'live-profile', 'slot-18.json'), 'utf8'))
+    const slot = JSON.parse(await readFile(join(outputDir, 'data', 'live-profile', 'slot-v2-18.json'), 'utf8'))
     assert.equal(slot.slot, 18)
-    assert.ok(Object.keys(slot.profiles).length >= 1_000)
-    assert.ok((await stat(join(outputDir, 'data', 'live-profile', 'slot-18.json'))).size < 1_024 * 1_024)
+    assert.ok(Array.isArray(slot.profiles))
+    assert.equal(slot.profiles.length, manifest.matchKeys.length)
+    assert.ok(slot.profiles.every(profile => Array.isArray(profile) && profile.length === 6))
+    assert.ok((await stat(join(outputDir, 'data', 'live-profile', 'slot-v2-18.json'))).size < 1_024 * 1_024)
 
     const replayManifest = JSON.parse(await readFile(join(outputDir, 'data', 'replay', 'manifest.json'), 'utf8'))
     assert.equal(Object.keys(replayManifest.labels).length, 3)

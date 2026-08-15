@@ -2,11 +2,6 @@ import type { Forecast, HorizonKey, LiveStation } from '~/shared/ops'
 
 type CompactProfile = [number, number, number, number, number, number]
 
-type ProfileStation = {
-  id: string
-  matchKey: string
-}
-
 type ProfileManifest = {
   schemaVersion: string
   modelVersion: string
@@ -15,13 +10,14 @@ type ProfileManifest = {
     version: string
     alertThresholds: Record<HorizonKey, number>
   }
-  stations: ProfileStation[]
+  matchKeys: string[]
+  legacyStationIds: string[]
   slots: Record<string, string>
 }
 
 type SlotPayload = {
   slot: number
-  profiles: Record<string, CompactProfile>
+  profiles: Array<CompactProfile | null>
 }
 
 type LiveSnapshot = {
@@ -34,7 +30,7 @@ const HORIZONS: HorizonKey[] = ['30', '60', '120']
 const FALLBACK_THRESHOLDS: Record<HorizonKey, number> = { '30': .45, '60': .45, '120': .4 }
 const slotCache = new Map<number, SlotPayload>()
 const snapshotsByStation = new Map<string, LiveSnapshot[]>()
-let matchIndex: Map<string, string[]> | undefined
+let matchIndex: Map<string, number[]> | undefined
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -198,7 +194,7 @@ function parseManifest(value: unknown): ProfileManifest | null {
   const source = asRecord(value)
   const riskPolicy = asRecord(source.riskPolicy)
   const thresholds = asRecord(riskPolicy.alertThresholds)
-  const stations = Array.isArray(source.stations)
+  const legacyStations = Array.isArray(source.stations)
     ? source.stations.map((value) => {
       const station = asRecord(value)
       return {
@@ -211,7 +207,11 @@ function parseManifest(value: unknown): ProfileManifest | null {
     Object.entries(asRecord(source.slots)).filter((entry): entry is [string, string] => typeof entry[1] === 'string'),
   )
 
-  if (!stations.length || !Object.keys(slots).length) return null
+  const matchKeys = Array.isArray(source.matchKeys)
+    ? source.matchKeys.map((value) => asText(value))
+    : legacyStations.map((station) => station.matchKey)
+
+  if (!matchKeys.length || matchKeys.some((matchKey) => !matchKey) || !Object.keys(slots).length) return null
   return {
     schemaVersion: asText(source.schemaVersion, '1.0'),
     modelVersion: asText(source.modelVersion, 'historical-profile-heuristic-v1'),
@@ -224,24 +224,29 @@ function parseManifest(value: unknown): ProfileManifest | null {
         '120': clamp(asNumber(thresholds['120'], FALLBACK_THRESHOLDS['120'])),
       },
     },
-    stations,
+    matchKeys,
+    legacyStationIds: legacyStations.length === matchKeys.length
+      ? legacyStations.map((station) => station.id)
+      : [],
     slots,
   }
 }
 
-function parseSlot(value: unknown): SlotPayload | null {
+function compactProfile(value: unknown): CompactProfile | null {
+  if (!Array.isArray(value) || value.length !== 6) return null
+  const compact = value.map(item => Math.max(0, Math.round(asNumber(item)))) as CompactProfile
+  return compact.slice(3).every(item => item <= 1000) ? compact : null
+}
+
+function parseSlot(value: unknown, legacyStationIds: string[] = []): SlotPayload | null {
   const source = asRecord(value)
   const slot = asNumber(source.slot, Number.NaN)
   if (!Number.isInteger(slot) || slot < 0 || slot > 47) return null
 
-  const profiles: Record<string, CompactProfile> = {}
-  for (const [id, value] of Object.entries(asRecord(source.profiles))) {
-    if (!Array.isArray(value) || value.length !== 6) continue
-    const compact = value.map(item => Math.max(0, Math.round(asNumber(item)))) as CompactProfile
-    if (!compact.slice(3).every(item => item <= 1000)) continue
-    profiles[id] = compact
-  }
-  return Object.keys(profiles).length ? { slot, profiles } : null
+  const profiles = Array.isArray(source.profiles)
+    ? source.profiles.map(compactProfile)
+    : legacyStationIds.map((id) => compactProfile(asRecord(source.profiles)[id]))
+  return profiles.some(Boolean) ? { slot, profiles } : null
 }
 
 export function useLiveRiskProfiles() {
@@ -255,10 +260,10 @@ export function useLiveRiskProfiles() {
     if (!parsed) throw new Error('歷史基線設定檔格式不完整。')
     manifest.value = parsed
     matchIndex = new Map()
-    for (const station of parsed.stations) {
-      const matches = matchIndex.get(station.matchKey) || []
-      matches.push(station.id)
-      matchIndex.set(station.matchKey, matches)
+    for (const [index, matchKey] of parsed.matchKeys.entries()) {
+      const matches = matchIndex.get(matchKey) || []
+      matches.push(index)
+      matchIndex.set(matchKey, matches)
     }
     return parsed
   }
@@ -268,7 +273,7 @@ export function useLiveRiskProfiles() {
     if (cached) return cached
     const path = profileManifest.slots[String(slot)]
     if (!path) return null
-    const parsed = parseSlot(await $fetch<unknown>(path, { cache: 'force-cache' }))
+    const parsed = parseSlot(await $fetch<unknown>(path, { cache: 'force-cache' }), profileManifest.legacyStationIds)
     if (parsed) slotCache.set(slot, parsed)
     return parsed
   }
@@ -284,7 +289,7 @@ export function useLiveRiskProfiles() {
 
       for (const station of stations) {
         const candidates = matchIndex?.get(liveMatchKey(station)) || []
-        const historicalId = candidates.length === 1 ? candidates[0] : null
+        const historicalIndex = candidates.length === 1 ? candidates[0] ?? null : null
         const momentum = recentMomentum(station, observedAt)
         const horizons = {} as Record<HorizonKey, Forecast>
 
@@ -293,7 +298,7 @@ export function useLiveRiskProfiles() {
             horizons[horizon] = inventoryOnlyForecast(station, horizon, '來源顯示疑似服務異常，需人工確認；不產生未來庫存風險。', 'not_applicable')
             continue
           }
-          const profile = historicalId ? slots[horizon]?.profiles[historicalId] : null
+          const profile = historicalIndex === null ? null : slots[horizon]?.profiles[historicalIndex] || null
           horizons[horizon] = profile
             ? makeForecast(station, profile, horizon, profileManifest.riskPolicy.alertThresholds[horizon], momentum)
             : inventoryOnlyForecast(station, horizon, '未對照到唯一的歷史站點基線；僅顯示即時庫存。', 'unmatched')
