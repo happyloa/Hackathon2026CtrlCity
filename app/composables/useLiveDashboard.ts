@@ -285,6 +285,7 @@ function scopedDashboard(dashboard: DashboardArtifact | null, district: string, 
 }
 
 export function useLiveDashboard() {
+  const liveStationsEndpoint = String(useRuntimeConfig().public.liveStationsEndpoint || '/api/v1/live-stations')
   const payload = useState<LiveResponse | null>('live-dashboard-payload', () => null)
   const dashboard = useState<DashboardArtifact | null>('live-dashboard-artifact', () => null)
   const pending = useState('live-dashboard-pending', () => false)
@@ -305,7 +306,7 @@ export function useLiveDashboard() {
     pending.value = true
     error.value = ''
     try {
-      const rawStations = await $fetch<unknown>('/api/v1/live-stations', { cache: 'no-store' })
+      const rawStations = await $fetch<unknown>(liveStationsEndpoint, { cache: 'no-store' })
       const response = createLiveResponse(rawStations)
       const forecasts = await forecastsFor(response.data.stations, response.meta.asOf)
       const nextDashboard = createLiveDashboard(response, forecasts, profileManifest.value)

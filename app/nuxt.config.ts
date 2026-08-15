@@ -3,10 +3,6 @@ const liveFeedPath = '/api/datasets/010e5b15-3823-4b20-b401-b1cf000550c5/json?pa
 export default defineNuxtConfig({
   ssr: false,
   srcDir: '.',
-  // Pages uses the standalone `functions/` directory. The legacy Nuxt API tree
-  // is intentionally excluded in every mode so the 14 MB build artifact is not
-  // imported into local dev or the edge bundle.
-  serverDir: '.pages-static-no-server',
   compatibilityDate: '2026-08-05',
   devtools: { enabled: true },
   css: ['leaflet/dist/leaflet.css', '~/assets/css/main.css'],
@@ -37,15 +33,8 @@ export default defineNuxtConfig({
     },
   },
   runtimeConfig: {
-    appMode: process.env.APP_MODE || 'local',
-    dataBackend: process.env.DATA_BACKEND || 'filesystem',
-    narrativeProvider: process.env.GENAI_BACKEND || 'template',
-    awsRegion: process.env.AWS_REGION || '',
-    bedrockModelId: process.env.BEDROCK_MODEL_ID || '',
-    liveFeedUrl: process.env.LIVE_FEED_URL || 'https://data.ntpc.gov.tw/api/datasets/010e5b15-3823-4b20-b401-b1cf000550c5/json?page=0&size=2000',
     public: {
-      productName: '新北市 YouBike 調度工作台',
-      dataMode: process.env.DATA_MODE || 'live',
+      liveStationsEndpoint: process.env.NUXT_PUBLIC_LIVE_STATIONS_ENDPOINT || '/api/v1/live-stations',
     },
   },
   nitro: {
