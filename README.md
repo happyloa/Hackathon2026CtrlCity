@@ -62,9 +62,10 @@ Cloudflare Pages 已透過 Git Integration 連接 main；推送後會自動建�
 
 - 原始活動資料集：docs/資料集/，已由 .gitignore 排除，絕不提交。
 - 已產製的展示用資料：app/data/dashboard.json，僅用於本機建置時產生靜態情境檔，不屬於 Nuxt server bundle。
-- [需求對照](docs/REQUIREMENT_COVERAGE.md)
-- [三分鐘展示講稿](docs/DEMO_3MIN.md)
-- [上台檢查清單](docs/PITCH_CHECKLIST.md)
-- [靜態部署與 1102 修正說明](docs/STATIC_RUNTIME.md)
+- [文件索引](docs/文件索引.md)
+- [命題需求對照](docs/03_實作與驗證/命題需求對照.md)
+- [三分鐘展示講稿](docs/04_展示與交付/三分鐘展示講稿.md)
+- [展示前檢查清單](docs/04_展示與交付/展示前檢查清單.md)
+- [靜態部署架構與 1102 修正](docs/03_實作與驗證/靜態部署架構與1102修正.md)
 
 即時資料來源為[新北市政府 YouBike 資料集](https://data.ntpc.gov.tw/datasets/010E5B15-3823-4B20-B401-B1CF000550C5)，地圖使用 [OpenStreetMap](https://www.openstreetmap.org/) 與 [Leaflet](https://leafletjs.com/)。

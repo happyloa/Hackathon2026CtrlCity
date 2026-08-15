@@ -1,7 +1,7 @@
 export const RISK_POLICY_VERSION = 'event-risk-policy-v1'
 
 // These values are frozen from the chronological validation split documented
-// in docs/MODEL_EVALUATION.md. They are deliberately shared by artifact
+// in docs/03_實作與驗證/歷史風險基線評估.md. They are deliberately shared by artifact
 // generation and static export so the visible alert state matches evaluation.
 export const ALERT_THRESHOLDS = Object.freeze({
   '30': 0.45,

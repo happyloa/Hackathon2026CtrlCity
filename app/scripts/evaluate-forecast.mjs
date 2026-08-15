@@ -14,7 +14,7 @@ const SOURCE_DIR = resolve(REPO_DIR, 'docs', '資料集')
 const ALIAS_FILE = resolve(SCRIPT_DIR, 'station-aliases.json')
 const OUTPUT_DIR = resolve(APP_DIR, 'data')
 const OUTPUT_FILE = resolve(OUTPUT_DIR, 'forecast-evaluation.json')
-const MARKDOWN_FILE = resolve(REPO_DIR, 'docs', 'MODEL_EVALUATION.md')
+const MARKDOWN_FILE = resolve(REPO_DIR, 'docs', '03_實作與驗證', '歷史風險基線評估.md')
 
 const HALF_HOUR_MS = 30 * 60 * 1000
 const HORIZONS = [30, 60, 120]
