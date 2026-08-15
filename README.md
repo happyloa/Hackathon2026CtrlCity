@@ -2,7 +2,7 @@
 
 新北市 YouBike 營運調度 Demo。它把官方即時站況、歷史風險回放、持續異常告警與人工覆核的調度建議，放在同一個 Nuxt 4 介面中。
 
-正式 Demo：<https://hackathon2026ctrlcity.pages.dev>
+目前展示網址（取得競賽 AWS 帳號前）：<https://hackathon2026ctrlcity.pages.dev>
 
 ## 重點功能
 
@@ -21,7 +21,7 @@
   -> 離線資料產製
   -> dashboard.json
   -> build 時輸出 3 份歷史情境 JSON
-  -> Cloudflare Pages 靜態 CDN
+  -> 靜態 CDN（目前為 Cloudflare Pages；最終為 AWS CloudFront）
 
 瀏覽器即時模式
   -> /api/v1/live-stations（極薄同源代理，只串流）
@@ -29,13 +29,13 @@
   -> /data/live-profile/（CDN 靜態基線 manifest 與按時段載入的 profile shard）
 ~~~
 
-歷史回放情境只會在使用者選擇「歷史預測」時按需載入；告警、調度與站點頁會沿用網址中的即時／歷史模式、回放時點及行政區。即時模式只取得 manifest 與當下 30／60 分鐘所需的精簡基線檔，不預取完整回放資料。新北市來源 API 沒有開放任意網站直接瀏覽器呼叫，因此保留一個只轉送資料、不解析 JSON 的 Pages Function。
+歷史回放情境只會在使用者選擇「歷史預測」時按需載入；告警、調度與站點頁會沿用網址中的即時／歷史模式、回放時點及行政區。即時模式只取得 manifest 與當下 30／60 分鐘所需的精簡基線檔，不預取完整回放資料。live profile v2 以一次 manifest 的站點比對鍵與按時段的對齊陣列儲存，避免在 48 份 shard 重複 station ID。新北市來源 API 沒有開放任意網站直接瀏覽器呼叫，因此目前保留一個只轉送資料、不解析 JSON 的 Pages Function。
 
 ## 成本與資源界線
 
 - 未建立 KV、D1、R2、Vectorize、Workers AI、Queue 或任何付費資料資源。
 - 靜態頁面與歷史 JSON 由 Pages CDN 提供；只有即時資料請求會碰到單一、唯讀的 Pages Function。
-- AWS SAM 與 Bedrock 程式僅是未部署的遷移骨架；線上 Demo 沒有呼叫 Bedrock，也不需要 AWS 憑證。
+- AWS SAM 與 Bedrock 程式仍是未部署的遷移骨架；線上 Demo 沒有呼叫 Bedrock，也不需要 AWS 憑證。取得競賽帳號後，最終 Demo 會改以 S3/CloudFront、API Gateway/Lambda 與 AgentCore 部署。
 
 ## 本機操作
 
@@ -46,6 +46,7 @@ npm test
 npm run data:validate
 npm run impact:evaluate
 npm run typecheck
+npm run build
 npm run build:cloudflare
 ~~~
 
@@ -53,15 +54,15 @@ build:cloudflare 會產生 app/dist：
 
 - 純靜態 SPA、fallback 與圖資資產
 - data/replay/manifest.json 與三份情境 JSON
-- data/live-profile/manifest.json 與 48 份半小時 profile shard（即時頁只按需載入）
+- data/live-profile/manifest.json 與 48 份半小時 profile shard（v2 compact array，即時頁只按需載入）
 - 僅 /api/* 進入 Pages Function 的 _routes.json
 
-Cloudflare Pages 已透過 Git Integration 連接 main；推送後會自動建置與部署。
+Cloudflare Pages 目前透過 Git Integration 連接 main；推送後會自動建置與部署。它是過渡展示環境，最終 AWS 部署會使用相同 `app/dist` 靜態產物，並維持 `/api/v1/live-stations` 的資料契約。
 
 ## 資料與文件
 
 - 原始活動資料集：docs/資料集/，已由 .gitignore 排除，絕不提交。
-- 已產製的展示用資料：app/data/dashboard.json，僅用於本機建置時產生靜態情境檔，不屬於 Nuxt server bundle。
+- 已產製的展示用資料：app/data/dashboard.json，僅用於本機建置時產生靜態情境檔，不屬於 Nuxt server bundle；檔案只保留 metadata、三個 scenarios 與 live profile，不重複預設情境。
 - [文件索引](docs/文件索引.md)
 - [命題需求對照](docs/03_實作與驗證/命題需求對照.md)
 - [三分鐘展示講稿](docs/04_展示與交付/三分鐘展示講稿.md)

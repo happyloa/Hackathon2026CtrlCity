@@ -920,170 +920,6 @@ a {
   color: var(--teal);
   font-size: 16px;
 }
-.live-feed-card {
-  padding: 18px 19px;
-  margin: 18px 0;
-}
-.live-feed-heading {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 18px;
-}
-.live-feed-heading h2 {
-  margin: 3px 0 5px;
-  font-size: 17px;
-  letter-spacing: -0.035em;
-}
-.live-feed-heading p:last-child {
-  margin: 0;
-  color: var(--muted);
-  font-size: 16px;
-}
-.live-feed-action {
-  display: grid;
-  justify-items: end;
-  gap: 8px;
-  color: var(--muted);
-  font-family: "DM Mono", monospace;
-  font-size: 16px;
-  white-space: nowrap;
-}
-.live-feed-action > span {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.live-feed-action button {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 7px 10px;
-  color: #0b625b;
-  background: #e5f6f0;
-  border: 0;
-  border-radius: 8px;
-  font: inherit;
-  font-family: "Noto Sans TC", sans-serif;
-  font-size: 16px;
-  font-weight: 700;
-  cursor: pointer;
-}
-.live-feed-action button:disabled {
-  cursor: wait;
-  opacity: 0.65;
-}
-.live-metric-grid {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 10px;
-  margin: 17px 0 14px;
-}
-.live-metric-grid > div {
-  padding: 12px 13px;
-  background: #f5f9f7;
-  border: 1px solid #e2ece8;
-  border-radius: 11px;
-}
-.live-metric-grid span {
-  display: block;
-  color: var(--muted);
-  font-size: 16px;
-  font-weight: 700;
-}
-.live-metric-grid strong {
-  display: block;
-  margin-top: 4px;
-  color: var(--ink);
-  font-family: "DM Mono", monospace;
-  font-size: 22px;
-  letter-spacing: -0.06em;
-}
-.live-attention-list {
-  border-top: 1px solid var(--line);
-}
-.live-attention-list > p {
-  margin: 12px 0 8px;
-  color: var(--muted);
-  font-size: 16px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-}
-.live-attention-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto auto;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 0;
-  border-top: 1px dashed #e4ecea;
-}
-.live-attention-row .text-link {
-  justify-self: end;
-  padding: 4px 0;
-  border: 0;
-  background: transparent;
-  line-height: 1.35;
-}
-.live-station-name {
-  min-width: 0;
-  display: grid;
-  gap: 2px;
-}
-.live-station-name b {
-  overflow: hidden;
-  color: var(--ink);
-  font-size: 16px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.live-station-name small {
-  color: var(--muted);
-  font-size: 16px;
-}
-.live-stock {
-  color: #506067;
-  font-family: "DM Mono", monospace;
-  font-size: 16px;
-}
-.live-status {
-  padding: 4px 7px;
-  border-radius: 99px;
-  font-size: 16px;
-  font-weight: 700;
-}
-.live-status.empty_now {
-  color: #a44938;
-  background: #fcebe7;
-}
-.live-status.forecast-empty {
-  color: #a44938;
-  background: #fcebe7;
-}
-.live-status.full_now {
-  color: #2f6597;
-  background: #e7f0fb;
-}
-.live-status.forecast-full {
-  color: #2f6597;
-  background: #e7f0fb;
-}
-.live-status.unavailable {
-  color: #6e7375;
-  background: #e9eeee;
-}
-.live-feed-error,
-.live-feed-empty {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-  min-height: 84px;
-  margin: 0;
-  color: var(--muted);
-  font-size: 16px;
-}
-.live-feed-error {
-  color: #b34c3e;
-}
 .loading-board {
   display: flex;
   align-items: center;
@@ -1487,42 +1323,6 @@ a {
     font-size: 23px;
   }
 }
-@media (max-width: 780px) {
-  .live-feed-heading {
-    display: grid;
-  }
-  .live-feed-action {
-    justify-items: start;
-  }
-  .live-metric-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .live-attention-row {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-  .live-status {
-    grid-column: 2;
-    grid-row: 1;
-  }
-  .live-stock {
-    grid-column: 1;
-    grid-row: 2;
-  }
-  .live-attention-row .text-link {
-    grid-column: 2;
-    grid-row: 2;
-    justify-self: end;
-  }
-}
-@media (max-width: 480px) {
-  .live-metric-grid {
-    grid-template-columns: 1fr;
-  }
-  .live-attention-row {
-    gap: 5px 10px;
-  }
-}
-
 /* Readability, live-update feedback, and theme controls */
 small {
   font-size: 1rem;
@@ -1585,11 +1385,7 @@ small {
   font-size: 20px;
 }
 .live-update-flash .metric-card,
-.live-update-flash .live-feed-card,
 .live-update-flash .map-panel {
-  animation: live-update-pulse 1.1s ease-out;
-}
-.live-feed-card.updated {
   animation: live-update-pulse 1.1s ease-out;
 }
 @keyframes live-update-pulse {
@@ -2053,7 +1849,6 @@ small {
 }
 
 .panel-heading h2,
-.live-feed-heading h2,
 .briefing-copy h2 {
   font-size: 18px;
   letter-spacing: -.03em;
@@ -2087,8 +1882,7 @@ small {
 
 .alert-main strong,
 .dispatch-route button,
-.dispatch-meta span,
-.live-station-name b {
+.dispatch-meta span {
   color: var(--ink);
 }
 
@@ -2096,11 +1890,8 @@ small {
 .alert-actions small,
 .acknowledged,
 .dispatch-meta small,
-.live-stock,
 .empty-state,
-.data-footnote,
-.live-feed-heading p:last-child,
-.live-attention-list > p {
+.data-footnote {
   color: var(--muted);
 }
 
@@ -2168,40 +1959,6 @@ small {
   color: var(--ink);
 }
 
-.live-feed-card {
-  padding: 16px;
-  margin: 0;
-}
-
-.live-feed-heading {
-  gap: 12px;
-}
-
-.live-feed-action {
-  color: var(--muted);
-}
-
-.live-feed-action button {
-  color: #fff;
-  background: var(--teal-dark);
-  border: 1px solid var(--teal-dark);
-  border-radius: 4px;
-}
-
-.live-attention-list {
-  margin-top: 12px;
-  border-top-color: var(--line);
-}
-
-.live-attention-row {
-  gap: 9px;
-  border-top-color: var(--line);
-}
-
-.live-status {
-  border-radius: 999px;
-}
-
 .live-inline-error {
   color: var(--red);
   background: #f7e3e1;
@@ -2233,9 +1990,7 @@ small {
 }
 
 .live-update-flash .metric-card,
-.live-update-flash .live-feed-card,
-.live-update-flash .map-panel,
-.live-feed-card.updated {
+.live-update-flash .map-panel {
   animation: data-refresh-border 1.1s ease-out;
 }
 
@@ -2313,8 +2068,6 @@ html[data-theme="dark"] .panel,
 html[data-theme="dark"] .metric-card,
 html[data-theme="dark"] .station-detail,
 html[data-theme="dark"] .briefing-card,
-html[data-theme="dark"] .live-feed-card,
-html[data-theme="dark"] .live-metric-grid > div,
 html[data-theme="dark"] .stock-cells div,
 html[data-theme="dark"] .forecast-note,
 html[data-theme="dark"] .dispatch-hero-stat,
@@ -2349,7 +2102,6 @@ html[data-theme="dark"] .horizon-switch button.active,
 html[data-theme="dark"] .segmented button.active,
 html[data-theme="dark"] .horizon-buttons button.active,
 html[data-theme="dark"] .live-refresh-button,
-html[data-theme="dark"] .live-feed-action button,
 html[data-theme="dark"] .briefing-button,
 html[data-theme="dark"] .assign-button {
   color: #12221e;
@@ -2371,11 +2123,8 @@ html[data-theme="dark"] .alert-main span,
 html[data-theme="dark"] .alert-actions small,
 html[data-theme="dark"] .acknowledged,
 html[data-theme="dark"] .dispatch-meta small,
-html[data-theme="dark"] .live-stock,
 html[data-theme="dark"] .empty-state,
-html[data-theme="dark"] .data-footnote,
-html[data-theme="dark"] .live-feed-heading p:last-child,
-html[data-theme="dark"] .live-attention-list > p {
+html[data-theme="dark"] .data-footnote {
   color: var(--muted);
 }
 
@@ -2385,7 +2134,6 @@ html[data-theme="dark"] .forecast-note strong,
 html[data-theme="dark"] .alert-main strong,
 html[data-theme="dark"] .dispatch-route button,
 html[data-theme="dark"] .dispatch-meta span,
-html[data-theme="dark"] .live-station-name b,
 html[data-theme="dark"] .briefing-copy h2,
 html[data-theme="dark"] .fact-pills b {
   color: var(--ink);
@@ -2439,32 +2187,11 @@ html[data-theme="dark"] .risk-summary b {
   color: inherit;
 }
 
-html[data-theme="dark"] .live-status.empty_now,
-html[data-theme="dark"] .live-status.forecast-empty {
-  color: #ffc4bd;
-  background: #4a2b2b;
-  border-color: #875453;
-}
-
-html[data-theme="dark"] .live-status.full_now,
-html[data-theme="dark"] .live-status.forecast-full {
-  color: #c3dcf1;
-  background: #293943;
-  border-color: #5d7d92;
-}
-
-html[data-theme="dark"] .live-status.unavailable {
-  color: var(--ink-soft);
-  background: var(--surface-muted);
-  border-color: var(--line-strong);
-}
-
 html[data-theme="dark"] .loading-board {
   color: var(--muted);
 }
 
-html[data-theme="dark"] .error-board,
-html[data-theme="dark"] .live-feed-error {
+html[data-theme="dark"] .error-board {
   color: #ffc4bd;
 }
 

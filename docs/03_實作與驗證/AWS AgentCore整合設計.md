@@ -9,14 +9,25 @@
 ## 建議架構
 
 ```text
-Nuxt / Cloudflare Pages
+目前：Nuxt 靜態前端 / Cloudflare Pages（暫時展示）
+最終：S3 私有 origin + CloudFront
+  ├─ /api/v1/live-stations → API Gateway + Lambda（唯讀官方即時資料代理）
   └─ 使用者主動點選「AI 調度覆核」
-       └─ AWS HTTP API + Lambda facade
+       └─ API Gateway + Lambda facade
             └─ AgentCore Harness（us-west-2）
                  └─ AgentCore Gateway（僅 Retrieve 工具）
                       └─ Managed Knowledge Base
                            └─ 私有 S3：命題、資料字典、調度規則、展示說明
 ```
+
+## 部署階段與可攜性
+
+- Cloudflare Pages 只是在取得主辦方提供的專用 AWS 帳號前，供團隊檢視與迭代的暫時展示環境；不會被當作最終競賽部署架構。
+- `dist/` 是平台無關的靜態 SPA。前端經由 `NUXT_PUBLIC_LIVE_STATIONS_ENDPOINT` 呼叫唯讀即時資料端點，預設為同源 `/api/v1/live-stations`。
+- 最終 AWS Demo 優先讓 CloudFront 將 `/api/*` 導向 API Gateway，以保留同源路徑；若採獨立 API Gateway 網域，才在建置時設定該公開 URL 並明確設定 CORS。
+- AWS 端不複製或上傳 `docs/資料集/`。S3 只放建置後的靜態網站與經挑選的知識庫文件；原始 CSV 保留本機並維持 Git 忽略。
+
+取得競賽帳號後的最小部署順序為：確認 IAM 身分與 region、建立 S3/CloudFront 靜態網站、建立 API Gateway/Lambda 即時資料代理、以同源路徑驗證即時模式，再建立 AgentCore、Knowledge Base 與「AI 調度覆核」端點。每一步都先使用活動帳號的免費額度／credit 與明確的 Budget 告警，完成展示後清理活動資源。
 
 - 瀏覽器只傳送縮減後的結構化 facts：選定站點、時間窗、前三筆告警、前三筆調度與摘要數字。
 - Lambda 以 IAM 呼叫 Harness；瀏覽器、Cloudflare Pages 與 Git repository 都不得保存 AWS access key、Bedrock key 或 AgentCore ARN。
@@ -43,9 +54,9 @@ Nuxt / Cloudflare Pages
 
 ## 實作前置條件與現況
 
-AWS CLI 已安裝於開發機，但尚未設定 AWS profile，也尚未建立任何 AWS 資源或產生費用。實作前需要活動提供的短期憑證或使用者指定的 AWS 帳號與 region，先用 `aws sts get-caller-identity` 確認身分與權限，再建立資源。
+工作坊帳號僅供練習；已在 Console 的 CloudShell 以 `aws sts get-caller-identity --region us-west-2` 確認為 Workshop Participant role。專案本機不保存或假設有可用的 AWS profile，也尚未由此專案建立 AWS 資源。正式實作必須等主辦方提供各組專用帳號與可用 region，再重新確認身分、Bedrock 模型權限、AgentCore 權限與支出上限。
 
-AgentCore CLI 與 AWS CLI 是兩套工具；工作坊以 Console 與 boto3 示範為主。若採 Lambda facade 與 AWS Console 建置，第一階段不必額外安裝 AgentCore CLI 或 Python。
+AgentCore CLI 與 AWS CLI 是兩套工具；工作坊以 Console 與 boto3 示範為主。若採 Lambda facade 與 AWS Console 建置，第一階段不必額外安裝 AgentCore CLI 或 Python。任何長期 access key、AgentCore ARN、Bedrock 憑證或 S3 bucket secret 都不得提交到 Git 或放入 Nuxt public runtime config。
 
 ## 官方依據
 
