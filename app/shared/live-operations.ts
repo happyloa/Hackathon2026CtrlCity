@@ -252,8 +252,8 @@ function actionableAlert(
   const reason = currentFailure
     ? `${timingLabel}${inventoryLabel}已為 0，低於 ${safetyStock} 的安全庫存。`
     : gap > 0
-      ? `${timingLabel}${inventoryLabel}為 ${Math.round(inventory)}，低於 ${safetyStock} 的安全庫存；風險指標為 ${Math.round(riskScore * 100)}%。`
-      : `${timingLabel}${inventoryLabel}為 ${Math.round(inventory)}；風險指標 ${Math.round(riskScore * 100)}% 已達告警門檻，但預測庫存尚未低於安全庫存。`
+      ? `${timingLabel}${inventoryLabel}為 ${Math.round(inventory)}，低於 ${safetyStock} 的安全庫存；風險分數為 ${Math.round(riskScore * 100)}／100。`
+      : `${timingLabel}${inventoryLabel}為 ${Math.round(inventory)}；風險分數 ${Math.round(riskScore * 100)}／100 已達告警門檻，但預測庫存尚未低於安全庫存。`
 
   return {
     station,

@@ -18,6 +18,9 @@ function forecast({
   alertThreshold = 0.45,
 } = {}) {
   return {
+    targetAt: '2026-08-09T09:00:00+08:00',
+    baselineBikes: 10,
+    baselineDocks: 10,
     predictedBikes,
     predictedDocks,
     emptyRisk,
@@ -28,7 +31,8 @@ function forecast({
     confidence: 'medium',
     alertThreshold,
     baselineStatus: 'matched',
-    method: 'live_historical_baseline',
+    baselineCoverage: 'sufficient',
+    method: 'historical_baseline_live_inventory',
     sampleSize: 12,
     reasons: ['已對照同站、同時段歷史基線。'],
   }

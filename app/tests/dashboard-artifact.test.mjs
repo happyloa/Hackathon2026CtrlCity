@@ -12,6 +12,7 @@ const RISK_FIELDS = ['emptyRisk', 'fullRisk', 'unavailableRisk', 'confidence']
 const MIN_EXPECTED_STATIONS = 1_500
 const HALF_HOUR_MS = 30 * 60 * 1000
 const PERSISTENT_STATES = new Set(['empty', 'full', 'unavailable'])
+const CURRENT_MODEL_VERSION = 'historical-live-inventory-baseline-v2'
 
 function assertProbability(value, label) {
   assert.equal(typeof value, 'number', `${label} must be numeric`)
@@ -91,8 +92,24 @@ test('every replay scenario has a coherent station inventory and bounded forecas
         assert.ok(Number.isFinite(forecast.predictedDocks) && forecast.predictedDocks >= 0, `station ${station.id} ${horizon}-minute predictedDocks is invalid`)
         assert.equal(forecast.alertThreshold, evaluation.thresholdSelection.selected[horizon].threshold, `station ${station.id} ${horizon}-minute alert threshold must match validation policy`)
         assert.ok(Number.isInteger(forecast.sampleSize) && forecast.sampleSize >= 0, `station ${station.id} ${horizon}-minute sampleSize is invalid`)
-        assert.equal(forecast.baselineStatus, 'matched', `historical replay station ${station.id} must have a matched baseline`)
-        assert.equal(forecast.method, 'historical_replay', `historical replay station ${station.id} must declare its method`)
+        if (dashboard.meta.modelVersion === CURRENT_MODEL_VERSION) {
+          assert.match(forecast.targetAt, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:00\+08:00$/, `station ${station.id} ${horizon}-minute targetAt is invalid`)
+          if (forecast.baselineStatus === 'matched') {
+            assert.equal(forecast.method, 'historical_replay', `matched replay station ${station.id} must use its historical baseline`)
+            assert.ok(['sufficient', 'limited'].includes(forecast.baselineCoverage), `station ${station.id} ${horizon}-minute baseline coverage is invalid`)
+            assert.ok(Number.isFinite(forecast.baselineBikes) && forecast.baselineBikes >= 0, `station ${station.id} ${horizon}-minute baseline bikes are invalid`)
+            assert.ok(Number.isFinite(forecast.baselineDocks) && forecast.baselineDocks >= 0, `station ${station.id} ${horizon}-minute baseline docks are invalid`)
+          } else {
+            assert.equal(forecast.baselineStatus, 'unmatched', `replay station ${station.id} has an invalid baseline status`)
+            assert.equal(forecast.method, 'inventory_only', `unmatched replay station ${station.id} must not invent a historical baseline`)
+            assert.equal(forecast.baselineCoverage, 'unmatched', `unmatched replay station ${station.id} must disclose missing coverage`)
+            assert.equal(forecast.baselineBikes, null, `unmatched replay station ${station.id} must not include baseline bikes`)
+            assert.equal(forecast.baselineDocks, null, `unmatched replay station ${station.id} must not include baseline docks`)
+          }
+        } else {
+          assert.equal(forecast.baselineStatus, 'matched', `historical replay station ${station.id} must have a matched baseline`)
+          assert.equal(forecast.method, 'historical_replay', `historical replay station ${station.id} must declare its method`)
+        }
       }
     }
 
@@ -152,6 +169,14 @@ test('risk policy and compact live profiles remain deployable without source CSV
   for (const station of dashboard.liveProfiles.stations) {
     assert.equal(station.slots.length, 48, `live profile ${station.id} must have 48 half-hour slots`)
     assert.match(station.matchKey, /\|/, `live profile ${station.id} must have a strict name match key`)
+  }
+
+  if (dashboard.meta.modelVersion === CURRENT_MODEL_VERSION) {
+    assert.equal(dashboard.liveProfiles.modelVersion, CURRENT_MODEL_VERSION)
+    assert.deepEqual(dashboard.liveProfiles.prediction?.inputPolicy, ['historical_station_slot_profile', 'current_live_inventory', 'page_session_momentum_optional'])
+    assert.equal(dashboard.liveProfiles.prediction?.primaryHorizonMinutes, 60)
+    assert.equal(dashboard.liveProfiles.prediction?.coverage?.historicalProfileStations, dashboard.liveProfiles.stations.length)
+    assert.ok(dashboard.liveProfiles.prediction?.coverage?.populatedStationSlots > 0)
   }
 
   const dispatchOperations = new Set(Object.values(dashboard.scenarios).flatMap(scenario => scenario.dispatches.map(dispatch => dispatch.operation)))

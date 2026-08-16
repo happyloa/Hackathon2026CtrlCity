@@ -22,6 +22,13 @@ function text(value, fallback = '') {
   return typeof value === 'string' && value.trim() ? value.trim() : fallback
 }
 
+function modelVersion(value) {
+  const version = text(value)
+  return !version || version === 'historical-profile-heuristic-v1'
+    ? 'historical-live-inventory-baseline-v2'
+    : version
+}
+
 function number(value, fallback = 0) {
   const candidate = typeof value === 'number' ? value : Number(value)
   return Number.isFinite(candidate) ? candidate : fallback
@@ -48,6 +55,12 @@ function confidence(value) {
   return score >= 0.65 ? 'high' : score >= 0.35 ? 'medium' : 'low'
 }
 
+function confidenceForSampleSize(sampleSize) {
+  if (sampleSize >= 12) return 'high'
+  if (sampleSize >= 6) return 'medium'
+  return 'low'
+}
+
 function serviceStatus(value, state) {
   const status = text(value)
   if (status === 'official_inactive') return 'official_inactive'
@@ -57,7 +70,8 @@ function serviceStatus(value, state) {
 
 function forecastMethod(value, fallback) {
   const method = text(value)
-  return method === 'historical_replay' || method === 'live_historical_baseline' || method === 'inventory_only'
+  if (method === 'live_historical_baseline') return 'historical_baseline_live_inventory'
+  return method === 'historical_replay' || method === 'historical_baseline_live_inventory' || method === 'inventory_only'
     ? method
     : fallback
 }
@@ -69,7 +83,43 @@ function baselineStatus(value, fallback) {
     : fallback
 }
 
-function normalizeStation(raw) {
+function baselineCoverage(value, sampleSize, status) {
+  const coverage = text(value)
+  if (coverage === 'sufficient' || coverage === 'limited' || coverage === 'unmatched' || coverage === 'not_applicable') {
+    return coverage
+  }
+  if (status !== 'matched') return status
+  return sampleSize >= 6 ? 'sufficient' : 'limited'
+}
+
+function predictionMetadata(raw, stations) {
+  const source = record(raw)
+  const confidencePolicy = record(source.confidencePolicy)
+  const coverage = record(source.coverage)
+  const populatedStationSlots = stations.reduce(
+    (total, station) => total + station.slots.filter(Boolean).length,
+    0,
+  )
+
+  return {
+    schemaVersion: '1.0',
+    primaryHorizonMinutes: 60,
+    objective: 'station_empty_or_full_inventory_risk',
+    method: 'historical_station_slot_baseline_plus_live_inventory',
+    inputPolicy: ['historical_station_slot_profile', 'current_live_inventory', 'page_session_momentum_optional'],
+    confidencePolicy: {
+      limitedMaxSampleSize: Math.max(0, Math.round(number(confidencePolicy.limitedMaxSampleSize, 5))),
+      sufficientMinSampleSize: Math.max(1, Math.round(number(confidencePolicy.sufficientMinSampleSize, 6))),
+      highConfidenceMinSampleSize: Math.max(1, Math.round(number(confidencePolicy.highConfidenceMinSampleSize, 12))),
+    },
+    coverage: {
+      historicalProfileStations: Math.max(0, Math.round(number(coverage.historicalProfileStations, stations.length))),
+      populatedStationSlots: Math.max(0, Math.round(number(coverage.populatedStationSlots, populatedStationSlots))),
+    },
+  }
+}
+
+function normalizeStation(raw, asOf) {
   const source = record(raw)
   const availableBikes = Math.max(0, Math.round(number(source.availableBikes)))
   const availableDocks = Math.max(0, Math.round(number(source.availableDocks)))
@@ -83,7 +133,14 @@ function normalizeStation(raw) {
     const unavailableRisk = clamp(number(forecast.unavailableRisk))
     const score = round(Math.max(emptyRisk, fullRisk))
     const alertThreshold = clamp(number(forecast.alertThreshold, alertThresholdFor(horizon)))
+    const sampleSize = Math.max(0, Math.round(number(forecast.sampleSize)))
+    const normalizedBaselineStatus = baselineStatus(forecast.baselineStatus, 'matched')
+    const baselineBikes = number(forecast.baselineBikes, Number.NaN)
+    const baselineDocks = number(forecast.baselineDocks, Number.NaN)
     horizons[horizon] = {
+      targetAt: text(forecast.targetAt, text(forecast.at, asOf)),
+      baselineBikes: Number.isFinite(baselineBikes) ? Math.max(0, Math.round(baselineBikes)) : null,
+      baselineDocks: Number.isFinite(baselineDocks) ? Math.max(0, Math.round(baselineDocks)) : null,
       predictedBikes: Math.max(0, Math.round(number(forecast.predictedBikes, availableBikes))),
       predictedDocks: Math.max(0, Math.round(number(forecast.predictedDocks, availableDocks))),
       emptyRisk,
@@ -91,11 +148,12 @@ function normalizeStation(raw) {
       unavailableRisk,
       riskScore: score,
       level: riskLevelFor(score, horizon),
-      confidence: confidence(forecast.confidence),
+      confidence: sampleSize ? confidenceForSampleSize(sampleSize) : confidence(forecast.confidence),
       alertThreshold,
-      baselineStatus: baselineStatus(forecast.baselineStatus, 'matched'),
+      baselineStatus: normalizedBaselineStatus,
+      baselineCoverage: baselineCoverage(forecast.baselineCoverage, sampleSize, normalizedBaselineStatus),
       method: forecastMethod(forecast.method, 'historical_replay'),
-      sampleSize: Math.max(0, Math.round(number(forecast.sampleSize))),
+      sampleSize,
       reasons: list(forecast.reasons).map((reason) => text(reason)).filter(Boolean),
     }
   }
@@ -230,7 +288,7 @@ function makeMeta(source, availableTimes, asOf, stationCount) {
     asOf,
     generatedAt: text(rawMeta.generatedAt, new Date(0).toISOString()),
     dataMode: 'historical_replay',
-    modelVersion: text(rawMeta.modelVersion, 'historical-profile-heuristic-v1'),
+    modelVersion: modelVersion(rawMeta.modelVersion),
     coverage: {
       sourceRows,
       sourceFiles: Math.max(0, Math.round(number(coverage.sourceFiles))),
@@ -260,7 +318,7 @@ function makeMeta(source, availableTimes, asOf, stationCount) {
 }
 
 function makeDashboard(source, asOf, scenario, availableTimes, districts) {
-  const stations = list(record(scenario).stations).map(normalizeStation).filter((station) => station.id)
+  const stations = list(record(scenario).stations).map(station => normalizeStation(station, asOf)).filter((station) => station.id)
   const stationMap = new Map(stations.map((station) => [station.id, station]))
   const alerts = list(record(scenario).alerts).map((alert) => normalizeAlert(alert, stationMap, asOf))
   const dispatches = list(record(scenario).dispatches).map((dispatch) => normalizeDispatch(dispatch, alerts))
@@ -380,9 +438,10 @@ async function exportLiveProfiles(source, outputDir) {
 
   const manifest = {
     schemaVersion: '2.0',
-    modelVersion: text(rawProfiles.modelVersion, 'historical-profile-heuristic-v1'),
+    modelVersion: modelVersion(rawProfiles.modelVersion),
     timezone: text(rawProfiles.timezone, 'Asia/Taipei'),
     riskPolicy: normalizeLiveRiskPolicy(rawProfiles.riskPolicy),
+    prediction: predictionMetadata(rawProfiles.prediction, stations),
     matchKeys: stations.map((station) => station.matchKey),
     slots: paths,
   }

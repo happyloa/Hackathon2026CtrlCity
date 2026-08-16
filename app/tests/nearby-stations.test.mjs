@@ -16,6 +16,9 @@ function station({
   predictedDocks = availableDocks,
 }) {
   const forecast = {
+    targetAt: '2026-08-09T09:00:00+08:00',
+    baselineBikes: availableBikes,
+    baselineDocks: availableDocks,
     predictedBikes: availableBikes,
     predictedDocks,
     emptyRisk: 0.05,
@@ -26,6 +29,7 @@ function station({
     confidence: 'medium',
     alertThreshold: .45,
     baselineStatus: 'matched',
+    baselineCoverage: 'sufficient',
     method: 'historical_replay',
     sampleSize: 12,
     reasons: [],

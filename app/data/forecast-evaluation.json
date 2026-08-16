@@ -1,15 +1,32 @@
 {
   "schemaVersion": "1.0",
-  "generatedAt": "2026-08-05T14:36:15.723Z",
+  "generatedAt": "2026-08-16T06:33:27.415Z",
   "model": {
-    "version": "historical-profile-heuristic-v1",
+    "version": "historical-live-inventory-baseline-v2",
     "objective": "預測未來時點是否空車或滿位",
     "horizonsMinutes": [
       30,
       60,
       120
     ],
+    "primaryHorizonMinutes": 60,
     "featurePolicy": "僅使用當前庫存、前一個半小時桶的庫存動量，以及訓練期站點×半小時槽統計。"
+  },
+  "runtimeContract": {
+    "schemaVersion": "1.0",
+    "primaryHorizonMinutes": 60,
+    "objective": "station_empty_or_full_inventory_risk",
+    "method": "historical_station_slot_baseline_plus_live_inventory",
+    "inputPolicy": [
+      "historical_station_slot_profile",
+      "current_live_inventory",
+      "page_session_momentum_optional"
+    ],
+    "confidencePolicy": {
+      "limitedMaxSampleSize": 5,
+      "sufficientMinSampleSize": 6,
+      "highConfidenceMinSampleSize": 12
+    }
   },
   "timeSplit": {
     "train": "2026-01-01 至 2026-04-30",
@@ -546,7 +563,7 @@
   },
   "limitations": [
     "固定站點抽樣用於控制本機記憶體，並非全站點離線評估。",
-    "服務不可用（同時無車與無可還位）不納入空車／滿位二元事件指標。",
+    "同時無車與無可還位的疑似服務異常快照不納入空車／滿位二元事件指標。",
     "未使用天氣、活動、交通、調度或即時事件資料；結果是啟發式基線而非可校準機率模型。",
     "每次重跑會更新 generatedAt，但資料切分、特徵、閾值候選與抽樣規則固定。"
   ]

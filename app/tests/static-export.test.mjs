@@ -15,12 +15,25 @@ test('static export preserves dual-direction dispatches and shards live profiles
 
     const manifest = JSON.parse(await readFile(join(outputDir, 'data', 'live-profile', 'manifest.json'), 'utf8'))
     assert.equal(manifest.schemaVersion, '2.0')
+    assert.equal(manifest.modelVersion, 'historical-live-inventory-baseline-v2')
     assert.equal(manifest.timezone, 'Asia/Taipei')
     assert.equal(Object.keys(manifest.slots).length, 48)
     assert.equal(manifest.riskPolicy.alertThresholds['60'], .45)
     assert.ok(Array.isArray(manifest.matchKeys))
     assert.equal(manifest.matchKeys.length, result.liveProfiles.stations)
     assert.equal('stations' in manifest, false)
+    assert.equal(manifest.prediction?.schemaVersion, '1.0')
+    assert.equal(manifest.prediction?.primaryHorizonMinutes, 60)
+    assert.equal(manifest.prediction?.objective, 'station_empty_or_full_inventory_risk')
+    assert.equal(manifest.prediction?.method, 'historical_station_slot_baseline_plus_live_inventory')
+    assert.deepEqual(manifest.prediction?.inputPolicy, ['historical_station_slot_profile', 'current_live_inventory', 'page_session_momentum_optional'])
+    assert.deepEqual(manifest.prediction?.confidencePolicy, {
+      limitedMaxSampleSize: 5,
+      sufficientMinSampleSize: 6,
+      highConfidenceMinSampleSize: 12,
+    })
+    assert.equal(manifest.prediction?.coverage?.historicalProfileStations, result.liveProfiles.stations)
+    assert.ok(manifest.prediction?.coverage?.populatedStationSlots > 0)
 
     const slot = JSON.parse(await readFile(join(outputDir, 'data', 'live-profile', 'slot-v2-18.json'), 'utf8'))
     assert.equal(slot.slot, 18)
@@ -34,6 +47,9 @@ test('static export preserves dual-direction dispatches and shards live profiles
     assert.equal(replayManifest.labels['2026-04-26T17:00:00+08:00'], '晚間雙向供需壓力')
 
     const replay = JSON.parse(await readFile(join(outputDir, 'data', 'replay', 'scenario-01-202604261700000800.json'), 'utf8'))
+    const forecast = replay.stations[0]?.forecast?.horizons?.['60']
+    assert.match(forecast.targetAt, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:00\+08:00$/)
+    assert.ok(['sufficient', 'limited', 'unmatched', 'not_applicable'].includes(forecast.baselineCoverage))
     const operations = new Set(replay.dispatches.map(dispatch => dispatch.operation))
     assert.ok(operations.has('deliver_bikes'))
     assert.ok(operations.has('remove_bikes'))

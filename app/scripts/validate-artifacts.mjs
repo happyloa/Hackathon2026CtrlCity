@@ -9,6 +9,7 @@ const ISO_LOCAL_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:00\+08:00$/
 const STATE_VALUES = new Set(['normal', 'low_bikes', 'low_docks', 'empty', 'full', 'unavailable'])
 const SEVERITY_VALUES = new Set(['normal', 'warning', 'critical'])
 const SERVICE_STATUS_VALUES = new Set(['operational', 'official_inactive', 'suspected_unavailable'])
+const CURRENT_MODEL_VERSION = 'historical-live-inventory-baseline-v2'
 
 function assert(condition, message) {
   if (!condition) throw new Error(message)
@@ -26,7 +27,7 @@ function assertRisk(value, path) {
   assert(isFiniteNumber(value) && value >= 0 && value <= 1, `${path} must be a probability between 0 and 1`)
 }
 
-function validateStation(station, scenarioAt, history) {
+function validateStation(station, scenarioAt, history, requiresPredictionContract) {
   const base = `station ${station?.id ?? '<missing>'}`
   for (const field of [
     'id',
@@ -69,7 +70,7 @@ function validateStation(station, scenarioAt, history) {
   for (const horizon of ['30', '60', '120']) {
     const forecast = station.forecast?.horizons?.[horizon]
     assert(forecast && typeof forecast === 'object', `${base} is missing ${horizon}-minute forecast`)
-    assertAt(forecast.at, `${base} ${horizon}-minute forecast.at`)
+    assertAt(forecast.targetAt ?? forecast.at, `${base} ${horizon}-minute forecast.targetAt`)
     assertRisk(forecast.emptyRisk, `${base} ${horizon}-minute emptyRisk`)
     assertRisk(forecast.fullRisk, `${base} ${horizon}-minute fullRisk`)
     assertRisk(forecast.unavailableRisk, `${base} ${horizon}-minute unavailableRisk`)
@@ -79,7 +80,13 @@ function validateStation(station, scenarioAt, history) {
     assertRisk(forecast.alertThreshold, `${base} ${horizon}-minute alertThreshold`)
     assert(Number.isInteger(forecast.sampleSize) && forecast.sampleSize >= 0, `${base} ${horizon}-minute sampleSize is invalid`)
     assert(['matched', 'unmatched', 'not_applicable'].includes(forecast.baselineStatus), `${base} ${horizon}-minute baselineStatus is invalid`)
-    assert(['historical_replay', 'live_historical_baseline', 'inventory_only'].includes(forecast.method), `${base} ${horizon}-minute method is invalid`)
+    assert(['historical_replay', 'historical_baseline_live_inventory', 'inventory_only'].includes(forecast.method), `${base} ${horizon}-minute method is invalid`)
+    if (requiresPredictionContract) {
+      assertAt(forecast.targetAt, `${base} ${horizon}-minute forecast.targetAt`)
+      assert(['sufficient', 'limited', 'unmatched', 'not_applicable'].includes(forecast.baselineCoverage), `${base} ${horizon}-minute baselineCoverage is invalid`)
+      assert(forecast.baselineBikes === null || (isFiniteNumber(forecast.baselineBikes) && forecast.baselineBikes >= 0), `${base} ${horizon}-minute baselineBikes is invalid`)
+      assert(forecast.baselineDocks === null || (isFiniteNumber(forecast.baselineDocks) && forecast.baselineDocks >= 0), `${base} ${horizon}-minute baselineDocks is invalid`)
+    }
     assert(Array.isArray(forecast.reasons) && forecast.reasons.length > 0, `${base} ${horizon}-minute reasons are missing`)
   }
 
@@ -95,7 +102,7 @@ function validateStation(station, scenarioAt, history) {
   }
 }
 
-function validateScenario(at, scenario) {
+function validateScenario(at, scenario, requiresPredictionContract) {
   assertAt(at, `scenario ${at} key`)
   for (const field of ['summary', 'stations', 'alerts', 'dispatches', 'briefingFacts', 'stationHistories']) {
     assert(Object.hasOwn(scenario, field), `scenario ${at} is missing ${field}`)
@@ -111,7 +118,7 @@ function validateScenario(at, scenario) {
   for (const station of scenario.stations) {
     assert(!stationIds.has(station.id), `scenario ${at} duplicates station ${station.id}`)
     stationIds.add(station.id)
-    validateStation(station, at, scenario.stationHistories[station.id])
+    validateStation(station, at, scenario.stationHistories[station.id], requiresPredictionContract)
   }
 
   for (const alert of scenario.alerts) {
@@ -134,7 +141,7 @@ function validateScenario(at, scenario) {
   }
 }
 
-function validateLiveProfiles(liveProfiles) {
+function validateLiveProfiles(liveProfiles, requiresPredictionContract) {
   assert(liveProfiles && typeof liveProfiles === 'object', 'liveProfiles is missing')
   assert(liveProfiles.schemaVersion === '1.0', 'liveProfiles schemaVersion is invalid')
   assert(liveProfiles.timezone === 'Asia/Taipei', 'liveProfiles timezone must be Asia/Taipei')
@@ -157,6 +164,19 @@ function validateLiveProfiles(liveProfiles) {
       assert(profile.slice(3).every((value) => value <= 1000), `liveProfiles ${station.id} has invalid permille risk`)
     }
   }
+  if (requiresPredictionContract) {
+    const prediction = liveProfiles.prediction
+    assert(prediction?.schemaVersion === '1.0', 'liveProfiles prediction schemaVersion is invalid')
+    assert(prediction.primaryHorizonMinutes === 60, 'liveProfiles prediction primary horizon must be 60 minutes')
+    assert(prediction.objective === 'station_empty_or_full_inventory_risk', 'liveProfiles prediction objective is invalid')
+    assert(prediction.method === 'historical_station_slot_baseline_plus_live_inventory', 'liveProfiles prediction method is invalid')
+    assert(Array.isArray(prediction.inputPolicy) && prediction.inputPolicy.join('|') === 'historical_station_slot_profile|current_live_inventory|page_session_momentum_optional', 'liveProfiles prediction inputs are invalid')
+    assert(prediction.confidencePolicy?.limitedMaxSampleSize === 5, 'liveProfiles prediction limited sample threshold is invalid')
+    assert(prediction.confidencePolicy?.sufficientMinSampleSize === 6, 'liveProfiles prediction sufficient sample threshold is invalid')
+    assert(prediction.confidencePolicy?.highConfidenceMinSampleSize === 12, 'liveProfiles prediction high-confidence threshold is invalid')
+    assert(prediction.coverage?.historicalProfileStations === liveProfiles.stations.length, 'liveProfiles prediction station coverage is invalid')
+    assert(prediction.coverage?.populatedStationSlots > 0, 'liveProfiles prediction slot coverage is invalid')
+  }
 }
 
 async function main() {
@@ -177,6 +197,7 @@ async function main() {
   assert(typeof dashboard.meta.generatedAt === 'string' && !Number.isNaN(Date.parse(dashboard.meta.generatedAt)), 'meta.generatedAt is invalid')
   assert(dashboard.meta.dataMode === 'historical_replay', 'meta.dataMode must be historical_replay')
   assert(typeof dashboard.meta.modelVersion === 'string' && dashboard.meta.modelVersion.length > 0, 'meta.modelVersion is missing')
+  const requiresPredictionContract = dashboard.meta.modelVersion === CURRENT_MODEL_VERSION
   assert(dashboard.meta.riskPolicy?.version, 'meta.riskPolicy is missing')
   for (const horizon of ['30', '60', '120']) {
     assertRisk(dashboard.meta.riskPolicy.alertThresholds?.[horizon], `meta.riskPolicy ${horizon}-minute threshold`)
@@ -192,12 +213,12 @@ async function main() {
   const scenarioEntries = Object.entries(dashboard.scenarios)
   assert(scenarioEntries.length >= 3 && scenarioEntries.length <= 6, 'dashboard must contain 3 to 6 replay scenarios')
   for (const [at, scenario] of scenarioEntries) {
-    validateScenario(at, scenario)
+    validateScenario(at, scenario, requiresPredictionContract)
   }
 
   const defaultScenario = dashboard.scenarios[dashboard.meta.asOf]
   assert(defaultScenario, 'default meta.asOf scenario is missing')
-  validateLiveProfiles(dashboard.liveProfiles)
+  validateLiveProfiles(dashboard.liveProfiles, requiresPredictionContract)
 
   console.log(`Artifact validation passed: ${(fileStats.size / 1024 / 1024).toFixed(2)} MiB, ${dashboard.meta.coverage.availableTimeCount} time slots, ${scenarioEntries.length} scenarios, ${defaultScenario.stations.length} default stations.`)
 }

@@ -35,6 +35,10 @@ const MAX_ALERTS = 18
 const MAX_DISPATCHES = 12
 const SAFE_INVENTORY_RATIO = 0.35
 const MAX_MOVE_BIKES = 8
+const MODEL_VERSION = 'historical-live-inventory-baseline-v2'
+const PRIMARY_HORIZON_MINUTES = 60
+const SUFFICIENT_BASELINE_MIN_SAMPLES = 6
+const HIGH_CONFIDENCE_MIN_SAMPLES = 12
 
 const HEADER_MAP = new Map([
   ['日期', 'observedAt'],
@@ -170,6 +174,11 @@ function clamp(value, min = 0, max = 1) {
 function round(value, decimals = 3) {
   const factor = 10 ** decimals
   return Math.round(value * factor) / factor
+}
+
+function baselineCoverageFor(observations, baselineStatus = 'matched') {
+  if (baselineStatus !== 'matched') return baselineStatus
+  return observations >= SUFFICIENT_BASELINE_MIN_SAMPLES ? 'sufficient' : 'limited'
 }
 
 function stableId(identityKey) {
@@ -523,7 +532,12 @@ function makeForecast(snapshot, history, profileStats) {
     const profileDocks = observations ? profile.docksSum / observations : snapshot.availableDocks
     const predictedBikes = Math.max(0, Math.round(snapshot.availableBikes * (1 - weight) + profileBikes * weight))
     const predictedDocks = Math.max(0, Math.round(snapshot.availableDocks * (1 - weight) + profileDocks * weight))
-    const reasons = []
+    const baselineStatus = observations > 0 ? 'matched' : 'unmatched'
+    const reasons = [
+      observations > 0
+        ? `已以回放時點庫存對照同站、同時段歷史基線（${observations} 筆樣本）。`
+        : '此站此時段缺少歷史基線樣本，僅依回放時點庫存判讀。',
+    ]
     if (snapshot.currentState === 'unavailable') reasons.push('場站同時無車與無可還位，屬疑似服務異常，需人工確認')
     if (snapshot.currentState === 'empty') reasons.push('目前已無可借車')
     if (snapshot.currentState === 'full') reasons.push('目前已無可還位')
@@ -534,17 +548,20 @@ function makeForecast(snapshot, history, profileStats) {
     if (reasons.length === 0) reasons.push('目前庫存與同時槽歷史型態穩定')
 
     horizons[String(minutes)] = {
-      at: formatAt(targetEpoch),
+      targetAt: formatAt(targetEpoch),
+      baselineBikes: observations ? Math.max(0, Math.round(profileBikes)) : null,
+      baselineDocks: observations ? Math.max(0, Math.round(profileDocks)) : null,
       emptyRisk: round(clamp(emptyRisk)),
       fullRisk: round(clamp(fullRisk)),
       unavailableRisk: round(clamp(unavailableRisk)),
       predictedBikes,
       predictedDocks,
-      confidence: round(Math.min(1, observations / 12)),
+      confidence: round(Math.min(1, observations / HIGH_CONFIDENCE_MIN_SAMPLES)),
       sampleSize: observations,
       alertThreshold: alertThresholdFor(minutes),
-      baselineStatus: 'matched',
-      method: 'historical_replay',
+      baselineStatus,
+      baselineCoverage: baselineCoverageFor(observations, baselineStatus),
+      method: observations > 0 ? 'historical_replay' : 'inventory_only',
       reasons: reasons.slice(0, 3),
     }
   }
@@ -804,13 +821,34 @@ function makeLiveProfiles(stationIndex, profileStats) {
     }))
     .sort((left, right) => left.id.localeCompare(right.id))
 
+  const populatedStationSlots = stations.reduce(
+    (total, station) => total + station.slots.filter(Boolean).length,
+    0,
+  )
+
   return {
     schemaVersion: '1.0',
-    modelVersion: 'historical-profile-heuristic-v1',
+    modelVersion: MODEL_VERSION,
     timezone: 'Asia/Taipei',
     riskPolicy: {
       version: RISK_POLICY_VERSION,
       alertThresholds: ALERT_THRESHOLDS,
+    },
+    prediction: {
+      schemaVersion: '1.0',
+      primaryHorizonMinutes: PRIMARY_HORIZON_MINUTES,
+      objective: 'station_empty_or_full_inventory_risk',
+      method: 'historical_station_slot_baseline_plus_live_inventory',
+      inputPolicy: ['historical_station_slot_profile', 'current_live_inventory', 'page_session_momentum_optional'],
+      confidencePolicy: {
+        limitedMaxSampleSize: SUFFICIENT_BASELINE_MIN_SAMPLES - 1,
+        sufficientMinSampleSize: SUFFICIENT_BASELINE_MIN_SAMPLES,
+        highConfidenceMinSampleSize: HIGH_CONFIDENCE_MIN_SAMPLES,
+      },
+      coverage: {
+        historicalProfileStations: stations.length,
+        populatedStationSlots,
+      },
     },
     // Array values are [sample count, mean bikes, mean docks, empty risk,
     // full risk, inferred service-review rate]. Risk rates use per mille
@@ -1013,8 +1051,8 @@ async function main() {
       asOf: defaultScenario.at,
       generatedAt: new Date().toISOString(),
       dataMode: 'historical_replay',
-      modelVersion: 'historical-profile-heuristic-v1',
-      forecastMethod: 'Current inventory plus an as-of station half-hour historical profile built only from buckets strictly earlier than each replay scenario; zero-inventory observations are excluded from empty/full risk profiles and remain an inferred service-status flag.',
+      modelVersion: MODEL_VERSION,
+      forecastMethod: '主要以 60 分鐘為調度判讀窗：將回放時點的站點庫存與同站、同半小時時槽歷史基線比對；即時模式會以相同基線對照官方即時庫存。回放基線只使用嚴格早於情境時點的桶，零車零位觀測不納入空車／滿位風險，僅保留為疑似服務狀態旗標。',
       riskPolicy: {
         version: RISK_POLICY_VERSION,
         alertThresholds: ALERT_THRESHOLDS,

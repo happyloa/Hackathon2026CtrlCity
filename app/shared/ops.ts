@@ -4,6 +4,8 @@ export type CurrentState = 'normal' | 'empty_now' | 'full_now' | 'unavailable'
 export type ServiceStatus = 'operational' | 'official_inactive' | 'suspected_unavailable'
 export type AlertStatus = 'open' | 'acknowledged' | 'resolved'
 export type HorizonKey = '30' | '60' | '120'
+export type BaselineCoverage = 'sufficient' | 'limited' | 'unmatched' | 'not_applicable'
+export type ForecastMethod = 'historical_replay' | 'historical_baseline_live_inventory' | 'inventory_only'
 
 /** Keeps the official station identifier in data while removing its repeated UI prefix. */
 export function displayStationName(name: string, fallback = '未命名站點'): string {
@@ -18,6 +20,11 @@ export function displayStationName(name: string, fallback = '未命名站點'): 
 }
 
 export interface Forecast {
+  /** Timestamp that this horizon describes, derived from the source snapshot. */
+  targetAt: string
+  /** Mean inventory for this station and target half-hour in the historical baseline. */
+  baselineBikes: number | null
+  baselineDocks: number | null
   predictedBikes: number
   predictedDocks: number
   emptyRisk: number
@@ -28,9 +35,45 @@ export interface Forecast {
   confidence: 'low' | 'medium' | 'high'
   alertThreshold: number
   baselineStatus: 'matched' | 'unmatched' | 'not_applicable'
-  method: 'historical_replay' | 'live_historical_baseline' | 'inventory_only'
+  /** Whether the matched historical slot has enough observations for this baseline. */
+  baselineCoverage: BaselineCoverage
+  method: ForecastMethod
   sampleSize: number
   reasons: string[]
+}
+
+/**
+ * Compact metadata shipped with the historical profile manifest. It describes
+ * the prediction contract without exposing raw historical station snapshots.
+ */
+export interface PredictionMetadata {
+  schemaVersion: '1.0'
+  primaryHorizonMinutes: 60
+  objective: 'station_empty_or_full_inventory_risk'
+  method: 'historical_station_slot_baseline_plus_live_inventory'
+  inputPolicy: readonly ['historical_station_slot_profile', 'current_live_inventory', 'page_session_momentum_optional']
+  confidencePolicy: {
+    limitedMaxSampleSize: number
+    sufficientMinSampleSize: number
+    highConfidenceMinSampleSize: number
+  }
+  coverage: {
+    historicalProfileStations: number
+    populatedStationSlots: number
+  }
+}
+
+/** Runtime reconciliation of an official live snapshot against historical profiles. */
+export interface PredictionCoverage {
+  asOf: string
+  primaryHorizonMinutes: 60
+  historicalProfileStations: number
+  liveStations: number
+  matchedStations: number
+  unmatchedStations: number
+  ambiguousStationMatches: number
+  notApplicableStations: number
+  matchedRate: number
 }
 
 export interface StationRisk {

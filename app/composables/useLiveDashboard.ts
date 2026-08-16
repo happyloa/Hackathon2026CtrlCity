@@ -109,7 +109,7 @@ function createLiveResponse(payload: unknown): LiveResponse {
     asOf: asOfFromSourceTime(sourceUpdatedAt),
     generatedAt: new Date().toISOString(),
     dataMode: 'live',
-    forecastModel: 'live-historical-baseline-v1',
+    forecastModel: 'historical-live-inventory-baseline-v2',
     narrativeProvider: 'template',
   }
 
@@ -124,8 +124,11 @@ function createLiveResponse(payload: unknown): LiveResponse {
   }
 }
 
-function fallbackForecast(station: LiveStation, horizon: HorizonKey): Forecast {
+function fallbackForecast(station: LiveStation, horizon: HorizonKey, observedAt: string): Forecast {
   return {
+    targetAt: new Date((Date.parse(observedAt) || Date.now()) + Number(horizon) * 60_000).toISOString(),
+    baselineBikes: null,
+    baselineDocks: null,
     predictedBikes: station.availableBikes,
     predictedDocks: station.availableDocks,
     emptyRisk: 0,
@@ -136,6 +139,7 @@ function fallbackForecast(station: LiveStation, horizon: HorizonKey): Forecast {
     confidence: 'low',
     alertThreshold: horizon === '120' ? .4 : .45,
     baselineStatus: station.serviceStatus === 'operational' ? 'unmatched' : 'not_applicable',
+    baselineCoverage: station.serviceStatus === 'operational' ? 'unmatched' : 'not_applicable',
     method: 'inventory_only',
     sampleSize: 0,
     reasons: ['尚未取得歷史基線；僅顯示即時庫存。'],
@@ -198,9 +202,9 @@ function createLiveDashboard(
 ): DashboardArtifact {
   const stations: StationRisk[] = response.data.stations.map((station) => {
     const forecasts = forecastByStation.get(station.id) || {
-      '30': fallbackForecast(station, '30'),
-      '60': fallbackForecast(station, '60'),
-      '120': fallbackForecast(station, '120'),
+      '30': fallbackForecast(station, '30', response.meta.asOf),
+      '60': fallbackForecast(station, '60', response.meta.asOf),
+      '120': fallbackForecast(station, '120', response.meta.asOf),
     }
     return {
       id: station.id,
@@ -227,7 +231,7 @@ function createLiveDashboard(
       asOf: response.meta.asOf,
       generatedAt: response.meta.generatedAt,
       dataMode: 'live',
-      modelVersion: riskPolicy ? 'live-historical-baseline-v1' : 'ntpc-live-inventory-v1',
+      modelVersion: riskPolicy ? 'historical-live-inventory-baseline-v2' : 'ntpc-live-inventory-v1',
       coverage: {
         sourceRows: stations.length,
         sourceFiles: 1,
@@ -244,7 +248,7 @@ function createLiveDashboard(
         notes: [
           '資料來源：新北市政府 Open Data；官方資料更新後才替換畫面。',
           riskPolicy
-            ? '30／60 分鐘為即時庫存結合同站歷史時段的啟發式風險指標，非校準後事件機率，需人工覆核。'
+            ? '60 分鐘為主要判讀窗：即時庫存會與同站歷史時段基線比對；風險指標不是校準後事件機率，需人工覆核。'
             : '歷史基線暫不可用，僅顯示即時庫存。',
           '告警與調度指派只保存在目前瀏覽器工作階段，不會送出真實車隊命令。',
         ],
@@ -294,7 +298,12 @@ export function useLiveDashboard() {
   const signature = useState('live-dashboard-signature', () => '')
   const acknowledgedAlertIds = useState<string[]>('live-dashboard-acknowledged-alerts', () => [])
   const acceptedDispatchIds = useState<string[]>('live-dashboard-accepted-dispatches', () => [])
-  const { manifest: profileManifest, error: profileError, forecastsFor } = useLiveRiskProfiles()
+  const {
+    manifest: profileManifest,
+    error: profileError,
+    coverage: profileCoverage,
+    forecastsFor,
+  } = useLiveRiskProfiles()
 
   const actions = computed<LiveActionState>(() => ({
     acknowledgedAlertIds: acknowledgedAlertIds.value,
@@ -354,6 +363,7 @@ export function useLiveDashboard() {
     error,
     updated,
     profileError,
+    profileCoverage,
     actions,
     refresh,
     acknowledge,

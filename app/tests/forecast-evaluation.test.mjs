@@ -5,6 +5,7 @@ import test from 'node:test'
 const evaluationUrl = new URL('../data/forecast-evaluation.json', import.meta.url)
 const evaluation = JSON.parse(await readFile(evaluationUrl, 'utf8'))
 const HORIZONS = ['30', '60', '120']
+const CURRENT_MODEL_VERSION = 'historical-live-inventory-baseline-v2'
 
 function assertRatio(value, label) {
   assert.equal(typeof value, 'number', `${label} must be numeric`)
@@ -14,13 +15,27 @@ function assertRatio(value, label) {
 
 test('forecast evaluation uses a chronological train, validation, and held-out test split', () => {
   assert.equal(evaluation.schemaVersion, '1.0')
-  assert.equal(evaluation.model?.version, 'historical-profile-heuristic-v1')
+  assert.equal(evaluation.model?.version, CURRENT_MODEL_VERSION, 'evaluation artifact must use the current historical-live baseline contract')
   assert.match(evaluation.timeSplit?.train ?? '', /2026-01-01.*2026-04-30/)
   assert.match(evaluation.timeSplit?.validation ?? '', /2026-05-01.*2026-05-31/)
   assert.match(evaluation.timeSplit?.test ?? '', /2026-06-01.*2026-06-30/)
   assert.equal(evaluation.thresholdSelection?.split, 'validation')
   assert.ok(evaluation.cohort?.stationCount > 100, 'evaluation cohort should cover a meaningful station sample')
   assert.ok(evaluation.data?.trainingProfiles > 1_000, 'training profiles should be populated from Jan-Apr data')
+
+  assert.equal(evaluation.model?.primaryHorizonMinutes, 60)
+  assert.deepEqual(evaluation.runtimeContract, {
+    schemaVersion: '1.0',
+    primaryHorizonMinutes: 60,
+    objective: 'station_empty_or_full_inventory_risk',
+    method: 'historical_station_slot_baseline_plus_live_inventory',
+    inputPolicy: ['historical_station_slot_profile', 'current_live_inventory', 'page_session_momentum_optional'],
+    confidencePolicy: {
+      limitedMaxSampleSize: 5,
+      sufficientMinSampleSize: 6,
+      highConfidenceMinSampleSize: 12,
+    },
+  })
 })
 
 test('held-out metrics are complete, bounded, and contain no source snapshots', async () => {

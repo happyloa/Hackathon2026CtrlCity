@@ -18,6 +18,10 @@ const MARKDOWN_FILE = resolve(REPO_DIR, 'docs', '03_實作與驗證', '歷史風
 
 const HALF_HOUR_MS = 30 * 60 * 1000
 const HORIZONS = [30, 60, 120]
+const PRIMARY_HORIZON_MINUTES = 60
+const MODEL_VERSION = 'historical-live-inventory-baseline-v2'
+const SUFFICIENT_BASELINE_MIN_SAMPLES = 6
+const HIGH_CONFIDENCE_MIN_SAMPLES = 12
 const THRESHOLD_CANDIDATES = [0.02, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9]
 const COHORT_MODULUS = 8
 const COHORT_REMAINDER = 0
@@ -479,13 +483,14 @@ function metricRow(label, result) {
 function markdownFor(evaluation) {
   const validation = evaluation.validation.horizons
   const test = evaluation.test.horizons
-  return `# 歷史風險啟發式基線：時間切分評估
+  return `# 歷史 × 即時庫存風險基線：時間切分評估
 
 本文件由 \`npm run model:evaluate\` 自動產生；原始 CSV 不會被複製或輸出至 Git。
 
 ## 做法
 
-- 模型：\`${evaluation.model.version}\`。以當前站點庫存、前一個 30 分鐘桶的動量，以及「站點 × 半小時槽」的訓練期歷史空車／滿位率產生風險分數。
+- 資料契約：\`${evaluation.model.version}\`。主要判讀窗為 **60 分鐘**：以當前站點庫存、前一個 30 分鐘桶的動量，以及「站點 × 半小時槽」的訓練期歷史空車／滿位率產生風險分數。此離線評估以歷史快照模擬當前庫存；正式即時模式才會將同一套基線與官方即時庫存逐站唯一對照。
+- 靜態 profile 只包含每站每半小時槽的樣本數、平均庫存與風險率；不包含原始 CSV、單筆快照或使用者資料。樣本數少於 ${SUFFICIENT_BASELINE_MIN_SAMPLES} 的對照會標記為基線覆蓋有限，${HIGH_CONFIDENCE_MIN_SAMPLES} 筆以上只表示歷史樣本較充足，不代表事件機率已校準。
 - 時間切分：訓練為 ${SPLITS.train.period}；閾值僅用 ${SPLITS.validation.period} 選擇；${SPLITS.test.period} 完全保留至最後測試。
 - 評估事件：預測未來 30／60／120 分鐘後，站點是否為「空車或滿位」。目前或目標時點同時無車且無位的疑似服務異常快照不納入此二元庫存事件評分，會另列排除量；現有歷史資料不足以確認其為停運。
 - 評估樣本：以站點規格化鍵的 SHA-256 取模固定抽樣，\`hash mod ${COHORT_MODULUS} = ${COHORT_REMAINDER}\`；本次涵蓋 ${evaluation.cohort.stationCount.toLocaleString()} 個站點。抽樣規則固定，重跑可重現。
@@ -511,6 +516,7 @@ ${Object.entries(test).map(([horizon, result]) => metricRow(`${horizon} 分鐘`,
 - 這是可解釋的啟發式基線，不是經校準的機率模型；風險分數的 Brier score 與 log loss 已輸出在 JSON 供後續模型比較。
 - 訓練特徵刻意只使用 1 至 4 月資料，避免把 5、6 月資訊洩漏進驗證或測試。正式部署時應採滾動式重訓與相同的時間外測試。
 - 固定抽樣降低本機評估的記憶體成本；上線前應在可控的批次環境對全站點重跑，並依行政區、尖離峰與空車／滿位類型檢視公平性與誤差。
+- 保留測試會使用前一個歷史半小時桶，因此較接近頁面已開啟一段時間的 warm-start 情況；首次開啟即時頁時沒有頁面內動量，會採較保守的無動量判讀，後續應另行評估 cold-start 指標。
 - 本評估沒有使用天氣、活動、捷運班次、調度紀錄或即時事件特徵，亦未評估「服務不可用」的成因。這些資料可作為後續 Amazon SageMaker 模型的特徵與獨立標籤。
 `
 }
@@ -587,10 +593,23 @@ async function main() {
     schemaVersion: '1.0',
     generatedAt: new Date().toISOString(),
     model: {
-      version: 'historical-profile-heuristic-v1',
+      version: MODEL_VERSION,
       objective: '預測未來時點是否空車或滿位',
       horizonsMinutes: HORIZONS,
+      primaryHorizonMinutes: PRIMARY_HORIZON_MINUTES,
       featurePolicy: '僅使用當前庫存、前一個半小時桶的庫存動量，以及訓練期站點×半小時槽統計。',
+    },
+    runtimeContract: {
+      schemaVersion: '1.0',
+      primaryHorizonMinutes: PRIMARY_HORIZON_MINUTES,
+      objective: 'station_empty_or_full_inventory_risk',
+      method: 'historical_station_slot_baseline_plus_live_inventory',
+      inputPolicy: ['historical_station_slot_profile', 'current_live_inventory', 'page_session_momentum_optional'],
+      confidencePolicy: {
+        limitedMaxSampleSize: SUFFICIENT_BASELINE_MIN_SAMPLES - 1,
+        sufficientMinSampleSize: SUFFICIENT_BASELINE_MIN_SAMPLES,
+        highConfidenceMinSampleSize: HIGH_CONFIDENCE_MIN_SAMPLES,
+      },
     },
     timeSplit: Object.fromEntries(Object.entries(SPLITS).map(([name, split]) => [name, split.period])),
     cohort: {
