@@ -20,9 +20,13 @@ type LeafletRenderer = import('leaflet').Renderer
 const mapElement = ref<HTMLElement | null>(null)
 const isLive = computed(() => props.dataMode === 'live')
 const stationQuery = ref('')
+const showAllStations = ref(false)
 const allMappedStations = computed(() => props.stations.filter(station => station.latitude !== null && station.longitude !== null))
 const mappedStations = computed(() => {
   const query = stationQuery.value.trim().toLocaleLowerCase('zh-TW')
+  if (!query && !showAllStations.value) {
+    return allMappedStations.value.filter((station) => station.id === props.selectedId || markerTone(station) !== 'stable')
+  }
   if (!query) return allMappedStations.value
   return allMappedStations.value.filter(station => `${station.name} ${station.district}`.toLocaleLowerCase('zh-TW').includes(query))
 })
@@ -84,8 +88,8 @@ function markerStatus(station: StationRisk) {
   if (tone === 'inventory-only') return '僅顯示即時庫存'
   if (station.currentState === 'empty_now') return '目前無車可借'
   if (station.currentState === 'full_now') return '目前無位可還'
-  if (tone === 'empty-risk') return '預測缺車風險'
-  if (tone === 'full-risk') return '預測缺位風險'
+  if (tone === 'empty-risk') return isLive.value ? '60 分鐘缺車風險' : '預測缺車風險'
+  if (tone === 'full-risk') return isLive.value ? '60 分鐘缺位風險' : '預測缺位風險'
   return isLive.value ? '即時庫存與基線穩定' : '預測風險低'
 }
 
@@ -106,8 +110,8 @@ function tooltipContent(station: StationRisk) {
   const forecast = forecastFor(station)
   const tone = markerTone(station)
   const inventory = `可借 ${station.availableBikes}・可還 ${station.availableDocks}`
-  const direction = tone === 'empty-risk' ? `無車風險指標 ${Math.round(forecast.emptyRisk * 100)}／100，建議補車` : tone === 'full-risk'
-    ? `無位風險指標 ${Math.round(forecast.fullRisk * 100)}／100，建議移車`
+  const direction = tone === 'empty-risk' ? `${isLive.value ? '60 分鐘' : ''}無車風險分數 ${Math.round(forecast.emptyRisk * 100)}／100，建議補車` : tone === 'full-risk'
+    ? `${isLive.value ? '60 分鐘' : ''}無位風險分數 ${Math.round(forecast.fullRisk * 100)}／100，建議移車`
     : markerStatus(station)
   const context = forecast.baselineStatus === 'matched'
     ? `${props.horizon} 分鐘 · ${direction}`
@@ -175,6 +179,10 @@ function fitNewTaipeiBounds() {
   if (points.length) leafletMap.fitBounds(leaflet.latLngBounds(points), { padding: [26, 26], maxZoom: 13 })
 }
 
+function toggleStationScope() {
+  showAllStations.value = !showAllStations.value
+}
+
 function focusSelectedStation() {
   if (!leafletMap || !props.selectedId) return
   const selected = mappedStations.value.find(station => station.id === props.selectedId)
@@ -235,9 +243,9 @@ onBeforeUnmount(() => {
     <div class="panel-heading map-heading">
       <div>
         <p class="section-kicker"><Icon :icon="isLive ? 'solar:bolt-circle-outline' : 'solar:map-point-wave-outline'" /> 站點地圖</p>
-        <h2>{{ isLive ? `${horizon} 分鐘即時基線風險` : `${horizon} 分鐘預測風險分布` }}</h2>
+        <h2>{{ isLive ? `${horizon} 分鐘風險站點` : `${horizon} 分鐘預測風險分布` }}</h2>
       </div>
-      <span class="risk-summary"><b>{{ mappedStations.length }}</b> {{ stationQuery ? '個搜尋結果' : (isLive ? '個即時站點' : '個預測站點') }}</span>
+      <span class="risk-summary"><b>{{ mappedStations.length }}</b> {{ stationQuery ? '個搜尋結果' : (showAllStations ? '個全市站點' : '個風險站點') }}</span>
     </div>
 
     <div class="geographic-map" role="region" :aria-label="isLive ? '新北市即時基線風險站點地圖' : '新北市歷史預測風險站點地圖'">
@@ -247,6 +255,7 @@ onBeforeUnmount(() => {
           <Icon icon="solar:magnifer-outline" />
           <input v-model="stationQuery" type="search" placeholder="搜尋站名或行政區" aria-label="搜尋站名或行政區" />
         </label>
+        <button type="button" class="map-view-toggle" @click="toggleStationScope"><Icon :icon="showAllStations ? 'solar:filter-outline' : 'solar:map-point-outline'" /> {{ showAllStations ? '只看風險站' : `顯示全市 ${allMappedStations.length} 站` }}</button>
         <button type="button" class="map-reset" @click="fitNewTaipeiBounds"><Icon icon="solar:map-arrow-left-outline" /> 回到新北全域</button>
       </div>
       <p v-if="!mappedStations.length" class="map-empty">目前沒有可定位的站點資料。</p>
@@ -254,14 +263,14 @@ onBeforeUnmount(() => {
     <div class="map-caption">
       <p class="map-instruction"><Icon icon="solar:cursor-square-outline" /> 點選站點查看風險與替代還車引導</p>
       <div class="geographic-map-legend" aria-label="風險方向圖例">
-        <span><i class="legend-dot normal" />基線穩定</span>
+        <span v-if="showAllStations"><i class="legend-dot normal" />基線穩定</span>
         <span><i class="legend-dot empty" />無車風險／目前無車</span>
         <span><i class="legend-dot full" />無位風險／目前無位</span>
         <span><i class="legend-dot unavailable" />疑似服務異常</span>
         <span v-if="isLive"><i class="legend-dot inventory-only" />未對照基線</span>
       </div>
     </div>
-    <p class="map-status-summary"><Icon icon="solar:info-circle-outline" /> {{ isLive ? `目前有 ${abnormalCount} 個站點需留意；請依圖例判讀風險類型。` : `目前有 ${abnormalCount} 個風險或服務異常站點。` }}</p>
+    <p class="map-status-summary"><Icon icon="solar:info-circle-outline" /> {{ showAllStations ? `全市共有 ${abnormalCount} 個風險或服務異常站點；可切回風險站聚焦。` : `目前聚焦 ${abnormalCount} 個風險或服務異常站點；可切換查看全市。` }}</p>
   </section>
 </template>
 
@@ -320,8 +329,11 @@ onBeforeUnmount(() => {
 .map-search svg { flex: 0 0 auto; color: var(--teal-dark); font-size: 19px; }
 .map-search input { width: 100%; min-width: 0; padding: 6px 4px; color: inherit; background: transparent; border: 0; outline: 0; font: inherit; }
 .map-search input::placeholder { color: var(--muted); opacity: 1; }
-.map-reset { display: inline-flex; align-items: center; gap: 5px; min-height: 36px; padding: 6px 9px; color: #fff; background: var(--teal-dark); border: 1px solid var(--teal-dark); border-radius: 5px; font: inherit; font-size: 16px; font-weight: 700; cursor: pointer; }
+.map-reset, .map-view-toggle { display: inline-flex; align-items: center; gap: 5px; min-height: 36px; padding: 6px 9px; border-radius: 5px; font: inherit; font-size: 16px; font-weight: 700; cursor: pointer; }
+.map-reset { color: #fff; background: var(--teal-dark); border: 1px solid var(--teal-dark); }
+.map-view-toggle { color: var(--teal-dark); background: var(--panel); border: 1px solid var(--line-strong, var(--line)); }
 .map-reset:hover, .map-reset:focus-visible { color: #fff; background: var(--teal); border-color: var(--teal); outline: 3px solid rgba(30, 111, 98, .28); outline-offset: 2px; }
+.map-view-toggle:hover, .map-view-toggle:focus-visible { color: var(--ink); border-color: var(--teal-dark); outline: 3px solid rgba(30, 111, 98, .18); outline-offset: 2px; }
 .geographic-map-legend {
   display: flex;
   flex-wrap: wrap;
@@ -360,14 +372,14 @@ onBeforeUnmount(() => {
 @media (max-width: 1150px) { .geographic-map, .map-canvas, :global(.geographic-map .leaflet-container) { min-height: 400px; } }
 @media (max-width: 780px) {
   .geographic-map, .map-canvas, :global(.geographic-map .leaflet-container) { min-height: 350px; }
-  .map-tools { top: 55px; right: 8px; max-width: calc(100% - 16px); }
-  .map-search { min-width: 170px; }
+  .map-tools { top: 55px; right: 8px; flex-wrap: wrap; max-width: calc(100% - 16px); }
+  .map-search { flex: 1 1 190px; min-width: 170px; }
   .map-caption { gap: 7px 12px; padding: 10px 14px 0; }
 }
 @media (max-width: 480px) {
   .geographic-map, .map-canvas, :global(.geographic-map .leaflet-container) { min-height: 320px; }
-  .map-tools { top: 51px; left: 8px; right: 8px; justify-content: space-between; }
-  .map-search { min-width: 0; flex: 1; }
-  .map-reset { padding: 6px 7px; }
+  .map-tools { top: 51px; left: 8px; right: 8px; display: grid; grid-template-columns: minmax(0, 1fr) auto; }
+  .map-search { grid-column: 1 / -1; min-width: 0; }
+  .map-reset, .map-view-toggle { padding: 6px 7px; }
 }
 </style>

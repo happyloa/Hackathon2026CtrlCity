@@ -50,7 +50,34 @@ const forecastCaption = computed(() => {
   if (isLive.value && !hasMatchedBaseline.value) return '未對照到唯一歷史站點；系統不假造未來風險。'
   const score = Math.round((forecast.value?.riskScore || 0) * 100)
   const sample = forecast.value?.sampleSize || 0
-  return `風險指標 ${score}／100 · 歷史樣本 ${sample} 筆 · 需人工覆核`
+  const coverage = forecast.value?.baselineCoverage === 'sufficient' ? '歷史樣本充足' : '歷史樣本較少'
+  return `風險分數 ${score}／100 · ${coverage}（${sample} 筆）· 需人工覆核`
+})
+
+const baselineComparison = computed(() => {
+  const value = forecast.value
+  if (!isLive.value || !hasMatchedBaseline.value || !value || value.baselineBikes === null || value.baselineDocks === null) return null
+
+  const differences = [
+    { label: '可借車', value: value.predictedBikes - value.baselineBikes, unit: '台' },
+    { label: '可還位', value: value.predictedDocks - value.baselineDocks, unit: '位' },
+  ]
+    .filter(item => item.value !== 0)
+    .sort((left, right) => Math.abs(right.value) - Math.abs(left.value))
+
+  const primary = differences[0]
+  const delta = primary
+    ? `${props.horizon} 分鐘推估${primary.value < 0 ? '低於' : '高於'}歷史基線 ${Math.abs(primary.value)} ${primary.unit}。`
+    : `${props.horizon} 分鐘推估與歷史基線接近。`
+
+  return {
+    baselineBikes: value.baselineBikes,
+    baselineDocks: value.baselineDocks,
+    predictedBikes: value.predictedBikes,
+    predictedDocks: value.predictedDocks,
+    sampleSize: value.sampleSize,
+    delta,
+  }
 })
 
 const chartProjections = computed(() => {
@@ -90,6 +117,19 @@ const detailTarget = computed(() => ({
       <div><span>可還位</span><strong>{{ station.availableDocks }}</strong></div>
       <div><span>總車柱</span><strong>{{ station.totalDocks }}</strong></div>
     </div>
+
+    <section v-if="baselineComparison" class="baseline-comparison" aria-label="即時庫存與歷史基線比較">
+      <div class="baseline-comparison-heading">
+        <span><Icon icon="solar:scale-outline" /> 即時與歷史基線比較</span>
+        <small>+{{ horizon }}m · {{ baselineComparison.sampleSize }} 筆樣本</small>
+      </div>
+      <div class="baseline-comparison-grid">
+        <div><span>現在</span><strong>{{ station.availableBikes }} 車／{{ station.availableDocks }} 位</strong></div>
+        <div><span>歷史基線</span><strong>{{ baselineComparison.baselineBikes }} 車／{{ baselineComparison.baselineDocks }} 位</strong></div>
+        <div><span>{{ horizon }}m 推估</span><strong>{{ baselineComparison.predictedBikes }} 車／{{ baselineComparison.predictedDocks }} 位</strong></div>
+      </div>
+      <p>{{ baselineComparison.delta }}</p>
+    </section>
 
     <div class="forecast-note">
       <span><Icon :icon="isLive ? 'solar:bolt-circle-outline' : 'solar:chart-2-outline'" /> {{ forecastHeadline }}</span>
@@ -131,6 +171,13 @@ const detailTarget = computed(() => ({
 </template>
 
 <style scoped>
+.baseline-comparison { margin: 0 0 13px; padding: 10px; background: var(--surface-muted); border: 1px solid var(--line); border-left: 3px solid var(--teal-dark); border-radius: 4px; }
+.baseline-comparison-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--ink); font-size: 16px; font-weight: 800; }
+.baseline-comparison-heading span { display: inline-flex; align-items: center; gap: 5px; }.baseline-comparison-heading svg { color: var(--teal-dark); font-size: 18px; }.baseline-comparison-heading small { color: var(--muted); font-size: 16px; font-weight: 700; }
+.baseline-comparison-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 9px; }
+.baseline-comparison-grid div { display: grid; gap: 2px; min-width: 0; padding: 7px; background: var(--panel); border: 1px solid var(--line); border-radius: 4px; }
+.baseline-comparison-grid span { color: var(--muted); font-size: 16px; font-weight: 700; }.baseline-comparison-grid strong { color: var(--ink); font-family: 'DM Mono', monospace; font-size: 16px; line-height: 1.35; }
+.baseline-comparison > p { margin: 8px 0 0; color: var(--teal-dark); font-size: 16px; font-weight: 800; line-height: 1.4; }
 .return-guidance { margin-top: 12px; padding: 11px; background: var(--surface-muted); border: 1px solid var(--line); border-left: 3px solid var(--blue); border-radius: 4px; }
 .return-guidance-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--ink); font-size: 16px; font-weight: 800; }
 .return-guidance-heading span { display: inline-flex; align-items: center; gap: 5px; }.return-guidance-heading svg { color: var(--blue); font-size: 18px; }.return-guidance-heading small { color: var(--muted); font-size: 16px; font-weight: 700; }
@@ -139,4 +186,5 @@ const detailTarget = computed(() => ({
 .return-guidance-empty { color: var(--muted); }.return-guidance-footnote { display: block; margin-top: 7px; color: var(--muted); font-size: 16px; line-height: 1.4; }
 .detail-trend { margin-top: 12px; border: 1px solid var(--line); border-radius: 4px; }.detail-trend summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px 10px; color: var(--ink); cursor: pointer; font-size: 16px; font-weight: 800; list-style: none; }.detail-trend summary::-webkit-details-marker { display: none; }.detail-trend summary svg { color: var(--teal-dark); font-size: 18px; transition: transform 150ms ease; }.detail-trend[open] summary { border-bottom: 1px solid var(--line); }.detail-trend[open] summary svg { transform: rotate(180deg); }.detail-trend .detail-chart-wrap { margin: 12px 10px; }
 :global(html[data-theme='dark'] .return-guidance) { border-left-color: var(--blue); }:global(html[data-theme='dark'] .return-station-list button) { color: var(--ink); background: var(--panel); border-color: var(--line); }:global(html[data-theme='dark'] .return-station-list strong) { color: #c3dcf1; }
+@media (max-width: 620px) { .baseline-comparison-grid { grid-template-columns: 1fr; }.baseline-comparison-heading { align-items: flex-start; flex-direction: column; gap: 2px; } }
 </style>

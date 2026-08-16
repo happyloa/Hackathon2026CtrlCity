@@ -5,9 +5,9 @@ const route = useRoute()
 const isDark = ref(false)
 
 const navigation = [
-  { to: '/', label: '營運總覽', icon: 'solar:radar-2-outline' },
-  { to: '/alerts', label: '告警處理', icon: 'solar:danger-triangle-outline' },
-  { to: '/dispatch', label: '調度建議', icon: 'solar:routing-2-outline' },
+  { to: '/', label: '調度中心', icon: 'solar:radar-2-outline' },
+  { to: '/alerts', label: '全部風險', icon: 'solar:danger-triangle-outline' },
+  { to: '/dispatch', label: '全部任務', icon: 'solar:routing-2-outline' },
 ]
 
 const activeLabel = computed(() => navigation.find(item => item.to === route.path)?.label || '站點資訊')

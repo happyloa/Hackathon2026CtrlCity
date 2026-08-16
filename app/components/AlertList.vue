@@ -6,6 +6,8 @@ const props = defineProps<{
   alerts: Alert[]
   stations: StationRisk[]
   compact?: boolean
+  maxItems?: number
+  embedded?: boolean
   contextQuery?: Record<string, string>
 }>()
 
@@ -15,7 +17,7 @@ const emit = defineEmits<{
 }>()
 
 const stationLookup = computed(() => new Map(props.stations.map(station => [station.id, station])))
-const visibleAlerts = computed(() => props.compact ? props.alerts.slice(0, 3) : props.alerts)
+const visibleAlerts = computed(() => props.compact ? props.alerts.slice(0, props.maxItems || 3) : props.alerts)
 const allAlertsTarget = computed(() => ({ path: '/alerts', query: props.contextQuery || {} }))
 
 function stationFor(alert: Alert) {
@@ -32,15 +34,15 @@ function conditionLabel(condition: Alert['condition']) {
     empty_now: '已無車可借',
     full_now: '已無位可還',
     unavailable: '疑似服務異常（需確認）',
-    empty_forecast: '預測將無車',
-    full_forecast: '預測將滿位',
+    empty_forecast: '後續缺車風險',
+    full_forecast: '後續缺位風險',
   }[condition]
 }
 </script>
 
 <template>
-  <section class="panel alert-panel">
-    <div class="panel-heading">
+  <section class="panel alert-panel" :class="{ 'is-embedded': embedded }">
+    <div v-if="!embedded" class="panel-heading">
       <div>
         <p class="section-kicker"><Icon icon="solar:bell-bing-outline" /> 告警中心</p>
         <h2>需要值班人員處理</h2>

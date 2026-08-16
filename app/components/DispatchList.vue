@@ -6,13 +6,15 @@ const props = defineProps<{
   dispatches: DispatchRecommendation[]
   stations: StationRisk[]
   compact?: boolean
+  maxItems?: number
+  embedded?: boolean
   contextQuery?: Record<string, string>
 }>()
 
 const emit = defineEmits<{ accept: [dispatchId: string]; select: [stationId: string] }>()
 
 const stationLookup = computed(() => new Map(props.stations.map(station => [station.id, station])))
-const visibleDispatches = computed(() => props.compact ? props.dispatches.slice(0, 3) : props.dispatches)
+const visibleDispatches = computed(() => props.compact ? props.dispatches.slice(0, props.maxItems || 3) : props.dispatches)
 const allDispatchesTarget = computed(() => ({ path: '/dispatch', query: props.contextQuery || {} }))
 const nameFor = (id: string) => displayStationName(stationLookup.value.get(id)?.name || '')
 const expandedDispatchId = ref<string | null>(null)
@@ -56,8 +58,8 @@ function toggleImpact(dispatchId: string) {
 </script>
 
 <template>
-  <section class="panel dispatch-panel">
-    <div class="panel-heading">
+  <section class="panel dispatch-panel" :class="{ 'is-embedded': embedded }">
+    <div v-if="!embedded" class="panel-heading">
       <div>
         <p class="section-kicker"><Icon icon="solar:routing-2-outline" /> 全域調度分配</p>
         <h2>先處理這些搬運任務</h2>
