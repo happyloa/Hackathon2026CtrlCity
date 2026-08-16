@@ -124,7 +124,7 @@ function markerOptions(station: StationRisk) {
   const gap = interventionGap(station)
   return {
     radius: Math.max(4.5, 5 + Math.min(7, Math.sqrt(gap) * 1.7)) + (selected ? 2 : 0),
-    color: selected ? '#f5f5f1' : '#1d2926',
+    color: selected ? '#f4f4f5' : '#242428',
     weight: selected ? 3 : 1.25,
     fillColor: markerColor(station),
     fillOpacity: selected ? 1 : .92,
@@ -330,9 +330,9 @@ onBeforeUnmount(() => {
 .map-search input { width: 100%; min-width: 0; padding: 6px 4px; color: inherit; background: transparent; border: 0; outline: 0; font: inherit; }
 .map-search input::placeholder { color: var(--muted); opacity: 1; }
 .map-reset, .map-view-toggle { display: inline-flex; align-items: center; gap: 5px; min-height: 36px; padding: 6px 9px; border-radius: 5px; font: inherit; font-size: 16px; font-weight: 700; cursor: pointer; }
-.map-reset { color: #fff; background: var(--teal-dark); border: 1px solid var(--teal-dark); }
+.map-reset { color: var(--on-accent); background: var(--teal-dark); border: 1px solid var(--teal-dark); }
 .map-view-toggle { color: var(--teal-dark); background: var(--panel); border: 1px solid var(--line-strong, var(--line)); }
-.map-reset:hover, .map-reset:focus-visible { color: #fff; background: var(--teal); border-color: var(--teal); outline: 3px solid rgba(30, 111, 98, .28); outline-offset: 2px; }
+.map-reset:hover, .map-reset:focus-visible { color: var(--on-accent); background: var(--teal); border-color: var(--teal); outline: 3px solid rgba(30, 111, 98, .28); outline-offset: 2px; }
 .map-view-toggle:hover, .map-view-toggle:focus-visible { color: var(--ink); border-color: var(--teal-dark); outline: 3px solid rgba(30, 111, 98, .18); outline-offset: 2px; }
 .geographic-map-legend {
   display: flex;
@@ -354,15 +354,13 @@ onBeforeUnmount(() => {
 :global(.geographic-map .leaflet-tooltip) { padding: 8px 10px; color: #1d2926; background: #fff; border: 1px solid #a9b7af; border-radius: 5px; box-shadow: none; font-size: 16px; }
 :global(.geographic-map .leaflet-tooltip strong), :global(.geographic-map .leaflet-tooltip span) { display: block; }
 :global(.geographic-map .leaflet-tooltip span) { margin-top: 3px; color: #55635f; font-weight: 600; }
-:global(html[data-theme='dark'] .geographic-map) { background: #10262c; border-color: var(--line-strong); }
-:global(html[data-theme='dark'] .geographic-map .leaflet-tile-pane) { filter: brightness(.72) saturate(.82); }
+:global(html[data-theme='dark'] .geographic-map) { background: #18181b; border-color: var(--line-strong); }
+:global(html[data-theme='dark'] .geographic-map .leaflet-tile-pane) { filter: brightness(.66) saturate(.58); }
 :global(html[data-theme='dark'] .map-instruction), :global(html[data-theme='dark'] .geographic-map-legend) { color: var(--muted); }
 :global(html[data-theme='dark'] .map-tools), :global(html[data-theme='dark'] .map-empty) { color: var(--ink); background: var(--panel); border-color: var(--line-strong); box-shadow: none; }
 :global(html[data-theme='dark'] .map-instruction svg), :global(html[data-theme='dark'] .map-search svg) { color: var(--teal); }
 :global(html[data-theme='dark'] .map-search) { color: var(--ink); }
 :global(html[data-theme='dark'] .map-search input::placeholder) { color: var(--muted); }
-:global(html[data-theme='dark'] .map-reset) { color: #12221e; background: #9dd4c6; border-color: #9dd4c6; }
-:global(html[data-theme='dark'] .map-reset:hover), :global(html[data-theme='dark'] .map-reset:focus-visible) { color: #12221e; background: #c4e6db; border-color: #c4e6db; }
 :global(html[data-theme='dark'] .legend-dot) { border-color: #effbf8; }
 :global(html[data-theme='dark'] .geographic-map .leaflet-control-zoom a), :global(html[data-theme='dark'] .geographic-map .leaflet-control-attribution) { color: var(--ink); background: var(--panel); border-color: var(--line-strong); }
 :global(html[data-theme='dark'] .geographic-map .leaflet-control-attribution a) { color: var(--teal); }

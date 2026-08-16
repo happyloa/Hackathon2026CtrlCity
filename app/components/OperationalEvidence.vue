@@ -84,7 +84,7 @@ const percent = (value: number) => `${(value * 100).toFixed(1)}%`
 .evidence-grid p { margin: 9px 0 0; color: var(--muted); font-size: 16px; line-height: 1.55; }
 .evidence-note { display: flex; align-items: flex-start; gap: 7px; margin: 12px 0 0; color: var(--muted); font-size: 16px; font-weight: 650; }
 .evidence-note svg { flex: 0 0 auto; margin-top: 2px; color: var(--blue); font-size: 19px; }
-:global(html[data-theme='dark'] .evidence-badge) { color: #c9f0e6; background: var(--surface-muted); }
+:global(html[data-theme='dark'] .evidence-badge) { color: var(--teal); background: var(--surface-muted); }
 @media (max-width: 900px) { .evidence-grid { grid-template-columns: 1fr; }.evidence-grid article + article { border-top: 1px solid var(--line); border-left: 0; } }
 @media (max-width: 620px) { .evidence-summary { grid-template-columns: minmax(0, 1fr) auto; }.evidence-summary-copy { display: none; }.evidence-content { padding: 16px; } }
 </style>

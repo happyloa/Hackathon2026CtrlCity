@@ -165,7 +165,7 @@ const allAlertsTarget = computed(() => ({ path: '/alerts', query: props.contextQ
   place-items: center;
   width: 23px;
   height: 23px;
-  color: #fff;
+  color: var(--on-accent);
   background: var(--teal-dark);
   border-radius: 50%;
   font-family: "DM Mono", monospace;
@@ -292,8 +292,4 @@ const allAlertsTarget = computed(() => ({ path: '/alerts', query: props.contextQ
   }
 }
 
-:global(html[data-theme='dark'] .step-heading > span) {
-  color: #12221e;
-  background: #9bd8ca;
-}
 </style>

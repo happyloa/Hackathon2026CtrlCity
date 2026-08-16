@@ -166,12 +166,12 @@ function toggleImpact(dispatchId: string) {
 }
 
 :global(html[data-theme='dark'] .dispatch-impact) { background: var(--surface-muted); border-color: var(--line); }
-:global(html[data-theme='dark'] .operation-badge) { color: #c9f0e6; background: #29443b; border-color: #5b8d7f; }
-:global(html[data-theme='dark'] .operation-badge.remove_bikes) { color: #c3dcf1; background: #293943; border-color: #60798b; }
+:global(html[data-theme='dark'] .operation-badge) { color: var(--teal); background: #2b2b30; border-color: #62626a; }
+:global(html[data-theme='dark'] .operation-badge.remove_bikes) { color: #c3dcf1; background: #2a2b31; border-color: #636974; }
 :global(html[data-theme='dark'] .impact-station) { background: var(--panel); border-color: var(--line); }
 :global(html[data-theme='dark'] .impact-station > p), :global(html[data-theme='dark'] .impact-station dd) { color: var(--ink); }
 :global(html[data-theme='dark'] .impact-station dd strong), :global(html[data-theme='dark'] .impact-toggle), :global(html[data-theme='dark'] .impact-arrow) { color: var(--teal); }
-:global(html[data-theme='dark'] .impact-station small.safe) { color: #c9f0e6; }:global(html[data-theme='dark'] .impact-station small.unsafe) { color: #ffc4bd; }
+:global(html[data-theme='dark'] .impact-station small.safe) { color: var(--teal); }:global(html[data-theme='dark'] .impact-station small.unsafe) { color: #ffc4bd; }
 
 @media (max-width: 780px) { .impact-grid { grid-template-columns: 1fr; }.impact-arrow { grid-template-columns: auto 1fr; place-content: start; align-items: center; min-width: 0; text-align: left; }.impact-arrow svg { justify-self: start; transform: rotate(90deg); } }
 </style>

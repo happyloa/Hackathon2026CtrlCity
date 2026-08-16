@@ -166,7 +166,7 @@ function selectStation(stationId: string) {
       </div>
     </section>
 
-    <section v-if="activeDashboard || sourceMode === 'live'" class="control-bar panel">
+    <section v-if="activeDashboard || sourceMode === 'live'" class="control-bar panel" :class="{ 'control-bar--live': sourceMode === 'live' }">
       <div class="source-switch" role="group" aria-label="資料模式">
         <span>工作模式</span>
         <div class="segmented">
@@ -197,10 +197,13 @@ function selectStation(stationId: string) {
         <span>風險時間</span>
         <strong>60 分鐘</strong>
       </div>
-      <button v-if="sourceMode === 'live'" class="live-refresh-button" type="button" :disabled="livePending" @click="refreshLive({ manual: true })">
-        <Icon :icon="livePending ? 'svg-spinners:3-dots-fade' : 'solar:refresh-circle-outline'" />
-        {{ livePending ? '比對中' : '立即更新' }}
-      </button>
+      <div v-if="sourceMode === 'live'" class="refresh-control">
+        <span>資料更新</span>
+        <button class="live-refresh-button" type="button" :disabled="livePending" @click="refreshLive({ manual: true })">
+          <Icon :icon="livePending ? 'svg-spinners:3-dots-fade' : 'solar:refresh-circle-outline'" />
+          {{ livePending ? '比對中' : '立即更新' }}
+        </button>
+      </div>
       <div class="control-note">
         <Icon :icon="sourceMode === 'live' ? 'solar:refresh-circle-outline' : 'solar:shield-warning-outline'" />
         {{ sourceMode === 'live'

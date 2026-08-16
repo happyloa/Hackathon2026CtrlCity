@@ -14,6 +14,8 @@
   --red: #a93a34;
   --yellow: #8a5a09;
   --blue: #2f648f;
+  --on-accent: #fff;
+  --refresh-surface: #edf7f2;
   --shadow: none;
   --scroll-track: #e4e9e4;
   --scroll-thumb: #70817a;
@@ -136,7 +138,7 @@ a {
   background: rgba(225, 255, 248, 0.08);
 }
 .nav-link.router-link-active {
-  color: #fff;
+  color: var(--on-accent);
   background: rgba(47, 163, 147, 0.24);
   box-shadow: inset 3px 0 0 #86e4d1;
 }
@@ -356,7 +358,7 @@ a {
 .horizon-switch button.active,
 .segmented button.active,
 .horizon-buttons button.active {
-  color: #fff;
+  color: var(--on-accent);
   background: var(--ink);
 }
 .control-note {
@@ -1455,7 +1457,7 @@ small {
 .brand-mark {
   width: 34px;
   height: 34px;
-  color: #fff;
+  color: var(--on-accent);
   background: var(--teal-dark);
   border-radius: 5px;
   font-size: 20px;
@@ -1611,6 +1613,8 @@ small {
 }
 
 .control-bar {
+  display: grid;
+  grid-template-columns: minmax(212px, 1.3fr) minmax(154px, 1fr) max-content max-content;
   align-items: end;
   gap: 14px;
   padding: 13px 14px;
@@ -1619,11 +1623,26 @@ small {
 
 .control-bar label,
 .source-switch,
-.horizon-switch {
+.horizon-switch,
+.forecast-window,
+.refresh-control {
+  display: grid;
   gap: 5px;
   color: var(--muted);
   font-weight: 700;
   letter-spacing: 0;
+}
+
+.source-switch {
+  min-width: 0;
+}
+
+.source-switch .segmented {
+  width: 100%;
+}
+
+.source-switch button {
+  flex: 1;
 }
 
 .control-bar select {
@@ -1654,7 +1673,7 @@ small {
 .horizon-switch button.active,
 .segmented button.active,
 .horizon-buttons button.active {
-  color: #fff;
+  color: var(--on-accent);
   background: var(--teal-dark);
 }
 
@@ -1665,7 +1684,7 @@ small {
 
 .live-refresh-button {
   min-height: 38px;
-  color: #fff;
+  color: var(--on-accent);
   background: var(--teal-dark);
   border-color: var(--teal-dark);
   border-radius: 5px;
@@ -1674,6 +1693,27 @@ small {
 .live-refresh-button:hover:not(:disabled) {
   background: var(--teal);
   border-color: var(--teal);
+}
+
+.forecast-window strong {
+  display: flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 0 9px;
+  color: var(--ink);
+  background: var(--surface-muted);
+  border: 1px solid var(--line-strong);
+  border-radius: 5px;
+  white-space: nowrap;
+}
+
+.refresh-control .live-refresh-button {
+  width: 100%;
+}
+
+.control-note {
+  grid-column: 1 / -1;
+  margin: 0;
 }
 
 .metric-grid {
@@ -1902,7 +1942,7 @@ small {
 }
 
 .assign-button {
-  color: #fff;
+  color: var(--on-accent);
   background: var(--teal-dark);
   border-radius: 4px;
 }
@@ -1942,7 +1982,7 @@ small {
 }
 
 .briefing-button {
-  color: #fff;
+  color: var(--on-accent);
   background: var(--teal-dark);
   border: 1px solid var(--teal-dark);
   border-radius: 4px;
@@ -1995,35 +2035,37 @@ small {
 }
 
 @keyframes data-refresh-border {
-  0% { border-color: var(--teal); background-color: #edf7f2; }
+  0% { border-color: var(--teal); background-color: var(--refresh-surface); }
   100% { border-color: var(--line); background-color: var(--panel); }
 }
 
 html[data-theme="dark"] {
-  --ink: #f3f5f1;
-  --ink-soft: #d5dfd8;
-  --teal: #79c9b8;
-  --teal-dark: #9bd8ca;
-  --sea: #222e2a;
-  --paper: #151a19;
-  --panel: #1d2523;
-  --surface-muted: #26302d;
-  --line: #4b5b54;
-  --line-strong: #62746b;
-  --muted: #b5c2bb;
+  --ink: #f4f4f5;
+  --ink-soft: #d8d8dc;
+  --teal: #7ed6c8;
+  --teal-dark: #a8e6dc;
+  --sea: #212124;
+  --paper: #151517;
+  --panel: #1d1d20;
+  --surface-muted: #28282c;
+  --line: #46464d;
+  --line-strong: #606069;
+  --muted: #b7b7bf;
   --orange: #e9bf73;
   --red: #ef9d96;
   --yellow: #e9bf73;
   --blue: #9bc3e2;
-  --scroll-track: #101514;
-  --scroll-thumb: #71847b;
-  --scroll-thumb-hover: #9bd8ca;
+  --on-accent: #171719;
+  --refresh-surface: #2b2b30;
+  --scroll-track: #111114;
+  --scroll-thumb: #6a6a73;
+  --scroll-thumb-hover: #a8e6dc;
   color-scheme: dark;
 }
 
 html[data-theme="dark"] .side-nav {
   color: var(--ink);
-  background: #101514;
+  background: #131316;
   border-right-color: var(--line);
 }
 
@@ -2040,13 +2082,13 @@ html[data-theme="dark"] .side-note {
 
 html[data-theme="dark"] .nav-link:hover {
   color: var(--ink);
-  background: #202a27;
+  background: #28282c;
 }
 
 html[data-theme="dark"] .nav-link.router-link-active {
-  color: #c9f0e6;
-  background: #23342f;
-  box-shadow: inset 3px 0 0 #9bd8ca;
+  color: var(--teal);
+  background: #2b2b30;
+  box-shadow: inset 3px 0 0 var(--teal-dark);
 }
 
 html[data-theme="dark"] .topbar-context,
@@ -2104,9 +2146,9 @@ html[data-theme="dark"] .horizon-buttons button.active,
 html[data-theme="dark"] .live-refresh-button,
 html[data-theme="dark"] .briefing-button,
 html[data-theme="dark"] .assign-button {
-  color: #12221e;
-  background: #9bd8ca;
-  border-color: #9bd8ca;
+  color: var(--on-accent);
+  background: var(--teal-dark);
+  border-color: var(--teal-dark);
   box-shadow: none;
 }
 
@@ -2141,8 +2183,8 @@ html[data-theme="dark"] .fact-pills b {
 
 html[data-theme="dark"] .metric-icon,
 html[data-theme="dark"] .briefing-orb {
-  color: #c9f0e6;
-  background: #29443b;
+  color: var(--teal);
+  background: #2b2b30;
 }
 
 html[data-theme="dark"] .metric-warning .metric-icon,
@@ -2163,19 +2205,19 @@ html[data-theme="dark"] .risk-critical {
 
 html[data-theme="dark"] .metric-positive .metric-icon {
   color: #c3dcf1;
-  background: #293943;
+  background: #2a2b31;
 }
 
 html[data-theme="dark"] .risk-badge {
-  color: #c9f0e6;
-  background: #29443b;
-  border-color: #5b8d7f;
+  color: var(--teal);
+  background: #2b2b30;
+  border-color: #62626a;
 }
 
 html[data-theme="dark"] .mode-pill {
-  color: #c9f0e6;
-  background: #29443b;
-  border-color: #5b8d7f;
+  color: var(--teal);
+  background: #2b2b30;
+  border-color: #62626a;
 }
 
 html[data-theme="dark"] .risk-summary {
@@ -2197,9 +2239,9 @@ html[data-theme="dark"] .error-board {
 
 html[data-theme="dark"] .quiet-button,
 html[data-theme="dark"] .assign-button.assigned {
-  color: #c9f0e6;
-  background: #29443b;
-  border-color: #5b8d7f;
+  color: var(--teal);
+  background: #2b2b30;
+  border-color: #62626a;
 }
 
 html[data-theme="dark"] .briefing-copy .section-kicker,
@@ -2233,6 +2275,32 @@ html[data-theme="dark"] button:focus-visible,
 html[data-theme="dark"] a:focus-visible,
 html[data-theme="dark"] select:focus-visible,
 html[data-theme="dark"] input:focus-visible {
-  outline-color: #9bd8ca;
+  outline-color: var(--teal-dark);
   box-shadow: none;
+}
+
+@media (max-width: 860px) {
+  .control-bar {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .control-bar--live {
+    grid-template-columns: minmax(0, 1fr) max-content max-content;
+  }
+
+  .source-switch {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 540px) {
+  .control-bar,
+  .control-bar--live {
+    grid-template-columns: 1fr;
+  }
+
+  .source-switch,
+  .control-note {
+    grid-column: auto;
+  }
 }
