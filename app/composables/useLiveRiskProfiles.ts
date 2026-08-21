@@ -322,9 +322,15 @@ export function useLiveRiskProfiles() {
   const error = useState('live-risk-profile-error', () => '')
   const coverage = useState<PredictionCoverage | null>('live-risk-profile-coverage', () => null)
 
+  function clearProfileCache() {
+    manifest.value = null
+    matchIndex = undefined
+    slotCache.clear()
+  }
+
   async function loadManifest(): Promise<ProfileManifest> {
     if (manifest.value) return manifest.value
-    const response = await $fetch<unknown>('/data/live-profile/manifest.json', { cache: 'force-cache' })
+    const response = await $fetch<unknown>('/data/live-profile/manifest.json', { cache: 'no-store' })
     const parsed = parseManifest(response)
     if (!parsed) throw new Error('歷史基線設定檔格式不完整。')
     manifest.value = parsed
@@ -342,12 +348,17 @@ export function useLiveRiskProfiles() {
     if (cached) return cached
     const path = profileManifest.slots[String(slot)]
     if (!path) return null
-    const parsed = parseSlot(await $fetch<unknown>(path, { cache: 'force-cache' }), profileManifest.legacyStationIds)
+    const parsed = parseSlot(await $fetch<unknown>(path, { cache: 'no-store' }), profileManifest.legacyStationIds)
     if (parsed) slotCache.set(slot, parsed)
     return parsed
   }
 
-  async function forecastsFor(stations: LiveStation[], observedAt: string): Promise<Map<string, Record<HorizonKey, Forecast>>> {
+  async function forecastsFor(
+    stations: LiveStation[],
+    observedAt: string,
+    options: { refreshProfiles?: boolean } = {},
+  ): Promise<Map<string, Record<HorizonKey, Forecast>>> {
+    if (options.refreshProfiles) clearProfileCache()
     const results = new Map<string, Record<HorizonKey, Forecast>>()
     try {
       const profileManifest = await loadManifest()

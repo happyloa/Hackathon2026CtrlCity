@@ -1,15 +1,17 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
-import { displayStationName, type DataMode, type HorizonKey, type StationRisk } from '~/shared/ops'
+import { displayStationName, type DataMode, type HorizonKey, type PredictionCoverage, type StationRisk } from '~/shared/ops'
 
 const props = defineProps<{
   stations: StationRisk[]
   horizon: HorizonKey
   selectedId?: string
   dataMode?: DataMode
+  profileCoverage?: PredictionCoverage | null
+  profileError?: string
 }>()
 
-const emit = defineEmits<{ select: [stationId: string] }>()
+const emit = defineEmits<{ select: [stationId: string], retryBaseline: [] }>()
 
 type LeafletModule = typeof import('leaflet')
 type LeafletMap = import('leaflet').Map
@@ -25,15 +27,38 @@ const allMappedStations = computed(() => props.stations.filter(station => statio
 const mappedStations = computed(() => {
   const query = stationQuery.value.trim().toLocaleLowerCase('zh-TW')
   if (!query && !showAllStations.value) {
-    return allMappedStations.value.filter((station) => station.id === props.selectedId || markerTone(station) !== 'stable')
+    return allMappedStations.value.filter(station => station.id === props.selectedId || isActionable(station))
   }
   if (!query) return allMappedStations.value
   return allMappedStations.value.filter(station => `${station.name} ${station.district}`.toLocaleLowerCase('zh-TW').includes(query))
 })
-const abnormalCount = computed(() => mappedStations.value.filter((station) => {
-  const tone = markerTone(station)
-  return tone === 'empty-risk' || tone === 'full-risk' || tone === 'service-review'
-}).length)
+const hasBaselineLoadError = computed(() => isLive.value && Boolean(props.profileError))
+const actionableCount = computed(() => allMappedStations.value.filter(isActionable).length)
+const unmatchedBaselineCount = computed(() => {
+  if (!isLive.value || hasBaselineLoadError.value) return 0
+  return allMappedStations.value.filter(station => station.serviceStatus === 'operational' && forecastFor(station).baselineStatus === 'unmatched').length
+})
+const headerCount = computed(() => stationQuery.value
+  ? mappedStations.value.length
+  : showAllStations.value
+    ? allMappedStations.value.length
+    : actionableCount.value)
+const headerLabel = computed(() => stationQuery.value
+  ? '個搜尋結果'
+  : showAllStations.value
+    ? '個全市站點'
+    : '個待處理站點')
+const baselineNotice = computed(() => {
+  if (!isLive.value) return ''
+  if (hasBaselineLoadError.value) return '歷史基線暫時無法載入，現在僅顯示官方即時庫存；按「立即更新」即可重新比對。'
+  if (unmatchedBaselineCount.value) return `${unmatchedBaselineCount.value} 個新增或改名站尚無同站歷史基線，僅顯示即時庫存，不納入 60 分鐘預估。`
+  return ''
+})
+const mapStatusText = computed(() => {
+  if (stationQuery.value) return `搜尋結果共 ${mappedStations.value.length} 站；點選站點查看即時庫存與判讀。`
+  if (showAllStations.value) return `顯示全市 ${allMappedStations.value.length} 站；顏色標示需要優先處理的狀態。`
+  return `預設只顯示 ${actionableCount.value} 個待處理站點；可切換查看全市或搜尋站名。`
+})
 
 let leaflet: LeafletModule | null = null
 let leafletMap: LeafletMap | null = null
@@ -67,6 +92,11 @@ function markerTone(station: StationRisk): MarkerTone {
   return 'stable'
 }
 
+function isActionable(station: StationRisk) {
+  const tone = markerTone(station)
+  return tone === 'empty-risk' || tone === 'full-risk' || tone === 'service-review'
+}
+
 function markerColor(station: StationRisk) {
   const colors: Record<MarkerTone, string> = {
     stable: '#1e6f62',
@@ -85,7 +115,7 @@ function markerStatus(station: StationRisk) {
       ? '官方未啟用（需確認）'
       : '疑似服務異常（需確認）'
   }
-  if (tone === 'inventory-only') return '僅顯示即時庫存'
+  if (tone === 'inventory-only') return hasBaselineLoadError.value ? '基線暫不可用，僅顯示即時庫存' : '尚無歷史基線，僅顯示即時庫存'
   if (station.currentState === 'empty_now') return '目前無車可借'
   if (station.currentState === 'full_now') return '目前無位可還'
   if (tone === 'empty-risk') return isLive.value ? '60 分鐘缺車風險' : '預測缺車風險'
@@ -215,12 +245,12 @@ async function initialiseMap() {
   resizeObserver.observe(mapElement.value)
 }
 
-const stationSignature = computed(() => mappedStations.value
+const stationSignature = computed(() => `${hasBaselineLoadError.value}|${mappedStations.value
   .map((station) => {
     const forecast = forecastFor(station)
     return `${station.id}:${station.latitude}:${station.longitude}:${station.availableBikes}:${station.availableDocks}:${station.currentState}:${station.serviceStatus}:${forecast.emptyRisk}:${forecast.fullRisk}:${forecast.predictedBikes}:${forecast.predictedDocks}:${forecast.baselineStatus}`
   })
-  .join('|'))
+  .join('|')}`)
 
 watch(stationSignature, () => renderMarkers())
 watch(() => props.selectedId, () => {
@@ -243,34 +273,46 @@ onBeforeUnmount(() => {
     <div class="panel-heading map-heading">
       <div>
         <p class="section-kicker"><Icon :icon="isLive ? 'solar:bolt-circle-outline' : 'solar:map-point-wave-outline'" /> 站點地圖</p>
-        <h2>{{ isLive ? `${horizon} 分鐘風險站點` : `${horizon} 分鐘預測風險分布` }}</h2>
+        <h2>{{ isLive ? `${horizon} 分鐘待處理站點` : `${horizon} 分鐘預測風險分布` }}</h2>
       </div>
-      <span class="risk-summary"><b>{{ mappedStations.length }}</b> {{ stationQuery ? '個搜尋結果' : (showAllStations ? '個全市站點' : '個風險站點') }}</span>
+      <div class="map-summary" :class="{ 'map-summary--warning': hasBaselineLoadError }">
+        <strong>{{ headerCount }}</strong>
+        <span>{{ headerLabel }}</span>
+        <small v-if="isLive">{{ hasBaselineLoadError ? '基線暫不可用' : (profileCoverage ? `已對照 ${profileCoverage.matchedStations}／${profileCoverage.liveStations}` : '正在載入基線') }}</small>
+      </div>
+    </div>
+
+    <div class="map-command-row" role="group" aria-label="地圖工具">
+      <label class="map-search">
+        <Icon icon="solar:magnifer-outline" />
+        <input v-model="stationQuery" type="search" placeholder="搜尋站名或行政區" aria-label="搜尋站名或行政區" />
+      </label>
+      <div class="map-actions">
+        <button type="button" class="map-view-toggle" :aria-pressed="showAllStations" @click="toggleStationScope"><Icon :icon="showAllStations ? 'solar:filter-outline' : 'solar:map-point-outline'" /> {{ showAllStations ? '只看待處理站' : `查看全市 ${allMappedStations.length} 站` }}</button>
+        <button type="button" class="map-reset" @click="fitNewTaipeiBounds"><Icon icon="solar:map-arrow-left-outline" /> 新北全域</button>
+      </div>
     </div>
 
     <div class="geographic-map" role="region" :aria-label="isLive ? '新北市即時基線風險站點地圖' : '新北市歷史預測風險站點地圖'">
       <div ref="mapElement" class="map-canvas" />
-      <div class="map-tools" role="group" aria-label="地圖工具">
-        <label class="map-search">
-          <Icon icon="solar:magnifer-outline" />
-          <input v-model="stationQuery" type="search" placeholder="搜尋站名或行政區" aria-label="搜尋站名或行政區" />
-        </label>
-        <button type="button" class="map-view-toggle" @click="toggleStationScope"><Icon :icon="showAllStations ? 'solar:filter-outline' : 'solar:map-point-outline'" /> {{ showAllStations ? '只看風險站' : `顯示全市 ${allMappedStations.length} 站` }}</button>
-        <button type="button" class="map-reset" @click="fitNewTaipeiBounds"><Icon icon="solar:map-arrow-left-outline" /> 回到新北全域</button>
-      </div>
       <p v-if="!mappedStations.length" class="map-empty">目前沒有可定位的站點資料。</p>
     </div>
     <div class="map-caption">
       <p class="map-instruction"><Icon icon="solar:cursor-square-outline" /> 點選站點查看風險與替代還車引導</p>
+      <p v-if="baselineNotice" class="baseline-notice" :class="{ 'baseline-notice--warning': hasBaselineLoadError }">
+        <Icon :icon="hasBaselineLoadError ? 'solar:danger-triangle-outline' : 'solar:info-circle-outline'" />
+        <span>{{ baselineNotice }}</span>
+        <button v-if="hasBaselineLoadError" type="button" class="baseline-retry" @click="emit('retryBaseline')"><Icon icon="solar:refresh-circle-outline" /> 重新比對</button>
+      </p>
       <div class="geographic-map-legend" aria-label="風險方向圖例">
-        <span v-if="showAllStations"><i class="legend-dot normal" />基線穩定</span>
-        <span><i class="legend-dot empty" />無車風險／目前無車</span>
-        <span><i class="legend-dot full" />無位風險／目前無位</span>
-        <span><i class="legend-dot unavailable" />疑似服務異常</span>
-        <span v-if="isLive"><i class="legend-dot inventory-only" />未對照基線</span>
+        <span v-if="showAllStations"><i class="legend-dot normal" />已對照、暫無處理</span>
+        <span><i class="legend-dot empty" />補車優先｜無車／缺車風險</span>
+        <span><i class="legend-dot full" />移車優先｜無位／缺位風險</span>
+        <span><i class="legend-dot unavailable" />服務狀態待確認</span>
+        <span v-if="isLive && !hasBaselineLoadError && unmatchedBaselineCount"><i class="legend-dot inventory-only" />僅即時庫存｜未納入預估</span>
       </div>
     </div>
-    <p class="map-status-summary"><Icon icon="solar:info-circle-outline" /> {{ showAllStations ? `全市共有 ${abnormalCount} 個風險或服務異常站點；可切回風險站聚焦。` : `目前聚焦 ${abnormalCount} 個風險或服務異常站點；可切換查看全市。` }}</p>
+    <p class="map-status-summary"><Icon icon="solar:info-circle-outline" /> {{ mapStatusText }}</p>
   </section>
 </template>
 
@@ -286,9 +328,26 @@ onBeforeUnmount(() => {
   border-radius: 6px;
 }
 
+.map-summary {
+  display: grid;
+  justify-items: end;
+  min-width: 126px;
+  padding: 7px 10px;
+  color: var(--teal-dark);
+  background: var(--surface-muted);
+  border: 1px solid var(--line-strong, var(--line));
+  border-radius: 6px;
+  font-weight: 700;
+  line-height: 1.15;
+}
+.map-summary strong { font-size: 22px; }
+.map-summary span { color: var(--ink); font-size: 16px; }
+.map-summary small { margin-top: 4px; color: var(--muted); font-size: 16px; font-weight: 600; }
+.map-summary--warning { color: #9a5d07; }
 .map-canvas { width: 100%; min-height: 440px; }
 .map-instruction,
 .geographic-map-legend,
+.baseline-notice,
 .map-empty {
   margin: 0;
   color: var(--muted);
@@ -296,38 +355,30 @@ onBeforeUnmount(() => {
   font-weight: 600;
 }
 
-.map-caption {
-  display: inline-flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px 18px;
-  padding: 11px 18px 0;
-}
+.map-command-row { display: flex; align-items: center; gap: 8px; padding: 0 14px 12px; }
+.map-actions { display: flex; align-items: center; gap: 7px; }
 .map-instruction {
   display: inline-flex;
   align-items: center;
   gap: 6px;
 }
-
+.map-caption { display: grid; gap: 8px; padding: 11px 18px 0; }
 .map-instruction svg { color: var(--teal-dark); font-size: 19px; }
-.map-tools {
-  position: absolute;
-  z-index: 500;
-  top: 12px;
-  right: 12px;
-  display: flex;
+.map-search {
+  display: inline-flex;
+  flex: 1 1 260px;
   align-items: center;
-  gap: 7px;
-  padding: 7px;
+  gap: 5px;
+  min-width: 0;
+  min-height: 38px;
+  padding: 0 9px;
   color: var(--ink);
   background: var(--panel);
   border: 1px solid var(--line-strong, var(--line));
-  border-radius: 6px;
+  border-radius: 5px;
 }
-
-.map-search { display: inline-flex; align-items: center; gap: 5px; min-width: 215px; color: inherit; }
 .map-search svg { flex: 0 0 auto; color: var(--teal-dark); font-size: 19px; }
-.map-search input { width: 100%; min-width: 0; padding: 6px 4px; color: inherit; background: transparent; border: 0; outline: 0; font: inherit; }
+.map-search input { width: 100%; min-width: 0; padding: 6px 0; color: inherit; background: transparent; border: 0; outline: 0; font: inherit; }
 .map-search input::placeholder { color: var(--muted); opacity: 1; }
 .map-reset, .map-view-toggle { display: inline-flex; align-items: center; gap: 5px; min-height: 36px; padding: 6px 9px; border-radius: 5px; font: inherit; font-size: 16px; font-weight: 700; cursor: pointer; }
 .map-reset { color: var(--on-accent); background: var(--teal-dark); border: 1px solid var(--teal-dark); }
@@ -339,10 +390,14 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
   gap: 5px 13px;
 }
-
 .geographic-map-legend span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 .legend-dot { width: 10px; height: 10px; border: 1px solid rgba(11, 42, 47, .62); border-radius: 50%; background: #1e6f62; }
 .legend-dot.empty { background: #a93a34; }.legend-dot.full { background: #2f648f; }.legend-dot.unavailable { background: #65706b; }.legend-dot.inventory-only { background: #8a5a09; }
+.baseline-notice { display: flex; align-items: flex-start; gap: 6px; color: var(--muted); }
+.baseline-notice svg { flex: 0 0 auto; margin-top: 1px; color: var(--teal-dark); font-size: 19px; }
+.baseline-notice--warning { color: #8b5608; }.baseline-notice--warning svg { color: #9a5d07; }
+.baseline-retry { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 4px; min-height: 30px; margin: -3px 0 -3px 4px; padding: 4px 7px; color: var(--teal-dark); background: transparent; border: 1px solid var(--line-strong, var(--line)); border-radius: 5px; font: inherit; font-weight: 700; cursor: pointer; }
+.baseline-retry svg { margin: 0; color: currentColor; font-size: 17px; }.baseline-retry:hover, .baseline-retry:focus-visible { color: var(--ink); background: var(--teal-dark); border-color: var(--teal-dark); outline: 3px solid rgba(30, 111, 98, .2); outline-offset: 2px; }
 .map-empty { position: absolute; z-index: 500; inset: 50% auto auto 50%; padding: 12px; color: var(--ink); background: var(--panel); border: 1px solid var(--line-strong, var(--line)); border-radius: 6px; font-weight: 700; transform: translate(-50%, -50%); }
 .map-status-summary { display: flex; align-items: center; gap: 6px; margin: 10px 18px 14px; color: var(--muted); font-size: 16px; font-weight: 600; }
 .map-status-summary svg { flex: 0 0 auto; color: var(--teal-dark); font-size: 19px; }
@@ -356,8 +411,10 @@ onBeforeUnmount(() => {
 :global(.geographic-map .leaflet-tooltip span) { margin-top: 3px; color: #55635f; font-weight: 600; }
 :global(html[data-theme='dark'] .geographic-map) { background: #18181b; border-color: var(--line-strong); }
 :global(html[data-theme='dark'] .geographic-map .leaflet-tile-pane) { filter: brightness(.66) saturate(.58); }
-:global(html[data-theme='dark'] .map-instruction), :global(html[data-theme='dark'] .geographic-map-legend) { color: var(--muted); }
-:global(html[data-theme='dark'] .map-tools), :global(html[data-theme='dark'] .map-empty) { color: var(--ink); background: var(--panel); border-color: var(--line-strong); box-shadow: none; }
+:global(html[data-theme='dark'] .map-instruction), :global(html[data-theme='dark'] .geographic-map-legend), :global(html[data-theme='dark'] .baseline-notice) { color: var(--muted); }
+:global(html[data-theme='dark'] .map-search), :global(html[data-theme='dark'] .map-summary), :global(html[data-theme='dark'] .map-empty) { color: var(--ink); background: var(--panel); border-color: var(--line-strong); box-shadow: none; }
+:global(html[data-theme='dark'] .map-summary--warning) { color: #e8ba65; }
+:global(html[data-theme='dark'] .baseline-retry) { color: var(--teal); }
 :global(html[data-theme='dark'] .map-instruction svg), :global(html[data-theme='dark'] .map-search svg) { color: var(--teal); }
 :global(html[data-theme='dark'] .map-search) { color: var(--ink); }
 :global(html[data-theme='dark'] .map-search input::placeholder) { color: var(--muted); }
@@ -370,14 +427,18 @@ onBeforeUnmount(() => {
 @media (max-width: 1150px) { .geographic-map, .map-canvas, :global(.geographic-map .leaflet-container) { min-height: 400px; } }
 @media (max-width: 780px) {
   .geographic-map, .map-canvas, :global(.geographic-map .leaflet-container) { min-height: 350px; }
-  .map-tools { top: 55px; right: 8px; flex-wrap: wrap; max-width: calc(100% - 16px); }
-  .map-search { flex: 1 1 190px; min-width: 170px; }
+  .map-command-row { align-items: stretch; flex-wrap: wrap; }
+  .map-search { flex-basis: 100%; }
+  .map-actions { width: 100%; }
+  .map-actions button { flex: 1 1 0; justify-content: center; }
   .map-caption { gap: 7px 12px; padding: 10px 14px 0; }
+  .map-status-summary { margin-right: 14px; margin-left: 14px; }
 }
 @media (max-width: 480px) {
   .geographic-map, .map-canvas, :global(.geographic-map .leaflet-container) { min-height: 320px; }
-  .map-tools { top: 51px; left: 8px; right: 8px; display: grid; grid-template-columns: minmax(0, 1fr) auto; }
-  .map-search { grid-column: 1 / -1; min-width: 0; }
+  .map-heading { align-items: flex-start; gap: 10px; }
+  .map-summary { min-width: 112px; }
+  .map-command-row { padding-right: 10px; padding-left: 10px; }
   .map-reset, .map-view-toggle { padding: 6px 7px; }
 }
 </style>

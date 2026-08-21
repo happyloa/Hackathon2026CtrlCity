@@ -11,6 +11,7 @@ import type {
   HorizonKey,
   LiveStation,
   LiveStationsPayload,
+  PredictionCoverage,
   ServiceStatus,
   StationRisk,
 } from '~/shared/ops'
@@ -269,6 +270,19 @@ function snapshotSignature(response: LiveResponse) {
   return `${response.meta.asOf}|${response.data.stations.map(station => `${station.id}:${station.availableBikes}:${station.availableDocks}:${station.currentState}:${station.serviceStatus}`).join('|')}`
 }
 
+function profileSignature(error: string, coverage: PredictionCoverage | null) {
+  if (!coverage) return `pending:${error}`
+  return [
+    error,
+    coverage.asOf,
+    coverage.historicalProfileStations,
+    coverage.matchedStations,
+    coverage.unmatchedStations,
+    coverage.ambiguousStationMatches,
+    coverage.notApplicableStations,
+  ].join('|')
+}
+
 function scopedDashboard(dashboard: DashboardArtifact | null, district: string, actions: LiveActionState): DashboardArtifact | null {
   if (!dashboard) return null
   const stations = district ? dashboard.stations.filter(station => station.district === district) : dashboard.stations
@@ -296,6 +310,7 @@ export function useLiveDashboard() {
   const error = useState('live-dashboard-error', () => '')
   const updated = useState('live-dashboard-updated', () => false)
   const signature = useState('live-dashboard-signature', () => '')
+  const baselineSignature = useState('live-dashboard-baseline-signature', () => '')
   const acknowledgedAlertIds = useState<string[]>('live-dashboard-acknowledged-alerts', () => [])
   const acceptedDispatchIds = useState<string[]>('live-dashboard-accepted-dispatches', () => [])
   const {
@@ -317,16 +332,21 @@ export function useLiveDashboard() {
     try {
       const rawStations = await $fetch<unknown>(liveStationsEndpoint, { cache: 'no-store' })
       const response = createLiveResponse(rawStations)
-      const forecasts = await forecastsFor(response.data.stations, response.meta.asOf)
+      const forecasts = await forecastsFor(response.data.stations, response.meta.asOf, {
+        refreshProfiles: Boolean(options.manual),
+      })
       const nextDashboard = createLiveDashboard(response, forecasts, profileManifest.value)
       const nextSignature = snapshotSignature(response)
+      const nextBaselineSignature = profileSignature(profileError.value, profileCoverage.value)
       const hadPrevious = Boolean(payload.value)
       const changed = hadPrevious && nextSignature !== signature.value
-      if (!hadPrevious || changed || options.manual) {
+      const baselineChanged = hadPrevious && nextBaselineSignature !== baselineSignature.value
+      if (!hadPrevious || changed || baselineChanged || options.manual) {
         payload.value = response
         dashboard.value = nextDashboard
       }
       signature.value = nextSignature
+      baselineSignature.value = nextBaselineSignature
 
       if (changed) {
         acknowledgedAlertIds.value = []

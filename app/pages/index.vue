@@ -207,7 +207,7 @@ function selectStation(stationId: string) {
       <div class="control-note">
         <Icon :icon="sourceMode === 'live' ? 'solar:refresh-circle-outline' : 'solar:shield-warning-outline'" />
         {{ sourceMode === 'live'
-          ? (liveProfileError || (liveUpdateState === 'updated' ? '官方資料已更新，畫面已同步。' : liveComparisonStatus))
+          ? (liveProfileError ? '歷史基線暫時無法載入，僅顯示即時庫存；按立即更新即可重新比對。' : (liveUpdateState === 'updated' ? '官方資料已更新，畫面已同步。' : liveComparisonStatus))
           : '歷史回放不會覆寫即時資料。' }}
       </div>
     </section>
@@ -232,7 +232,16 @@ function selectStation(stationId: string) {
           @acknowledge="acknowledge"
           @accept="acceptDispatch"
         />
-        <RiskMap :stations="activeDashboard.stations" :horizon="horizon" :selected-id="selectedStationId" :data-mode="sourceMode" @select="selectStation" />
+        <RiskMap
+          :stations="activeDashboard.stations"
+          :horizon="horizon"
+          :selected-id="selectedStationId"
+          :data-mode="sourceMode"
+          :profile-coverage="sourceMode === 'live' ? liveProfileCoverage : null"
+          :profile-error="sourceMode === 'live' ? liveProfileError : ''"
+          @select="selectStation"
+          @retry-baseline="refreshLive({ manual: true })"
+        />
       </section>
 
       <StationDetailPanel :station="selectedStation" :stations="activeDashboard.stations" :history="selectedHistory" :horizon="horizon" :data-mode="sourceMode" :context-query="contextQuery" @close="selectedStationId = ''" @select="selectStation" />
