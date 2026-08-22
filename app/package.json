@@ -13,11 +13,16 @@
     "data:validate": "node scripts/validate-artifacts.mjs",
     "model:evaluate": "node scripts/evaluate-forecast.mjs",
     "impact:evaluate": "node scripts/evaluate-operational-impact.mjs",
+    "aws:preflight": "node scripts/aws-preflight.mjs",
+    "aws:deploy": "node scripts/aws-deploy.mjs",
+    "aws:publish": "node scripts/aws-publish.mjs",
+    "aws:knowledge": "node scripts/aws-upload-knowledge.mjs",
+    "aws:smoke": "node scripts/aws-smoke.mjs",
     "test": "node --test tests/*.test.mjs",
     "typecheck": "nuxt typecheck"
   },
   "dependencies": {
-    "@aws-sdk/client-bedrock-runtime": "^3.1103.0",
+    "@aws-sdk/client-bedrock-agentcore": "^3.1103.0",
     "@iconify/vue": "^5.0.1",
     "leaflet": "^1.9.4",
     "nuxt": "^4.5.1",

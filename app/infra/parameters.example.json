@@ -1,13 +1,13 @@
 {
   "Parameters": {
     "EnvironmentName": "hackathon",
-    "AllowedCorsOrigin": "http://localhost:3000",
-    "ArtifactPrefix": "youbike-ops",
-    "DataMode": "historical_replay",
-    "BedrockModelId": "",
-    "LiveFeedUrl": "",
-    "EnableForecastSchedule": "false",
-    "ForecastScheduleExpression": "rate(30 minutes)",
-    "ArtifactRetentionDays": "90"
+    "LiveFeedUrl": "https://data.ntpc.gov.tw/api/datasets/010e5b15-3823-4b20-b401-b1cf000550c5/json?page=0&size=2000",
+    "AgentCoreHarnessArn": "",
+    "AgentCoreHarnessQualifier": "DEFAULT",
+    "CreateAgentCoreHarness": "false",
+    "AgentCoreHarnessName": "CtrlCityReview",
+    "AgentCoreModelId": "",
+    "LogRetentionDays": "7",
+    "CreateKnowledgeSourceBucket": "false"
   }
 }
