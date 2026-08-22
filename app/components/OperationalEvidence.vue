@@ -16,12 +16,12 @@ const percent = (value: number) => `${(value * 100).toFixed(1)}%`
 </script>
 
 <template>
-  <details class="panel evidence-panel">
-    <summary class="evidence-summary">
-      <span><Icon icon="solar:chart-square-outline" /> 可驗證的方案效益</span>
-      <span class="evidence-summary-copy">查看保留測試與反事實試算</span>
-      <Icon class="evidence-summary-arrow" icon="solar:alt-arrow-down-outline" />
-    </summary>
+  <DisclosurePanel
+    class="panel evidence-panel"
+    title="可驗證的方案效益"
+    description="查看保留測試與反事實試算"
+    icon="solar:chart-square-outline"
+  >
     <div class="evidence-content">
     <div class="panel-heading">
       <div>
@@ -61,19 +61,10 @@ const percent = (value: number) => `${(value * 100).toFixed(1)}%`
 
     <p class="evidence-note"><Icon icon="solar:info-circle-outline" /> 調度數字是歷史庫存反事實試算，不代表已在真實車隊執行或保證相同成效。</p>
     </div>
-  </details>
+  </DisclosurePanel>
 </template>
 
 <style scoped>
-.evidence-panel { overflow: hidden; }
-.evidence-summary { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 13px 16px; color: var(--ink); cursor: pointer; list-style: none; font-size: 16px; font-weight: 800; }
-.evidence-summary::-webkit-details-marker { display: none; }
-.evidence-summary > span:first-child { display: inline-flex; align-items: center; gap: 7px; }
-.evidence-summary > span:first-child svg { color: var(--teal-dark); font-size: 20px; }
-.evidence-summary-copy { color: var(--muted); font-weight: 650; text-align: right; }
-.evidence-summary-arrow { color: var(--teal-dark); font-size: 19px; transition: transform .18s ease; }
-.evidence-panel[open] .evidence-summary { border-bottom: 1px solid var(--line); }
-.evidence-panel[open] .evidence-summary-arrow { transform: rotate(180deg); }
 .evidence-content { padding: 18px 20px 20px; }
 .evidence-badge { align-self: flex-start; padding: 5px 8px; color: var(--teal-dark); background: var(--surface-muted); border: 1px solid var(--line-strong); border-radius: 5px; font-size: 16px; font-weight: 800; }
 .evidence-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
@@ -86,5 +77,5 @@ const percent = (value: number) => `${(value * 100).toFixed(1)}%`
 .evidence-note svg { flex: 0 0 auto; margin-top: 2px; color: var(--blue); font-size: 19px; }
 :global(html[data-theme='dark'] .evidence-badge) { color: var(--teal); background: var(--surface-muted); }
 @media (max-width: 900px) { .evidence-grid { grid-template-columns: 1fr; }.evidence-grid article + article { border-top: 1px solid var(--line); border-left: 0; } }
-@media (max-width: 620px) { .evidence-summary { grid-template-columns: minmax(0, 1fr) auto; }.evidence-summary-copy { display: none; }.evidence-content { padding: 16px; } }
+@media (max-width: 620px) { .evidence-content { padding: 16px; } }
 </style>

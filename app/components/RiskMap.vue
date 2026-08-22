@@ -283,10 +283,11 @@ onBeforeUnmount(() => {
     </div>
 
     <div class="map-command-row" role="group" aria-label="地圖工具">
-      <label class="map-search">
+      <div class="map-search" role="search">
         <Icon icon="solar:magnifer-outline" />
-        <input v-model="stationQuery" type="search" placeholder="搜尋站名或行政區" aria-label="搜尋站名或行政區" />
-      </label>
+        <input v-model="stationQuery" type="text" inputmode="search" enterkeyhint="search" placeholder="搜尋站名或行政區" aria-label="搜尋站名或行政區" />
+        <button v-if="stationQuery" class="map-search-clear" type="button" aria-label="清除站點搜尋" @click="stationQuery = ''"><Icon icon="solar:close-circle-outline" /></button>
+      </div>
       <div class="map-actions">
         <button type="button" class="map-view-toggle" :aria-pressed="showAllStations" @click="toggleStationScope"><Icon :icon="showAllStations ? 'solar:filter-outline' : 'solar:map-point-outline'" /> {{ showAllStations ? '只看待處理站' : `查看全市 ${allMappedStations.length} 站` }}</button>
         <button type="button" class="map-reset" @click="fitNewTaipeiBounds"><Icon icon="solar:map-arrow-left-outline" /> 新北全域</button>
@@ -380,6 +381,7 @@ onBeforeUnmount(() => {
 .map-search svg { flex: 0 0 auto; color: var(--teal-dark); font-size: 19px; }
 .map-search input { width: 100%; min-width: 0; padding: 6px 0; color: inherit; background: transparent; border: 0; outline: 0; font: inherit; }
 .map-search input::placeholder { color: var(--muted); opacity: 1; }
+.map-search-clear { display: inline-grid; flex: 0 0 auto; width: 30px; height: 30px; place-items: center; padding: 0; color: var(--muted); background: transparent; border: 0; border-radius: 4px; font: inherit; }.map-search-clear:hover, .map-search-clear:focus-visible { color: var(--on-accent); background: var(--teal-dark); outline: 0; }.map-search-clear svg { color: currentColor; font-size: 20px; }
 .map-reset, .map-view-toggle { display: inline-flex; align-items: center; gap: 5px; min-height: 36px; padding: 6px 9px; border-radius: 5px; font: inherit; font-size: 16px; font-weight: 700; cursor: pointer; }
 .map-reset { color: var(--on-accent); background: var(--teal-dark); border: 1px solid var(--teal-dark); }
 .map-view-toggle { color: var(--teal-dark); background: var(--panel); border: 1px solid var(--line-strong, var(--line)); }

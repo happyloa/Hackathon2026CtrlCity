@@ -45,7 +45,6 @@ body {
   background: var(--paper);
 }
 button,
-select,
 input {
   font: inherit;
   transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
@@ -55,7 +54,6 @@ button {
 }
 button:focus-visible,
 a:focus-visible,
-select:focus-visible,
 input:focus-visible {
   outline: 3px solid rgba(30, 111, 98, 0.42);
   outline-offset: 2px;
@@ -307,26 +305,6 @@ a {
   gap: 17px;
   padding: 15px 18px;
   margin-bottom: 18px;
-}
-.control-bar label {
-  display: grid;
-  gap: 6px;
-  min-width: 154px;
-  color: var(--muted);
-  font-size: 16px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-}
-.control-bar select {
-  width: 100%;
-  padding: 8px 28px 8px 10px;
-  color: var(--ink);
-  background: #f8faf8;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  font-size: 16px;
-  font-weight: 600;
-  outline: none;
 }
 .horizon-switch {
   display: grid;
@@ -1614,15 +1592,15 @@ small {
 
 .control-bar {
   display: grid;
-  grid-template-columns: minmax(212px, 1.3fr) minmax(154px, 1fr) max-content max-content;
+  grid-template-columns: minmax(212px, 1.3fr) minmax(220px, 1.15fr) minmax(154px, .85fr) max-content;
   align-items: end;
   gap: 14px;
   padding: 13px 14px;
   margin-bottom: 14px;
 }
 
-.control-bar label,
 .source-switch,
+.modal-picker,
 .horizon-switch,
 .forecast-window,
 .refresh-control {
@@ -1645,12 +1623,8 @@ small {
   flex: 1;
 }
 
-.control-bar select {
-  padding: 8px 28px 8px 9px;
-  color: var(--ink);
-  background: var(--panel);
-  border-color: var(--line-strong);
-  border-radius: 5px;
+.control-bar--live {
+  grid-template-columns: minmax(212px, 1.3fr) minmax(154px, 1fr) max-content max-content;
 }
 
 .horizon-switch > div,
@@ -2094,7 +2068,7 @@ html[data-theme="dark"] .nav-link.router-link-active {
 html[data-theme="dark"] .topbar-context,
 html[data-theme="dark"] .control-note,
 html[data-theme="dark"] .source-switch,
-html[data-theme="dark"] .control-bar label,
+html[data-theme="dark"] .modal-picker,
 html[data-theme="dark"] .horizon-switch {
   color: var(--muted);
 }
@@ -2102,7 +2076,6 @@ html[data-theme="dark"] .horizon-switch {
 html[data-theme="dark"] .theme-toggle,
 html[data-theme="dark"] .operator,
 html[data-theme="dark"] .intro-data-note,
-html[data-theme="dark"] .control-bar select,
 html[data-theme="dark"] .horizon-switch > div,
 html[data-theme="dark"] .segmented,
 html[data-theme="dark"] .horizon-buttons,
@@ -2273,7 +2246,6 @@ html[data-theme="dark"] .live-inline-error {
 
 html[data-theme="dark"] button:focus-visible,
 html[data-theme="dark"] a:focus-visible,
-html[data-theme="dark"] select:focus-visible,
 html[data-theme="dark"] input:focus-visible {
   outline-color: var(--teal-dark);
   box-shadow: none;
@@ -2285,7 +2257,7 @@ html[data-theme="dark"] input:focus-visible {
   }
 
   .control-bar--live {
-    grid-template-columns: minmax(0, 1fr) max-content max-content;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .source-switch {

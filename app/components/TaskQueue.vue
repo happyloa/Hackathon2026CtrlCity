@@ -163,13 +163,13 @@ const allAlertsTarget = computed(() => ({ path: '/alerts', query: props.contextQ
   display: grid;
   flex: 0 0 auto;
   place-items: center;
-  width: 23px;
-  height: 23px;
+  width: 26px;
+  height: 26px;
   color: var(--on-accent);
   background: var(--teal-dark);
   border-radius: 50%;
   font-family: "DM Mono", monospace;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 800;
 }
 

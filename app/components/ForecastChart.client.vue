@@ -19,7 +19,7 @@ const props = defineProps<{
   projections?: ProjectionPoint[]
 }>()
 
-const dimensions = { width: 640, height: 250, top: 16, right: 16, bottom: 31, left: 34 }
+const dimensions = { width: 640, height: 250, top: 18, right: 16, bottom: 37, left: 44 }
 const plotWidth = dimensions.width - dimensions.left - dimensions.right
 const plotHeight = dimensions.height - dimensions.top - dimensions.bottom
 
@@ -188,8 +188,8 @@ const chartDescription = computed(() => {
 <style scoped>
 .forecast-chart { display: flex; flex-direction: column; gap: 4px; }
 .forecast-chart svg { display: block; flex: 1 1 auto; min-height: 0; width: 100%; }
-.chart-grid { stroke: var(--line); stroke-width: 1; }.chart-axis { stroke: var(--line-strong); stroke-width: 1; }.axis-label { fill: var(--muted); font-size: 12px; }
+.chart-grid { stroke: var(--line); stroke-width: 1; }.chart-axis { stroke: var(--line-strong); stroke-width: 1; }.axis-label { fill: var(--muted); font-size: 16px; }
 .trend-line { fill: none; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }.bikes-line { stroke: var(--teal); }.docks-line { stroke: var(--orange); }.projected { stroke-dasharray: 6 4; stroke-width: 2; }
 .data-point { stroke: var(--panel); stroke-width: 1.5; }.data-point:focus { stroke: var(--ink); stroke-width: 2.5; outline: none; }.bikes-point { fill: var(--teal); }.docks-point { fill: var(--orange); }.projection-point { fill: var(--panel); stroke-width: 2.3; }.projection-point.bikes-point { stroke: var(--teal); }.projection-point.docks-point { stroke: var(--orange); }
-.forecast-legend { display: flex; flex-wrap: wrap; gap: 4px 11px; color: var(--muted); font-size: 12px; line-height: 1.2; }.forecast-legend span { display: inline-flex; align-items: center; gap: 4px; }.legend-key { display: inline-block; width: 12px; border-top: 2px solid; }.legend-key.bikes-line { border-color: var(--teal); }.legend-key.docks-line { border-color: var(--orange); }.legend-key.projected { border-color: var(--muted); border-top-style: dashed; }
+.forecast-legend { display: flex; flex-wrap: wrap; gap: 4px 11px; color: var(--muted); font-size: 16px; line-height: 1.3; }.forecast-legend span { display: inline-flex; align-items: center; gap: 4px; }.legend-key { display: inline-block; width: 14px; border-top: 2px solid; }.legend-key.bikes-line { border-color: var(--teal); }.legend-key.docks-line { border-color: var(--orange); }.legend-key.projected { border-color: var(--muted); border-top-style: dashed; }
 </style>

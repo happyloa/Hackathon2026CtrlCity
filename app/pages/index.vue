@@ -101,6 +101,11 @@ function scenarioOptionLabel(time: string) {
   const date = new Intl.DateTimeFormat('zh-TW', { month: '2-digit', day: '2-digit', weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(time))
   return `${replayManifest.value?.labels[time] || '歷史營運情境'} · ${date}`
 }
+const replayPickerOptions = computed(() => dateOptions.value.map(time => ({ value: time, label: scenarioOptionLabel(time) })))
+const districtPickerOptions = computed(() => [
+  { value: '', label: '全部行政區' },
+  ...districtOptions.value.map(district => ({ value: district, label: district })),
+])
 const asOfLabel = computed(() => {
   const date = activeMeta.value?.asOf || activeDashboard.value?.meta.asOf
   if (!date) return '尚未載入'
@@ -174,19 +179,20 @@ function selectStation(stationId: string) {
           <button type="button" :class="{ active: sourceMode === 'historical_replay' }" @click="sourceMode = 'historical_replay'"><Icon icon="solar:clock-circle-outline" /> 歷史演練</button>
         </div>
       </div>
-      <label v-if="sourceMode === 'historical_replay'">
-        <span>回放時點</span>
-        <select v-model="selectedAt">
-          <option v-for="time in dateOptions" :key="time" :value="time">{{ scenarioOptionLabel(time) }}</option>
-        </select>
-      </label>
-      <label>
-        <span>行政區</span>
-        <select v-model="selectedDistrict">
-          <option value="">全部行政區</option>
-          <option v-for="district in districtOptions" :key="district" :value="district">{{ district }}</option>
-        </select>
-      </label>
+      <ModalPicker
+        v-if="sourceMode === 'historical_replay'"
+        v-model="selectedAt"
+        label="回放時點"
+        title="選擇歷史回放時點"
+        :options="replayPickerOptions"
+        empty-label="尚無可回放情境"
+      />
+      <ModalPicker
+        v-model="selectedDistrict"
+        label="行政區"
+        title="選擇行政區"
+        :options="districtPickerOptions"
+      />
       <div v-if="sourceMode === 'historical_replay'" class="horizon-switch" role="group" aria-label="預測時間窗">
         <span>預測時間窗</span>
         <div>
@@ -246,12 +252,12 @@ function selectStation(stationId: string) {
 
       <StationDetailPanel :station="selectedStation" :stations="activeDashboard.stations" :history="selectedHistory" :horizon="horizon" :data-mode="sourceMode" :context-query="contextQuery" @close="selectedStationId = ''" @select="selectStation" />
 
-      <details class="panel supporting-details">
-        <summary>
-          <span><Icon icon="solar:chart-square-outline" /> 判讀依據與交班摘要</span>
-          <small>查看資料說明、歷史驗證與情境摘要</small>
-          <Icon icon="solar:alt-arrow-down-outline" />
-        </summary>
+      <DisclosurePanel
+        class="panel supporting-details"
+        title="判讀依據與交班摘要"
+        description="查看資料說明、歷史驗證與情境摘要"
+        icon="solar:chart-square-outline"
+      >
         <div class="supporting-details-content">
           <OperationalEvidence :as-of="activeDashboard.meta.asOf" :data-mode="sourceMode" />
           <BriefingCard
@@ -269,7 +275,7 @@ function selectStation(stationId: string) {
               : '歷史演練使用已整理資料產生庫存風險與雙向調度建議；可借、可還皆為 0 時只標示為疑似服務異常，仍需人工確認。' }}</span>
           </section>
         </div>
-      </details>
+      </DisclosurePanel>
     </template>
   </div>
 </template>
@@ -286,52 +292,6 @@ function selectStation(stationId: string) {
 
 .supporting-details {
   margin-top: 14px;
-  overflow: hidden;
-}
-
-.supporting-details > summary {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 12px;
-  align-items: center;
-  padding: 13px 16px;
-  color: var(--ink);
-  cursor: pointer;
-  font-size: 16px;
-  font-weight: 800;
-  list-style: none;
-}
-
-.supporting-details > summary::-webkit-details-marker {
-  display: none;
-}
-
-.supporting-details > summary span {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-}
-
-.supporting-details > summary span svg,
-.supporting-details > summary > svg {
-  color: var(--teal-dark);
-  font-size: 19px;
-  transition: transform .18s ease;
-}
-
-.supporting-details > summary small {
-  color: var(--muted);
-  font-size: 16px;
-  font-weight: 650;
-  text-align: right;
-}
-
-.supporting-details[open] > summary {
-  border-bottom: 1px solid var(--line);
-}
-
-.supporting-details[open] > summary > svg {
-  transform: rotate(180deg);
 }
 
 .supporting-details-content {
@@ -363,14 +323,6 @@ function selectStation(stationId: string) {
 }
 
 @media (max-width: 620px) {
-  .supporting-details > summary {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-
-  .supporting-details > summary small {
-    display: none;
-  }
-
   .supporting-details-content {
     padding: 12px;
   }

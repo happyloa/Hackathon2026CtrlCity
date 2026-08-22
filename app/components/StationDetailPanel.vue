@@ -153,13 +153,12 @@ const detailTarget = computed(() => ({
       <small class="return-guidance-footnote">距離為直線估算，實際引導仍須依道路與現場狀態確認。</small>
     </section>
 
-    <details v-if="!isLive" class="detail-trend">
-      <summary><span>最近 6 小時庫存趨勢</span><Icon icon="solar:alt-arrow-down-outline" /></summary>
+    <DisclosurePanel v-if="!isLive" class="detail-trend" title="最近 6 小時庫存趨勢">
       <div class="detail-chart-wrap">
         <div class="mini-heading"><span>歷史＋基線推估</span><i><b />可借車 <b class="dock-key" />可還位</i></div>
         <ForecastChart :history="history" :station-name="stationName" :capacity="station.totalDocks" :projections="chartProjections" />
       </div>
-    </details>
+    </DisclosurePanel>
 
     <div class="reason-list">
       <p>{{ isLive ? '即時與基線判讀' : '模型判讀依據' }}</p>
@@ -184,7 +183,7 @@ const detailTarget = computed(() => ({
 .return-guidance > p { margin: 6px 0 8px; color: var(--muted); font-size: 16px; line-height: 1.45; }
 .return-station-list { display: grid; gap: 5px; }.return-station-list button { display: flex; align-items: center; justify-content: space-between; gap: 9px; width: 100%; padding: 7px 8px; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 4px; font: inherit; text-align: left; cursor: pointer; }.return-station-list button:hover, .return-station-list button:focus-visible { border-color: var(--teal-dark); outline: 0; }.return-station-list span { display: grid; min-width: 0; gap: 1px; }.return-station-list b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.return-station-list small { color: var(--muted); font-size: 16px; }.return-station-list strong { flex: 0 0 auto; color: var(--blue); font-family: 'DM Mono', monospace; font-size: 16px; }
 .return-guidance-empty { color: var(--muted); }.return-guidance-footnote { display: block; margin-top: 7px; color: var(--muted); font-size: 16px; line-height: 1.4; }
-.detail-trend { margin-top: 12px; border: 1px solid var(--line); border-radius: 4px; }.detail-trend summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px 10px; color: var(--ink); cursor: pointer; font-size: 16px; font-weight: 800; list-style: none; }.detail-trend summary::-webkit-details-marker { display: none; }.detail-trend summary svg { color: var(--teal-dark); font-size: 18px; transition: transform 150ms ease; }.detail-trend[open] summary { border-bottom: 1px solid var(--line); }.detail-trend[open] summary svg { transform: rotate(180deg); }.detail-trend .detail-chart-wrap { margin: 12px 10px; }
+.detail-trend { margin-top: 12px; border: 1px solid var(--line); border-radius: 4px; }.detail-trend :deep(.disclosure-trigger) { padding: 9px 10px; }.detail-trend .detail-chart-wrap { margin: 12px 10px; }
 :global(html[data-theme='dark'] .return-guidance) { border-left-color: var(--blue); }:global(html[data-theme='dark'] .return-station-list button) { color: var(--ink); background: var(--panel); border-color: var(--line); }:global(html[data-theme='dark'] .return-station-list strong) { color: var(--blue); }
 @media (max-width: 620px) { .baseline-comparison-grid { grid-template-columns: 1fr; }.baseline-comparison-heading { align-items: flex-start; flex-direction: column; gap: 2px; } }
 </style>
