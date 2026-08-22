@@ -289,6 +289,7 @@ function candidateRisk(station: StationRisk, operation: DispatchOperation, horiz
 function candidateIsStable(station: StationRisk, operation: DispatchOperation, horizon: HorizonKey): boolean {
   if (station.serviceStatus !== 'operational' || station.currentState !== 'normal') return false
   const forecast = station.forecast.horizons[horizon]
+  if (forecast.baselineStatus !== 'matched') return false
   return candidateRisk(station, operation, horizon) < alertThreshold(forecast)
 }
 

@@ -43,6 +43,7 @@ export function nearbyReturnStations(
     .filter((station) => station.id !== target.id && station.serviceStatus === 'operational')
     .flatMap((station) => {
       const forecast = station.forecast.horizons[horizon]
+      if (forecast.baselineStatus !== 'matched') return []
       const safetyDocks = Math.max(2, Math.ceil(station.totalDocks * .1))
       const projectedDocks = Math.min(station.availableDocks, forecast.predictedDocks)
       const distanceMeters = distanceMetersBetween(target, station)

@@ -22,9 +22,11 @@ const expanded = ref(props.defaultOpen)
       <small v-if="description" class="disclosure-description">{{ description }}</small>
       <Icon class="disclosure-arrow" icon="solar:alt-arrow-down-outline" />
     </button>
-    <div v-if="expanded" class="disclosure-content">
-      <slot />
-    </div>
+    <Transition name="disclosure">
+      <div v-if="expanded" class="disclosure-content">
+        <slot />
+      </div>
+    </Transition>
   </section>
 </template>
 
@@ -38,9 +40,13 @@ const expanded = ref(props.defaultOpen)
 .disclosure-panel.is-open .disclosure-trigger { border-bottom: 1px solid var(--line); }
 .disclosure-panel.is-open .disclosure-arrow { transform: rotate(180deg); }
 .disclosure-trigger:hover, .disclosure-trigger:focus-visible { background: var(--surface-muted); outline: 0; }
+.disclosure-enter-active, .disclosure-leave-active { transition: opacity .16s ease, transform .16s ease; }
+.disclosure-enter-from, .disclosure-leave-to { opacity: 0; transform: translateY(-4px); }
 
 @media (max-width: 620px) {
   .disclosure-trigger { grid-template-columns: minmax(0, 1fr) auto; }
   .disclosure-description { display: none; }
 }
+
+@media (prefers-reduced-motion: reduce) { .disclosure-enter-active, .disclosure-leave-active { transition: none; } }
 </style>

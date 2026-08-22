@@ -21,6 +21,8 @@ const navigationTarget = (path: string) => ({ path, query: navigationQuery.value
 function applyTheme() {
   document.documentElement.dataset.theme = isDark.value ? 'dark' : 'light'
   localStorage.setItem('yb-ops-theme', isDark.value ? 'dark' : 'light')
+  document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
+    ?.setAttribute('content', isDark.value ? '#151517' : '#f5f5f1')
 }
 
 function toggleTheme() {
@@ -47,7 +49,14 @@ onMounted(() => {
       </NuxtLink>
 
       <nav aria-label="主要導覽">
-        <NuxtLink v-for="item in navigation" :key="item.to" :to="navigationTarget(item.to)" class="nav-link">
+        <NuxtLink
+          v-for="item in navigation"
+          :key="item.to"
+          :to="navigationTarget(item.to)"
+          class="nav-link"
+          :aria-label="item.label"
+          :title="item.label"
+        >
           <Icon :icon="item.icon" />
           <span>{{ item.label }}</span>
         </NuxtLink>
@@ -66,7 +75,7 @@ onMounted(() => {
 
     <main class="main-canvas">
       <header class="topbar">
-        <div>
+        <div class="topbar-title">
           <p class="eyebrow">公共自行車營運調度</p>
           <h1>{{ activeLabel }}</h1>
         </div>
@@ -74,7 +83,7 @@ onMounted(() => {
           <span class="topbar-context"><Icon icon="solar:map-point-outline" /> 新北市服務範圍</span>
           <button class="theme-toggle" type="button" :aria-pressed="isDark" :aria-label="isDark ? '切換為淺色模式' : '切換為深色模式'" @click="toggleTheme">
             <Icon :icon="isDark ? 'solar:sun-2-outline' : 'solar:moon-outline'" />
-            {{ isDark ? '淺色模式' : '深色模式' }}
+            <span>{{ isDark ? '淺色模式' : '深色模式' }}</span>
           </button>
         </div>
       </header>

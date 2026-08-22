@@ -14,6 +14,7 @@ function station({
   serviceStatus = 'operational',
   fullRisk = 0.05,
   predictedDocks = availableDocks,
+  baselineStatus = 'matched',
 }) {
   const forecast = {
     targetAt: '2026-08-09T09:00:00+08:00',
@@ -28,9 +29,9 @@ function station({
     level: fullRisk >= .45 ? 'high' : 'normal',
     confidence: 'medium',
     alertThreshold: .45,
-    baselineStatus: 'matched',
-    baselineCoverage: 'sufficient',
-    method: 'historical_replay',
+    baselineStatus,
+    baselineCoverage: baselineStatus === 'matched' ? 'sufficient' : 'unmatched',
+    method: baselineStatus === 'matched' ? 'historical_replay' : 'inventory_only',
     sampleSize: 12,
     reasons: [],
   }
@@ -67,8 +68,9 @@ test('offers only nearby operational stations that retain a safe return capacity
   const riskyNearby = station({ id: 'risky-nearby', latitude: 25.002, fullRisk: .8, predictedDocks: 0 })
   const farAway = station({ id: 'far-away', latitude: 25.01, availableBikes: 12, availableDocks: 8 })
   const unavailable = station({ id: 'unavailable', latitude: 25.001, serviceStatus: 'official_inactive' })
+  const inventoryOnly = station({ id: 'inventory-only', latitude: 25.0005, availableDocks: 12, baselineStatus: 'unmatched' })
 
-  const choices = nearbyReturnStations(fullTarget, [fullTarget, safeNearby, riskyNearby, farAway, unavailable], '60')
+  const choices = nearbyReturnStations(fullTarget, [fullTarget, safeNearby, riskyNearby, farAway, unavailable, inventoryOnly], '60')
 
   assert.deepEqual(choices.map(choice => choice.stationId), ['safe-nearby'])
   assert.equal(choices[0].name, 'safe-nearby')

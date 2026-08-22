@@ -32,6 +32,7 @@ const mappedStations = computed(() => {
   if (!query) return allMappedStations.value
   return allMappedStations.value.filter(station => `${station.name} ${station.district}`.toLocaleLowerCase('zh-TW').includes(query))
 })
+const searchResults = computed(() => stationQuery.value.trim() ? mappedStations.value.slice(0, 6) : [])
 const hasBaselineLoadError = computed(() => isLive.value && Boolean(props.profileError))
 const actionableCount = computed(() => allMappedStations.value.filter(isActionable).length)
 const unmatchedBaselineCount = computed(() => {
@@ -140,8 +141,8 @@ function tooltipContent(station: StationRisk) {
   const forecast = forecastFor(station)
   const tone = markerTone(station)
   const inventory = `可借 ${station.availableBikes}・可還 ${station.availableDocks}`
-  const direction = tone === 'empty-risk' ? `${isLive.value ? '60 分鐘' : ''}無車風險分數 ${Math.round(forecast.emptyRisk * 100)}／100，建議補車` : tone === 'full-risk'
-    ? `${isLive.value ? '60 分鐘' : ''}無位風險分數 ${Math.round(forecast.fullRisk * 100)}／100，建議移車`
+  const direction = tone === 'empty-risk' ? `無車風險分數 ${Math.round(forecast.emptyRisk * 100)}／100，建議補車` : tone === 'full-risk'
+    ? `無位風險分數 ${Math.round(forecast.fullRisk * 100)}／100，建議移車`
     : markerStatus(station)
   const context = forecast.baselineStatus === 'matched'
     ? `${props.horizon} 分鐘 · ${direction}`
@@ -213,11 +214,16 @@ function toggleStationScope() {
   showAllStations.value = !showAllStations.value
 }
 
+function chooseSearchResult(stationId: string) {
+  emit('select', stationId)
+}
+
 function focusSelectedStation() {
   if (!leafletMap || !props.selectedId) return
   const selected = mappedStations.value.find(station => station.id === props.selectedId)
   if (!selected || selected.latitude === null || selected.longitude === null) return
-  leafletMap.panTo([selected.latitude, selected.longitude], { animate: true, duration: .35 })
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  leafletMap.panTo([selected.latitude, selected.longitude], { animate: !reduceMotion, duration: reduceMotion ? 0 : .35 })
 }
 
 async function initialiseMap() {
@@ -290,8 +296,17 @@ onBeforeUnmount(() => {
       </div>
       <div class="map-actions">
         <button type="button" class="map-view-toggle" :aria-pressed="showAllStations" @click="toggleStationScope"><Icon :icon="showAllStations ? 'solar:filter-outline' : 'solar:map-point-outline'" /> {{ showAllStations ? '只看待處理站' : `查看全市 ${allMappedStations.length} 站` }}</button>
-        <button type="button" class="map-reset" @click="fitNewTaipeiBounds"><Icon icon="solar:map-arrow-left-outline" /> 新北全域</button>
+        <button type="button" class="map-reset" aria-label="重設為新北市全域" title="重設為新北市全域" @click="fitNewTaipeiBounds"><Icon icon="solar:map-arrow-left-outline" /> <span class="map-reset-label">新北全域</span></button>
       </div>
+    </div>
+
+    <div v-if="stationQuery" class="map-search-results" role="region" aria-label="站點搜尋結果" aria-live="polite">
+      <button v-for="station in searchResults" :key="station.id" type="button" @click="chooseSearchResult(station.id)">
+        <span><strong>{{ displayStationName(station.name) }}</strong><small>{{ station.district || '新北市' }}</small></span>
+        <b>{{ station.availableBikes }} 車／{{ station.availableDocks }} 位</b>
+      </button>
+      <p v-if="!searchResults.length">找不到符合的站點。</p>
+      <p v-else-if="mappedStations.length > searchResults.length">另有 {{ mappedStations.length - searchResults.length }} 站，請輸入更完整的站名或行政區。</p>
     </div>
 
     <div class="geographic-map" role="region" :aria-label="isLive ? '新北市即時基線風險站點地圖' : '新北市歷史預測風險站點地圖'">
@@ -318,7 +333,7 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.geographic-map-panel { overflow: hidden; }
+.geographic-map-panel { container-type: inline-size; overflow: hidden; }
 .geographic-map {
   position: relative;
   min-height: 440px;
@@ -387,6 +402,14 @@ onBeforeUnmount(() => {
 .map-view-toggle { color: var(--teal-dark); background: var(--panel); border: 1px solid var(--line-strong, var(--line)); }
 .map-reset:hover, .map-reset:focus-visible { color: var(--on-accent); background: var(--teal); border-color: var(--teal); outline: 3px solid rgba(30, 111, 98, .28); outline-offset: 2px; }
 .map-view-toggle:hover, .map-view-toggle:focus-visible { color: var(--ink); border-color: var(--teal-dark); outline: 3px solid rgba(30, 111, 98, .18); outline-offset: 2px; }
+.map-search-results { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin: 0 14px 12px; padding: 8px; background: var(--surface-muted); border: 1px solid var(--line); border-radius: 6px; }
+.map-search-results button { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 52px; padding: 8px 10px; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 5px; font: inherit; text-align: left; }
+.map-search-results button:hover, .map-search-results button:focus-visible { border-color: var(--teal-dark); }
+.map-search-results button > span { display: grid; min-width: 0; gap: 2px; }
+.map-search-results strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; }
+.map-search-results small { color: var(--muted); font-size: 16px; }
+.map-search-results b { flex: 0 0 auto; color: var(--teal-dark); font-family: ui-monospace, Consolas, monospace; font-size: 16px; white-space: nowrap; }
+.map-search-results > p { grid-column: 1 / -1; margin: 4px; color: var(--muted); font-size: 16px; text-align: center; }
 .geographic-map-legend {
   display: flex;
   flex-wrap: wrap;
@@ -427,20 +450,24 @@ onBeforeUnmount(() => {
 :global(html[data-theme='dark'] .geographic-map .leaflet-tooltip span) { color: var(--muted); }
 
 @media (max-width: 1150px) { .geographic-map, .map-canvas, :global(.geographic-map .leaflet-container) { min-height: 400px; } }
-@media (max-width: 780px) {
+@container (max-width: 760px) {
   .geographic-map, .map-canvas, :global(.geographic-map .leaflet-container) { min-height: 350px; }
   .map-command-row { align-items: stretch; flex-wrap: wrap; }
   .map-search { flex-basis: 100%; }
   .map-actions { width: 100%; }
   .map-actions button { flex: 1 1 0; justify-content: center; }
+  .map-search-results { grid-template-columns: 1fr; }
   .map-caption { gap: 7px 12px; padding: 10px 14px 0; }
   .map-status-summary { margin-right: 14px; margin-left: 14px; }
 }
-@media (max-width: 480px) {
+@container (max-width: 480px) {
   .geographic-map, .map-canvas, :global(.geographic-map .leaflet-container) { min-height: 320px; }
-  .map-heading { align-items: flex-start; gap: 10px; }
-  .map-summary { min-width: 112px; }
+  .map-heading { display: grid; align-items: start; gap: 10px; }
+  .map-summary { width: 100%; min-width: 0; justify-items: start; }
   .map-command-row { padding-right: 10px; padding-left: 10px; }
-  .map-reset, .map-view-toggle { padding: 6px 7px; }
+  .map-actions { display: grid; grid-template-columns: minmax(0, 1fr) 48px; }
+  .map-reset, .map-view-toggle { min-height: 44px; padding: 6px 7px; }
+  .map-reset-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
+  .map-search-results { margin-right: 10px; margin-left: 10px; }
 }
 </style>

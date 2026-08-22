@@ -90,6 +90,7 @@ const chartDescription = computed(() => {
 
 <template>
   <figure class="forecast-chart">
+    <div class="chart-scroll">
     <svg
       :viewBox="`0 0 ${dimensions.width} ${dimensions.height}`"
       preserveAspectRatio="xMidYMid meet"
@@ -145,16 +146,12 @@ const chartDescription = computed(() => {
           :cx="chart.x(point.index)"
           :cy="chart.y(point.bikes)"
           r="3.2"
-          tabindex="0"
-          :aria-label="`${point.label}，可借車 ${point.bikes} 台`"
         ><title>{{ point.label }}：可借車 {{ point.bikes }} 台</title></circle>
         <circle
           class="data-point docks-point"
           :cx="chart.x(point.index)"
           :cy="chart.y(point.docks)"
           r="3.2"
-          tabindex="0"
-          :aria-label="`${point.label}，可還位 ${point.docks} 位`"
         ><title>{{ point.label }}：可還位 {{ point.docks }} 位</title></circle>
       </g>
       <g v-for="point in chart.projected" :key="`projection-${point.index}`">
@@ -163,19 +160,16 @@ const chartDescription = computed(() => {
           :cx="chart.x(point.index)"
           :cy="chart.y(point.bikes)"
           r="4"
-          tabindex="0"
-          :aria-label="`${point.label} 基線推估，可借車 ${point.bikes} 台`"
         ><title>{{ point.label }} 基線推估：可借車 {{ point.bikes }} 台</title></circle>
         <circle
           class="data-point projection-point docks-point"
           :cx="chart.x(point.index)"
           :cy="chart.y(point.docks)"
           r="4"
-          tabindex="0"
-          :aria-label="`${point.label} 基線推估，可還位 ${point.docks} 位`"
         ><title>{{ point.label }} 基線推估：可還位 {{ point.docks }} 位</title></circle>
       </g>
     </svg>
+    </div>
 
     <figcaption class="forecast-legend">
       <span><i class="legend-key bikes-line" />可借車</span>
@@ -187,7 +181,8 @@ const chartDescription = computed(() => {
 
 <style scoped>
 .forecast-chart { display: flex; flex-direction: column; gap: 4px; }
-.forecast-chart svg { display: block; flex: 1 1 auto; min-height: 0; width: 100%; }
+.chart-scroll { flex: 1 1 auto; min-height: 0; overflow-x: auto; }
+.forecast-chart svg { display: block; width: 640px; min-width: 640px; height: auto; aspect-ratio: 640 / 250; }
 .chart-grid { stroke: var(--line); stroke-width: 1; }.chart-axis { stroke: var(--line-strong); stroke-width: 1; }.axis-label { fill: var(--muted); font-size: 16px; }
 .trend-line { fill: none; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }.bikes-line { stroke: var(--teal); }.docks-line { stroke: var(--orange); }.projected { stroke-dasharray: 6 4; stroke-width: 2; }
 .data-point { stroke: var(--panel); stroke-width: 1.5; }.data-point:focus { stroke: var(--ink); stroke-width: 2.5; outline: none; }.bikes-point { fill: var(--teal); }.docks-point { fill: var(--orange); }.projection-point { fill: var(--panel); stroke-width: 2.3; }.projection-point.bikes-point { stroke: var(--teal); }.projection-point.docks-point { stroke: var(--orange); }

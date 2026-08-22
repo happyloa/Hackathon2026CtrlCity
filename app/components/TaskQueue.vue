@@ -24,7 +24,7 @@ const headline = computed(() => {
   return '目前沒有待處理項目'
 })
 const contextLabel = computed(() => props.dataMode === 'live'
-  ? '任務依即時庫存與 60 分鐘歷史比對排序。'
+  ? '空／滿站看即時庫存；已對照基線的站點另評估 60 分鐘風險。'
   : '用歷史時點重演相同的確認與指派流程。')
 const allDispatchesTarget = computed(() => ({ path: '/dispatch', query: props.contextQuery || {} }))
 const allAlertsTarget = computed(() => ({ path: '/alerts', query: props.contextQuery || {} }))
@@ -281,9 +281,17 @@ const allAlertsTarget = computed(() => ({ path: '/alerts', query: props.contextQ
     padding-right: 14px;
   }
 
-  .step-link {
-    align-self: center;
+  .step-heading {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas: 'number title' '. link';
+    align-items: start;
   }
+
+  .step-heading > span { grid-area: number; }
+  .step-heading > div { grid-area: title; min-width: 0; }
+  .step-heading > div small { display: none; }
+  .step-link { grid-area: link; min-height: 44px; margin: 2px 0 -6px; }
 
   :deep(.is-embedded .dispatch-list),
   :deep(.is-embedded .alert-list) {

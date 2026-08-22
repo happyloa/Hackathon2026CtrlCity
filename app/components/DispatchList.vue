@@ -61,7 +61,7 @@ function toggleImpact(dispatchId: string) {
   <section class="panel dispatch-panel" :class="{ 'is-embedded': embedded }">
     <div v-if="!embedded" class="panel-heading">
       <div>
-        <p class="section-kicker"><Icon icon="solar:routing-2-outline" /> 全域調度分配</p>
+        <p class="section-kicker"><Icon icon="solar:routing-2-outline" /> 搬運任務清單</p>
         <h2>先處理這些搬運任務</h2>
       </div>
       <NuxtLink v-if="compact" :to="allDispatchesTarget" class="text-link">調度工作台 <Icon icon="solar:arrow-right-up-outline" /></NuxtLink>
@@ -154,10 +154,15 @@ function toggleImpact(dispatchId: string) {
 @container (max-width: 620px) {
   .dispatch-row { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'route route' 'meta assign'; gap: 8px 12px; align-items: center; }
   .dispatch-route { grid-area: route; display: grid; grid-template-columns: auto minmax(0, 1fr) auto minmax(0, 1fr); width: 100%; gap: 6px; }
-  .dispatch-route button { min-width: 0; overflow: visible; line-height: 1.35; text-overflow: clip; white-space: normal; overflow-wrap: anywhere; }
+  .dispatch-route button { min-width: 0; overflow: visible; line-height: 1.35; text-overflow: clip; white-space: normal; overflow-wrap: break-word; }
   .dispatch-meta { grid-area: meta; display: flex; align-items: baseline; gap: 8px; min-width: 0; text-align: left; }
   .dispatch-meta span, .dispatch-meta small { display: inline; white-space: normal; }
   .assign-button { grid-area: assign; }
+}
+
+@container (max-width: 420px) {
+  .dispatch-row { grid-template-columns: 1fr; grid-template-areas: 'route' 'meta' 'assign'; }
+  .assign-button { width: 100%; min-height: 44px; }
 }
 
 @container (max-width: 390px) {

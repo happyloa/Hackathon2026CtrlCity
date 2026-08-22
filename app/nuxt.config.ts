@@ -22,19 +22,22 @@ export default defineNuxtConfig({
       title: '新北市 YouBike 調度工作台',
       meta: [
         { name: 'description', content: '新北市公共自行車站點庫存、風險與調度決策支援' },
-        { name: 'theme-color', content: '#1d2926' },
+        { name: 'theme-color', content: '#f5f5f1' },
       ],
+      script: [{
+        id: 'theme-init',
+        innerHTML: `(function(){try{var saved=localStorage.getItem('yb-ops-theme');var dark=saved==='dark'||(!saved&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=dark?'dark':'light';document.querySelector('meta[name="theme-color"]')?.setAttribute('content',dark?'#151517':'#f5f5f1')}catch(_){}})()`,
+      }],
       link: [
         { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
-        { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
-        { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' },
-        { rel: 'stylesheet', href: 'https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Noto+Sans+TC:wght@400;500;600;700&display=swap' },
       ],
     },
   },
   runtimeConfig: {
     public: {
       liveStationsEndpoint: process.env.NUXT_PUBLIC_LIVE_STATIONS_ENDPOINT || '/api/v1/live-stations',
+      agentEnabled: process.env.NUXT_PUBLIC_AGENT_ENABLED === 'true',
+      agentReviewEndpoint: process.env.NUXT_PUBLIC_AGENT_REVIEW_ENDPOINT || '/api/v1/agent-review',
     },
   },
   nitro: {

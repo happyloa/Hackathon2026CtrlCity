@@ -25,6 +25,11 @@ function accept(dispatchId: string) {
   else replay.acceptDispatch(dispatchId)
 }
 
+function retryDashboard() {
+  if (mode.value === 'live') void live.refresh({ manual: true })
+  else void replay.loadScenario(requestedAsOf.value)
+}
+
 watch([mode, requestedAsOf], ([nextMode, nextAsOf]) => {
   if (nextMode === 'historical_replay') void replay.loadScenario(nextAsOf)
 }, { immediate: true })
@@ -32,6 +37,7 @@ watch([mode, requestedAsOf], ([nextMode, nextAsOf]) => {
 
 <template>
   <div class="subpage">
+    <WorkspaceContext :mode="mode" :district="district" :data-time="dashboard?.meta.asOf" :query="contextQuery" />
     <section class="subpage-hero panel dispatch-hero">
       <div>
         <p class="section-kicker"><Icon icon="solar:routing-2-outline" /> {{ mode === 'live' ? '即時調度決策支援' : '歷史調度回放' }}</p>
@@ -40,9 +46,9 @@ watch([mode, requestedAsOf], ([nextMode, nextAsOf]) => {
       </div>
       <div class="dispatch-hero-stat"><Icon icon="solar:shield-check-outline" /><span>需人工覆核</span></div>
     </section>
-    <p v-if="activeError && dashboard" class="live-inline-error"><Icon icon="solar:danger-triangle-outline" /> {{ activeError }}目前仍顯示上一筆成功載入的資料。</p>
-    <div v-if="activePending && !dashboard" class="loading-board"><Icon icon="svg-spinners:3-dots-fade" />{{ mode === 'live' ? '正在建立即時調度建議…' : '正在載入歷史調度情境…' }}</div>
-    <div v-else-if="activeError && !dashboard" class="loading-board error-board"><Icon icon="solar:danger-triangle-outline" />{{ activeError }}</div>
+    <div v-if="activeError && dashboard" class="live-inline-error" role="alert"><Icon icon="solar:danger-triangle-outline" /> {{ activeError }} 目前仍顯示上一筆成功載入的資料。<PageRetryButton :busy="activePending" @retry="retryDashboard" /></div>
+    <div v-if="activePending && !dashboard" class="loading-board" role="status" aria-live="polite" aria-busy="true"><Icon icon="svg-spinners:3-dots-fade" />{{ mode === 'live' ? '正在建立即時調度建議…' : '正在載入歷史調度情境…' }}</div>
+    <div v-else-if="activeError && !dashboard" class="loading-board error-board" role="alert"><Icon icon="solar:danger-triangle-outline" />{{ activeError }}<PageRetryButton :busy="activePending" @retry="retryDashboard" /></div>
     <DispatchList v-else-if="dashboard" :dispatches="dashboard.dispatches" :stations="dashboard.stations" @select="navigateTo({ path: '/stations/' + $event, query: contextQuery })" @accept="accept" />
   </div>
 </template>

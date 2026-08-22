@@ -8,7 +8,7 @@ const route = useRoute()
 const router = useRouter()
 const selectedAt = ref(typeof route.query.at === 'string' ? route.query.at : '')
 const selectedDistrict = ref(typeof route.query.district === 'string' ? route.query.district : '')
-const horizon = ref<HorizonKey>('60')
+const horizon: HorizonKey = '60'
 const selectedStationId = ref('')
 const sourceMode = ref<SourceMode>(route.query.mode === 'historical_replay' ? 'historical_replay' : 'live')
 const liveOperations = useLiveDashboard()
@@ -20,7 +20,6 @@ const liveProfileError = liveOperations.profileError
 const liveProfileCoverage = liveOperations.profileCoverage
 const liveUpdateState = computed<'idle' | 'updated'>(() => liveOperations.updated.value ? 'updated' : 'idle')
 const refreshLive = liveOperations.refresh
-const horizonOptions: HorizonKey[] = ['30', '60', '120']
 useLivePolling(refreshLive, computed(() => sourceMode.value === 'live'))
 
 const {
@@ -74,11 +73,7 @@ watch(activeDashboard, (value) => {
 }, { immediate: true })
 
 watch(sourceMode, (mode) => {
-  if (mode === 'live') {
-    horizon.value = '60'
-  } else {
-    void loadScenario(selectedAt.value || undefined)
-  }
+  if (mode === 'historical_replay') void loadScenario(selectedAt.value || undefined)
 })
 
 watch(selectedAt, () => {
@@ -124,15 +119,15 @@ const metricCards = computed(() => {
   }
   return [
     { label: '待指派任務', value: summary.recommendedMoves, caption: '依優先分數排序', icon: 'solar:routing-2-outline', tone: 'positive' as const },
-    { label: '待確認風險', value: summary.persistentAlerts, caption: `含 ${summary.highRiskNext60m} 個 ${horizon.value} 分鐘高風險站`, icon: 'solar:danger-triangle-outline', tone: 'warning' as const },
+    { label: '待確認風險', value: summary.persistentAlerts, caption: `含 ${summary.highRiskNext60m} 個 60 分鐘高風險站`, icon: 'solar:danger-triangle-outline', tone: 'warning' as const },
     { label: '當下無車／無位', value: `${summary.emptyNow}／${summary.fullNow}`, caption: '歷史回放時點', icon: 'solar:wheel-angle-outline', tone: 'critical' as const },
   ]
 })
 
-const modeTitle = computed(() => sourceMode.value === 'live' ? '調度中心' : '歷史演練')
+const modeTitle = computed(() => sourceMode.value === 'live' ? '先處理高優先任務' : '重演歷史營運情境')
 const modeDescription = computed(() => sourceMode.value === 'live'
-  ? '從最優先任務開始處理。即時庫存會與同站、同時段歷史資料比對，產出 60 分鐘風險與可行搬運建議。'
-  : '選擇一個歷史時點，依相同流程確認風險與搬運建議；不會影響即時工作佇列。')
+  ? '依官方即時庫存與同站歷史基線排序，逐筆覆核 60 分鐘風險與搬運建議。'
+  : '選擇歷史時點，重現風險確認與任務指派；不影響即時工作佇列。')
 const liveComparisonStatus = computed(() => {
   const coverage = liveProfileCoverage.value
   if (!coverage) return '正在比對官方即時庫存與歷史基線。'
@@ -152,7 +147,6 @@ function acceptDispatch(dispatchId: string) {
 
 function selectStation(stationId: string) {
   selectedStationId.value = stationId
-  void nextTick(() => document.querySelector('.station-detail')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }))
 }
 </script>
 
@@ -175,8 +169,8 @@ function selectStation(stationId: string) {
       <div class="source-switch" role="group" aria-label="資料模式">
         <span>工作模式</span>
         <div class="segmented">
-          <button type="button" :class="{ active: sourceMode === 'live' }" @click="sourceMode = 'live'"><Icon icon="solar:bolt-circle-outline" /> 即時調度</button>
-          <button type="button" :class="{ active: sourceMode === 'historical_replay' }" @click="sourceMode = 'historical_replay'"><Icon icon="solar:clock-circle-outline" /> 歷史演練</button>
+          <button type="button" :class="{ active: sourceMode === 'live' }" :aria-pressed="sourceMode === 'live'" @click="sourceMode = 'live'"><Icon icon="solar:bolt-circle-outline" /> 即時調度</button>
+          <button type="button" :class="{ active: sourceMode === 'historical_replay' }" :aria-pressed="sourceMode === 'historical_replay'" @click="sourceMode = 'historical_replay'"><Icon icon="solar:clock-circle-outline" /> 歷史演練</button>
         </div>
       </div>
       <ModalPicker
@@ -193,13 +187,7 @@ function selectStation(stationId: string) {
         title="選擇行政區"
         :options="districtPickerOptions"
       />
-      <div v-if="sourceMode === 'historical_replay'" class="horizon-switch" role="group" aria-label="預測時間窗">
-        <span>預測時間窗</span>
-        <div>
-          <button v-for="item in horizonOptions" :key="item" type="button" :class="{ active: horizon === item }" @click="horizon = item">{{ item }}m</button>
-        </div>
-      </div>
-      <div v-else class="forecast-window" aria-label="即時風險時間">
+      <div class="forecast-window" :aria-label="sourceMode === 'live' ? '即時風險時間' : '歷史演練風險時間'">
         <span>風險時間</span>
         <strong>60 分鐘</strong>
       </div>
@@ -210,7 +198,7 @@ function selectStation(stationId: string) {
           {{ livePending ? '比對中' : '立即更新' }}
         </button>
       </div>
-      <div class="control-note">
+      <div class="control-note" role="status" aria-live="polite">
         <Icon :icon="sourceMode === 'live' ? 'solar:refresh-circle-outline' : 'solar:shield-warning-outline'" />
         {{ sourceMode === 'live'
           ? (liveProfileError ? '歷史基線暫時無法載入，僅顯示即時庫存；按立即更新即可重新比對。' : (liveUpdateState === 'updated' ? '官方資料已更新，畫面已同步。' : liveComparisonStatus))
@@ -222,11 +210,11 @@ function selectStation(stationId: string) {
       <MetricCard v-for="card in metricCards" :key="card.label" v-bind="card" />
     </section>
 
-    <div v-if="activePending && !activeDashboard" class="loading-board"><Icon icon="svg-spinners:3-dots-fade" />{{ sourceMode === 'live' ? '正在取得官方即時資料…' : '正在載入歷史回放資料…' }}</div>
-    <div v-else-if="activeError && !activeDashboard" class="loading-board error-board"><Icon icon="solar:danger-triangle-outline" />{{ sourceMode === 'live' ? '官方即時資料暫時無法取得，請稍後再試。' : '歷史資料暫時無法取得，請重新整理後再試。' }}</div>
+    <div v-if="activePending && !activeDashboard" class="loading-board" role="status" aria-live="polite"><Icon icon="svg-spinners:3-dots-fade" />{{ sourceMode === 'live' ? '正在取得官方即時資料…' : '正在載入歷史回放資料…' }}</div>
+    <div v-else-if="activeError && !activeDashboard" class="loading-board error-board" role="alert"><Icon icon="solar:danger-triangle-outline" />{{ sourceMode === 'live' ? '官方即時資料暫時無法取得，請稍後再試。' : '歷史資料暫時無法取得，請重新整理後再試。' }}</div>
 
     <template v-else-if="activeDashboard">
-      <p v-if="sourceMode === 'live' && liveError" class="live-inline-error"><Icon icon="solar:danger-triangle-outline" /> {{ liveError }}</p>
+      <p v-if="sourceMode === 'live' && liveError" class="live-inline-error" role="alert"><Icon icon="solar:danger-triangle-outline" /> {{ liveError }}</p>
       <section class="dashboard-grid primary-grid task-first-grid">
         <TaskQueue
           :alerts="activeDashboard.alerts"
@@ -252,6 +240,15 @@ function selectStation(stationId: string) {
 
       <StationDetailPanel :station="selectedStation" :stations="activeDashboard.stations" :history="selectedHistory" :horizon="horizon" :data-mode="sourceMode" :context-query="contextQuery" @close="selectedStationId = ''" @select="selectStation" />
 
+      <AgentReviewCard
+        v-if="sourceMode === 'live'"
+        :as-of="activeDashboard.meta.asOf"
+        horizon="60"
+        :district="selectedDistrict"
+        :facts="activeDashboard.briefingFacts"
+        :summary="activeDashboard.summary"
+      />
+
       <DisclosurePanel
         class="panel supporting-details"
         title="判讀依據與交班摘要"
@@ -260,14 +257,6 @@ function selectStation(stationId: string) {
       >
         <div class="supporting-details-content">
           <OperationalEvidence :as-of="activeDashboard.meta.asOf" :data-mode="sourceMode" />
-          <BriefingCard
-            v-if="sourceMode === 'historical_replay'"
-            :as-of="activeMeta?.asOf || activeDashboard.meta.asOf"
-            :horizon="horizon"
-            :district="selectedDistrict"
-            :facts="activeDashboard.briefingFacts"
-            :summary="activeDashboard.summary"
-          />
           <section class="data-footnote">
             <Icon icon="solar:info-circle-outline" />
             <span>{{ sourceMode === 'live'
@@ -300,10 +289,6 @@ function selectStation(stationId: string) {
 
 .supporting-details-content :deep(.evidence-panel) {
   margin: 0;
-}
-
-.supporting-details-content :deep(.briefing-card) {
-  margin-top: 14px;
 }
 
 .supporting-details-content .data-footnote {

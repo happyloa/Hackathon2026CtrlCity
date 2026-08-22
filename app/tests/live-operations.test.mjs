@@ -16,6 +16,7 @@ function forecast({
   unavailableRisk = 0,
   level = 'normal',
   alertThreshold = 0.45,
+  baselineStatus = 'matched',
 } = {}) {
   return {
     targetAt: '2026-08-09T09:00:00+08:00',
@@ -30,9 +31,9 @@ function forecast({
     level,
     confidence: 'medium',
     alertThreshold,
-    baselineStatus: 'matched',
-    baselineCoverage: 'sufficient',
-    method: 'historical_baseline_live_inventory',
+    baselineStatus,
+    baselineCoverage: baselineStatus === 'matched' ? 'sufficient' : 'unmatched',
+    method: baselineStatus === 'matched' ? 'historical_baseline_live_inventory' : 'inventory_only',
     sampleSize: 12,
     reasons: ['已對照同站、同時段歷史基線。'],
   }
@@ -236,6 +237,28 @@ test('keeps the alert but creates no dispatch when no source can preserve safety
   assert.equal(plan.alerts.length, 1)
   assert.equal(plan.dispatches.length, 0)
   assert.match(plan.alerts[0].reasons.at(-1), /未找到 8 公里內.*可供車輛/)
+})
+
+test('keeps a current inventory alert but does not use an unmatched station as forecast-safe supply', () => {
+  const empty = station({
+    id: 'empty-with-unmatched-source',
+    availableBikes: 0,
+    availableDocks: 20,
+    currentState: 'empty_now',
+    stationForecast: forecast({ predictedBikes: 0, predictedDocks: 20, emptyRisk: .9, level: 'critical' }),
+  })
+  const inventoryOnlySource = station({
+    id: 'inventory-only-source',
+    availableBikes: 15,
+    availableDocks: 5,
+    latitude: 25.001,
+    stationForecast: forecast({ predictedBikes: 15, predictedDocks: 5, baselineStatus: 'unmatched' }),
+  })
+
+  const plan = buildLiveOperations([empty, inventoryOnlySource], OBSERVED_AT)
+
+  assert.equal(plan.alerts.length, 1)
+  assert.equal(plan.dispatches.length, 0)
 })
 
 test('never recommends moving more bikes than the physical source or destination can support', () => {
