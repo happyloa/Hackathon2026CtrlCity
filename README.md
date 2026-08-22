@@ -1,73 +1,50 @@
-# YouBike 新北調度雷達
+# CtrlCity｜新北市 YouBike 調度工作台
 
-新北市 YouBike 營運調度 Demo。它把官方即時站況、歷史風險回放、持續異常告警與人工覆核的調度建議，放在同一個 Nuxt 4 介面中。
+以新北市官方即時站況對照主辦方六個月歷史資料，產生 60 分鐘空／滿站風險、待確認告警與可行搬運建議。公開 Demo：<https://hackathon2026ctrlcity.pages.dev>
 
-目前展示網址（取得競賽 AWS 帳號前）：<https://hackathon2026ctrlcity.pages.dev>
+## Demo 主線
 
-## 重點功能
+- 即時調度：每 5 分鐘檢查官方資料，也可手動更新；來源失敗時不以歷史資料冒充即時資料。
+- 風險判讀：目前空／滿站直接依官方庫存偵測；匹配到同站歷史基線時，再計算 60 分鐘風險。
+- 任務支援：列出搬運來源、目的、建議車數、距離與安全庫存試算，所有指派都需人工覆核。
+- 地圖與站點：預設只顯示待處理站，可搜尋全市站點、查看歷史基線與附近替代還車站。
+- 歷史演練：重現固定時點的風險、告警與反事實調度試算，作為展示與驗證證據。
+- AWS 覆核：正式帳號啟用後，AgentCore 只解釋畫面既有事實，不重算模型或自動派車。
 
-- 即時模式：透過同源輕量代理讀取新北市 YouBike Open Data，每五分鐘檢查一次；官方快照確實變動後，才以當前庫存對照同站、同時段的六個月歷史基線，更新 60 分鐘風險判讀、待確認風險與雙向搬運建議。
-- 歷史回放：以 30／60／120 分鐘風險、持續無車／無位／疑似服務異常告警，以及補車／移車雙向建議，呈現三個可切換的歷史情境。
-- 新北市地圖：使用 OpenStreetMap 底圖，顯示新北市站點、風險顏色、站名／行政區搜尋與地圖定位。
-- 人工覆核：告警確認、調度接受與調度影響試算都清楚標示為 Demo 操作，不會送出真實派車。
-- 效益證據：以 2026 年 6 月保留測試呈現預判品質，並對三個歷史情境產生可重現的庫存反事實調度試算。
+## 本機執行
 
-## 1102 修正
-
-原先的 edge SSR 會解析約 10 MB 的歷史資料、篩選站點並序列化回應，可能超出 Pages Functions 的 CPU 限制。現在的資料路徑如下：
-
-~~~
-歷史 CSV（不進 Git）
-  -> 離線資料產製
-  -> dashboard.json
-  -> build 時輸出 3 份歷史情境 JSON
-  -> 靜態 CDN（目前為 Cloudflare Pages；最終為 AWS CloudFront）
-
-瀏覽器即時模式
-  -> /api/v1/live-stations（極薄同源代理，只串流）
-  -> 新北市政府 YouBike Open Data
-  -> /data/live-profile/（CDN 靜態基線 manifest 與按時段載入的 profile shard）
-~~~
-
-歷史回放情境只會在使用者選擇「歷史演練」時按需載入；告警、調度與站點頁會沿用網址中的即時／歷史模式、回放時點及行政區。即時模式只取得 manifest 與當下 30／60／120 分鐘所需的精簡基線檔，不預取完整回放資料。live profile v2 以一次 manifest 的站點比對鍵與按時段的對齊陣列儲存，並帶有樣本數、平均庫存與風險率；不包含原始 CSV。新北市來源 API 沒有開放任意網站直接瀏覽器呼叫，因此目前保留一個只轉送資料、不解析 JSON 的 Pages Function。
-
-## 成本與資源界線
-
-- 未建立 KV、D1、R2、Vectorize、Workers AI、Queue 或任何付費資料資源。
-- 靜態頁面與歷史 JSON 由 Pages CDN 提供；只有即時資料請求會碰到單一、唯讀的 Pages Function。
-- AWS SAM 與 Bedrock 程式仍是未部署的遷移骨架；線上 Demo 沒有呼叫 Bedrock，也不需要 AWS 憑證。取得競賽帳號後，最終 Demo 會改以 S3/CloudFront、API Gateway/Lambda 與 AgentCore 部署。
-
-## 本機操作
-
-~~~
+```powershell
 cd app
 npm install
+npm run dev
+```
+
+完整驗證：
+
+```powershell
 npm test
 npm run data:validate
 npm run impact:evaluate
 npm run typecheck
 npm run build
-npm run build:cloudflare
-~~~
+```
 
-build:cloudflare 會產生 app/dist：
+`npm run build:cloudflare` 會輸出 `app/dist/`，供 Cloudflare Pages 的 Git Integration 部署。前端與歷史回放皆為靜態產物；只有 `/api/v1/live-stations` 經過唯讀代理，因此不會把大型資料或 Nuxt server bundle 送進 Pages Functions。
 
-- 純靜態 SPA、fallback 與圖資資產
-- data/replay/manifest.json 與三份情境 JSON
-- data/live-profile/manifest.json 與 48 份半小時 profile shard（v2 compact array，即時頁只按需載入）
-- 僅 /api/* 進入 Pages Function 的 _routes.json
+## AWS 正式環境
 
-Cloudflare Pages 目前透過 Git Integration 連接 main；推送後會自動建置與部署。它是過渡展示環境，最終 AWS 部署會使用相同 `app/dist` 靜態產物，並維持 `/api/v1/live-stations` 的資料契約。
+程式已備妥私有 S3、CloudFront、HTTP API／Lambda、選配 AgentCore Harness 與獨立知識文件 bucket。預設不建立知識來源、不啟用 Agent，也不會在本機驗證時建立任何 AWS 資源。
+
+正式帳號到手後，先依 [AWS 技術交接](app/aws/README.md)執行 preflight，再部署、發布與 smoke test。帳號、region、核准模型與 Harness／Knowledge Base 權限尚未確認前，不應執行部署。
 
 ## 資料與文件
 
-- 原始活動資料集：docs/資料集/，已由 .gitignore 排除，絕不提交。
-- 已產製的展示用資料：app/data/dashboard.json，僅用於本機建置時產生靜態情境檔，不屬於 Nuxt server bundle；檔案只保留 metadata、三個 scenarios 與 live profile，不重複預設情境。
+- `docs/資料集/` 約 1.1 GB，只保留本機且已由 `.gitignore` 排除；不會進入 Git、瀏覽器 bundle 或知識庫。
 - [文件索引](docs/文件索引.md)
 - [命題需求對照](docs/03_實作與驗證/命題需求對照.md)
-- [即時歷史基線判讀流程](docs/03_實作與驗證/即時歷史基線判讀流程.md)
+- [預測與資料方法](docs/03_實作與驗證/預測與資料方法.md)
+- [操作使用說明](docs/04_展示與交付/操作使用說明.md)
 - [三分鐘展示講稿](docs/04_展示與交付/三分鐘展示講稿.md)
-- [展示前檢查清單](docs/04_展示與交付/展示前檢查清單.md)
-- [靜態部署架構與 1102 修正](docs/03_實作與驗證/靜態部署架構與1102修正.md)
+- [AWS 正式環境交接](docs/03_實作與驗證/AWS正式環境交接.md)
 
-即時資料來源為[新北市政府 YouBike 資料集](https://data.ntpc.gov.tw/datasets/010E5B15-3823-4B20-B401-B1CF000550C5)，地圖使用 [OpenStreetMap](https://www.openstreetmap.org/) 與 [Leaflet](https://leafletjs.com/)。
+即時資料來源為[新北市政府 YouBike 公開資料](https://data.ntpc.gov.tw/datasets/010E5B15-3823-4B20-B401-B1CF000550C5)，底圖使用 [OpenStreetMap](https://www.openstreetmap.org/) 與 [Leaflet](https://leafletjs.com/)。
