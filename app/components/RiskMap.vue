@@ -309,7 +309,7 @@ onBeforeUnmount(() => {
       <p v-else-if="mappedStations.length > searchResults.length" class="col-span-full m-1 text-center text-base text-muted">另有 {{ mappedStations.length - searchResults.length }} 站，請輸入更完整的站名或行政區。</p>
     </div>
 
-    <div class="geographic-map map-height relative mx-3.5 min-h-112 overflow-hidden rounded-lg border border-line bg-map" role="region" :aria-label="isLive ? '新北市即時基線風險站點地圖' : '新北市歷史預測風險站點地圖'">
+    <div class="geographic-map map-height relative z-0 isolate mx-3.5 min-h-112 overflow-hidden rounded-lg border border-line bg-map" role="region" :aria-label="isLive ? '新北市即時基線風險站點地圖' : '新北市歷史預測風險站點地圖'">
       <div ref="mapElement" class="map-canvas map-height min-h-112 w-full" />
       <p v-if="!mappedStations.length" class="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 rounded-lg border border-line-strong bg-panel p-3 text-base font-bold text-ink">目前沒有可定位的站點資料。</p>
     </div>
