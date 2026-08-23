@@ -18,6 +18,23 @@ const visibleDispatches = computed(() => props.compact ? props.dispatches.slice(
 const allDispatchesTarget = computed(() => ({ path: '/dispatch', query: props.contextQuery || {} }))
 const nameFor = (id: string) => displayStationName(stationLookup.value.get(id)?.name || '')
 const expandedDispatchId = ref<string | null>(null)
+const containerClasses = {
+  default: 'panel overflow-hidden',
+  embedded: 'overflow-hidden border-0 bg-transparent shadow-none',
+} as const
+const operationClasses = {
+  deliver_bikes: 'border-positive bg-positive-surface text-positive',
+  remove_bikes: 'border-info bg-info-surface text-info',
+} as const
+const assignClasses = {
+  proposed: 'border-accent bg-accent text-on-accent hover:bg-accent-strong',
+  assigned: 'border-line bg-panel-muted text-muted',
+  completed: 'border-line bg-panel-muted text-muted',
+} as const
+const safetyClasses = {
+  safe: 'text-positive',
+  unsafe: 'text-danger',
+} as const
 const operationLabel = (dispatch: DispatchRecommendation) => dispatch.operation === 'remove_bikes' ? '移車' : '補車'
 const sourceRole = (dispatch: DispatchRecommendation) => dispatch.operation === 'remove_bikes' ? '待疏散滿位站' : '供給站'
 const destinationRole = (dispatch: DispatchRecommendation) => dispatch.operation === 'remove_bikes' ? '接收空位站' : '缺車站'
@@ -58,125 +75,67 @@ function toggleImpact(dispatchId: string) {
 </script>
 
 <template>
-  <section class="panel dispatch-panel" :class="{ 'is-embedded': embedded }">
-    <div v-if="!embedded" class="panel-heading">
+  <section :class="embedded ? containerClasses.embedded : containerClasses.default">
+    <div v-if="!embedded" class="flex flex-col gap-3 border-b border-line p-4 sm:flex-row sm:items-start sm:justify-between">
       <div>
-        <p class="section-kicker"><Icon icon="solar:routing-2-outline" /> 搬運任務清單</p>
-        <h2>先處理這些搬運任務</h2>
+        <p class="section-kicker text-base"><Icon icon="solar:routing-2-outline" /> 搬運任務清單</p>
+        <h2 class="m-0 mt-1 text-xl font-bold tracking-tight text-ink">先處理這些搬運任務</h2>
       </div>
-      <NuxtLink v-if="compact" :to="allDispatchesTarget" class="text-link">調度工作台 <Icon icon="solar:arrow-right-up-outline" /></NuxtLink>
+      <NuxtLink v-if="compact" :to="allDispatchesTarget" class="text-link min-h-11 text-base">調度工作台 <Icon icon="solar:arrow-right-up-outline" /></NuxtLink>
     </div>
 
-    <div v-if="visibleDispatches.length" class="dispatch-list">
-      <article v-for="dispatch in visibleDispatches" :key="dispatch.id" class="dispatch-item">
-        <div class="dispatch-row">
-          <div class="dispatch-route">
-            <span class="operation-badge" :class="dispatch.operation">{{ operationLabel(dispatch) }}</span>
-            <button type="button" @click="emit('select', dispatch.fromStationId)">{{ nameFor(dispatch.fromStationId) }}</button>
-            <span class="dispatch-route-arrow" aria-hidden="true"><Icon icon="solar:arrow-right-outline" /></span>
-            <button type="button" @click="emit('select', dispatch.toStationId)">{{ nameFor(dispatch.toStationId) }}</button>
+    <div v-if="visibleDispatches.length" class="divide-y divide-line">
+      <article v-for="dispatch in visibleDispatches" :key="dispatch.id" class="p-4">
+        <div class="flex flex-col gap-3 lg:flex-row lg:items-center">
+          <div class="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
+            <span class="shrink-0 rounded-full border px-2 py-1 text-base font-bold" :class="operationClasses[dispatch.operation]">{{ operationLabel(dispatch) }}</span>
+            <button type="button" class="min-w-0 flex-1 break-words text-left text-base font-bold text-ink hover:text-accent hover:underline" @click="emit('select', dispatch.fromStationId)">{{ nameFor(dispatch.fromStationId) }}</button>
+            <span class="shrink-0 text-lg text-muted" aria-hidden="true"><Icon icon="solar:arrow-right-outline" /></span>
+            <button type="button" class="min-w-0 flex-1 break-words text-left text-base font-bold text-accent hover:text-accent-strong hover:underline" @click="emit('select', dispatch.toStationId)">{{ nameFor(dispatch.toStationId) }}</button>
           </div>
-          <div class="dispatch-meta">
-            <span><b>{{ dispatch.bikeCount }}</b> 台</span>
-            <small>{{ dispatch.distanceKm.toFixed(1) }} km · 優先 {{ Math.round(dispatch.priorityScore) }}</small>
+          <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-base text-muted lg:justify-end">
+            <span><b class="font-mono text-lg text-ink">{{ dispatch.bikeCount }}</b> 台</span>
+            <small class="text-base">{{ dispatch.distanceKm.toFixed(1) }} km · 優先 {{ Math.round(dispatch.priorityScore) }}</small>
           </div>
           <button
             type="button"
-            class="assign-button"
-            :class="{ assigned: dispatch.status !== 'proposed' }"
+            class="min-h-11 w-full rounded-md border px-3 text-base font-bold transition-colors sm:w-auto"
+            :class="assignClasses[dispatch.status]"
             :disabled="dispatch.status !== 'proposed'"
             @click="emit('accept', dispatch.id)"
           >
             {{ dispatch.status === 'proposed' ? `指派${operationLabel(dispatch)}` : '已指派' }}
           </button>
         </div>
-        <button type="button" class="impact-toggle" :aria-expanded="expandedDispatchId === dispatch.id" @click="toggleImpact(dispatch.id)">
+        <button type="button" class="mt-2 inline-flex min-h-11 items-center gap-1 text-base font-bold text-accent hover:text-accent-strong hover:underline" :aria-expanded="expandedDispatchId === dispatch.id" @click="toggleImpact(dispatch.id)">
           <Icon icon="solar:calculator-minimalistic-outline" />
           {{ expandedDispatchId === dispatch.id ? '收合調度影響試算' : '查看調度影響試算' }}
           <Icon :icon="expandedDispatchId === dispatch.id ? 'solar:alt-arrow-up-outline' : 'solar:alt-arrow-down-outline'" />
         </button>
-        <section v-if="expandedDispatchId === dispatch.id && impactFor(dispatch)" class="dispatch-impact" aria-label="調度影響試算">
-          <p class="impact-notice"><Icon icon="solar:shield-warning-outline" /> 模擬結果，不改寫預測；指派前仍需人工覆核。</p>
-          <div class="impact-grid">
-            <div class="impact-station">
-              <p><span>{{ sourceRole(dispatch) }}</span>{{ displayStationName(impactFor(dispatch)?.from.name || '') }}</p>
-              <dl>
-                <div><dt>可借車</dt><dd>{{ impactFor(dispatch)?.from.availableBikes }} <b>→</b> <strong>{{ impactFor(dispatch)?.fromAfterBikes }}</strong></dd></div>
-                <div><dt>可還位</dt><dd>{{ impactFor(dispatch)?.from.availableDocks }} <b>→</b> <strong>{{ impactFor(dispatch)?.fromAfterDocks }}</strong></dd></div>
+        <section v-if="expandedDispatchId === dispatch.id && impactFor(dispatch)" class="mt-1 rounded-lg border border-line bg-panel-muted p-3" aria-label="調度影響試算">
+          <p class="m-0 flex items-start gap-2 text-base font-semibold leading-6 text-muted"><Icon class="mt-1 shrink-0 text-lg text-warning" icon="solar:shield-warning-outline" /> 模擬結果，不改寫預測；指派前仍需人工覆核。</p>
+          <div class="mt-3 grid gap-3 lg:grid-cols-3">
+            <div class="rounded-md border border-line bg-panel p-3">
+              <p class="m-0 mb-2 grid gap-1 text-base font-bold text-ink"><span class="text-muted">{{ sourceRole(dispatch) }}</span>{{ displayStationName(impactFor(dispatch)?.from.name || '') }}</p>
+              <dl class="grid gap-1 text-base">
+                <div class="flex justify-between gap-2 text-muted"><dt>可借車</dt><dd class="m-0 font-mono font-bold text-ink">{{ impactFor(dispatch)?.from.availableBikes }} <b class="px-1 text-muted">→</b> <strong class="text-accent">{{ impactFor(dispatch)?.fromAfterBikes }}</strong></dd></div>
+                <div class="flex justify-between gap-2 text-muted"><dt>可還位</dt><dd class="m-0 font-mono font-bold text-ink">{{ impactFor(dispatch)?.from.availableDocks }} <b class="px-1 text-muted">→</b> <strong class="text-accent">{{ impactFor(dispatch)?.fromAfterDocks }}</strong></dd></div>
               </dl>
-              <small :class="{ safe: impactFor(dispatch)?.donorSafe, unsafe: !impactFor(dispatch)?.donorSafe }"><Icon :icon="impactFor(dispatch)?.donorSafe ? 'solar:check-circle-outline' : 'solar:danger-triangle-outline'" /> {{ sourceSafetyLabel(dispatch) }}：{{ impactFor(dispatch)?.donorSafetyStock }} 台</small>
+              <small class="mt-2 flex items-center gap-1 text-base font-bold" :class="impactFor(dispatch)?.donorSafe ? safetyClasses.safe : safetyClasses.unsafe"><Icon :icon="impactFor(dispatch)?.donorSafe ? 'solar:check-circle-outline' : 'solar:danger-triangle-outline'" /> {{ sourceSafetyLabel(dispatch) }}：{{ impactFor(dispatch)?.donorSafetyStock }} 台</small>
             </div>
-            <div class="impact-arrow"><Icon icon="solar:round-arrow-right-outline" /><span>搬運 {{ impactFor(dispatch)?.movableBikes }} 台</span></div>
-            <div class="impact-station">
-              <p><span>{{ destinationRole(dispatch) }}</span>{{ displayStationName(impactFor(dispatch)?.to.name || '') }}</p>
-              <dl>
-                <div><dt>可借車</dt><dd>{{ impactFor(dispatch)?.to.availableBikes }} <b>→</b> <strong>{{ impactFor(dispatch)?.toAfterBikes }}</strong></dd></div>
-                <div><dt>可還位</dt><dd>{{ impactFor(dispatch)?.to.availableDocks }} <b>→</b> <strong>{{ impactFor(dispatch)?.toAfterDocks }}</strong></dd></div>
+            <div class="flex items-center gap-2 text-base font-bold text-accent lg:flex-col lg:justify-center lg:text-center"><Icon class="text-2xl" icon="solar:round-arrow-right-outline" /><span>搬運 {{ impactFor(dispatch)?.movableBikes }} 台</span></div>
+            <div class="rounded-md border border-line bg-panel p-3">
+              <p class="m-0 mb-2 grid gap-1 text-base font-bold text-ink"><span class="text-muted">{{ destinationRole(dispatch) }}</span>{{ displayStationName(impactFor(dispatch)?.to.name || '') }}</p>
+              <dl class="grid gap-1 text-base">
+                <div class="flex justify-between gap-2 text-muted"><dt>可借車</dt><dd class="m-0 font-mono font-bold text-ink">{{ impactFor(dispatch)?.to.availableBikes }} <b class="px-1 text-muted">→</b> <strong class="text-accent">{{ impactFor(dispatch)?.toAfterBikes }}</strong></dd></div>
+                <div class="flex justify-between gap-2 text-muted"><dt>可還位</dt><dd class="m-0 font-mono font-bold text-ink">{{ impactFor(dispatch)?.to.availableDocks }} <b class="px-1 text-muted">→</b> <strong class="text-accent">{{ impactFor(dispatch)?.toAfterDocks }}</strong></dd></div>
               </dl>
-              <small :class="{ safe: impactFor(dispatch)?.receiverSafe, unsafe: !impactFor(dispatch)?.receiverSafe }"><Icon :icon="impactFor(dispatch)?.receiverSafe ? 'solar:check-circle-outline' : 'solar:danger-triangle-outline'" /> {{ destinationSafetyLabel() }}：{{ impactFor(dispatch)?.receiverDockBuffer }} 位</small>
+              <small class="mt-2 flex items-center gap-1 text-base font-bold" :class="impactFor(dispatch)?.receiverSafe ? safetyClasses.safe : safetyClasses.unsafe"><Icon :icon="impactFor(dispatch)?.receiverSafe ? 'solar:check-circle-outline' : 'solar:danger-triangle-outline'" /> {{ destinationSafetyLabel() }}：{{ impactFor(dispatch)?.receiverDockBuffer }} 位</small>
             </div>
           </div>
         </section>
       </article>
     </div>
-    <div v-else class="empty-state"><Icon icon="solar:check-circle-outline" />目前沒有可行的搬運建議。</div>
+    <div v-else class="flex min-h-24 items-center justify-center gap-2 p-4 text-center text-base font-semibold text-positive"><Icon class="text-lg" icon="solar:check-circle-outline" />目前沒有可行的搬運建議。</div>
   </section>
 </template>
-
-<style scoped>
-.dispatch-panel { container-type: inline-size; }
-.dispatch-item + .dispatch-item { border-top: 1px solid var(--line); }
-.operation-badge { flex: 0 0 auto; padding: 3px 6px; color: var(--teal-dark); background: var(--surface-muted); border: 1px solid var(--line-strong); border-radius: 999px; font-size: 16px; font-weight: 800; }
-.operation-badge.remove_bikes { color: var(--blue); background: #e4edf5; border-color: #a9c2d7; }
-.impact-toggle { display: inline-flex; align-items: center; gap: 5px; margin: 0 16px 11px; padding: 5px 0; color: var(--teal-dark); background: transparent; border: 0; font: inherit; font-size: 16px; font-weight: 800; cursor: pointer; }
-.impact-toggle:hover, .impact-toggle:focus-visible { color: var(--ink); text-decoration: underline; outline: 0; }
-.impact-toggle:focus-visible { text-decoration-thickness: 2px; text-underline-offset: 4px; }
-.impact-toggle svg { font-size: 18px; }
-.dispatch-impact { margin: 0 16px 14px; padding: 12px; background: var(--surface-muted); border: 1px solid var(--line); border-radius: 6px; }
-.impact-notice { display: flex; align-items: center; gap: 6px; margin: 0 0 10px; color: var(--muted); font-size: 16px; font-weight: 700; }
-.impact-notice svg { flex: 0 0 auto; color: var(--orange); font-size: 19px; }
-.impact-grid { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 10px; align-items: stretch; }
-.impact-station { padding: 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 5px; }
-.impact-station > p { display: grid; gap: 2px; margin: 0 0 8px; color: var(--ink); font-size: 16px; font-weight: 800; }
-.impact-station > p span { color: var(--muted); font-size: 16px; font-weight: 700; }
-.impact-station dl { display: grid; gap: 4px; margin: 0; }
-.impact-station dl div { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 16px; }
-.impact-station dt, .impact-station dd { margin: 0; }
-.impact-station dd { color: var(--ink); font-family: 'DM Mono', monospace; font-weight: 700; }
-.impact-station dd b { color: var(--muted); padding: 0 2px; }
-.impact-station dd strong { color: var(--teal-dark); }
-.impact-station small { display: flex; align-items: center; gap: 4px; margin-top: 9px; color: var(--muted); font-size: 16px; font-weight: 700; }
-.impact-station small.safe { color: var(--teal-dark); }.impact-station small.unsafe { color: var(--red); }
-.impact-station small svg { font-size: 18px; }
-.impact-arrow { display: grid; place-content: center; gap: 3px; min-width: 76px; color: var(--teal-dark); text-align: center; font-size: 16px; font-weight: 800; }
-.impact-arrow svg { justify-self: center; font-size: 24px; }
-
-@container (max-width: 620px) {
-  .dispatch-row { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'route route' 'meta assign'; gap: 8px 12px; align-items: center; }
-  .dispatch-route { grid-area: route; display: grid; grid-template-columns: auto minmax(0, 1fr) auto minmax(0, 1fr); width: 100%; gap: 6px; }
-  .dispatch-route button { min-width: 0; overflow: visible; line-height: 1.35; text-overflow: clip; white-space: normal; overflow-wrap: break-word; }
-  .dispatch-meta { grid-area: meta; display: flex; align-items: baseline; gap: 8px; min-width: 0; text-align: left; }
-  .dispatch-meta span, .dispatch-meta small { display: inline; white-space: normal; }
-  .assign-button { grid-area: assign; }
-}
-
-@container (max-width: 420px) {
-  .dispatch-row { grid-template-columns: 1fr; grid-template-areas: 'route' 'meta' 'assign'; }
-  .assign-button { width: 100%; min-height: 44px; }
-}
-
-@container (max-width: 390px) {
-  .dispatch-route { gap: 4px; }
-  .dispatch-meta { gap: 6px; }
-}
-
-:global(html[data-theme='dark'] .dispatch-impact) { background: var(--surface-muted); border-color: var(--line); }
-:global(html[data-theme='dark'] .operation-badge) { color: var(--teal); background: #2b2b30; border-color: #62626a; }
-:global(html[data-theme='dark'] .operation-badge.remove_bikes) { color: #c3dcf1; background: #2a2b31; border-color: #636974; }
-:global(html[data-theme='dark'] .impact-station) { background: var(--panel); border-color: var(--line); }
-:global(html[data-theme='dark'] .impact-station > p), :global(html[data-theme='dark'] .impact-station dd) { color: var(--ink); }
-:global(html[data-theme='dark'] .impact-station dd strong), :global(html[data-theme='dark'] .impact-toggle), :global(html[data-theme='dark'] .impact-arrow) { color: var(--teal); }
-:global(html[data-theme='dark'] .impact-station small.safe) { color: var(--teal); }:global(html[data-theme='dark'] .impact-station small.unsafe) { color: #ffc4bd; }
-
-@media (max-width: 780px) { .impact-grid { grid-template-columns: 1fr; }.impact-arrow { grid-template-columns: auto 1fr; place-content: start; align-items: center; min-width: 0; text-align: left; }.impact-arrow svg { justify-self: start; transform: rotate(90deg); } }
-</style>

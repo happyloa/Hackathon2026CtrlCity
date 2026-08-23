@@ -22,14 +22,9 @@ const isLive = computed(() => props.dataMode === 'live')
 const stationName = computed(() => displayStationName(props.station?.name || ''))
 const forecast = computed(() => props.station?.forecast.horizons[props.horizon])
 const hasMatchedBaseline = computed(() => forecast.value?.baselineStatus === 'matched')
-const riskBadgeTone = computed(() => {
-  if (props.station?.serviceStatus !== 'operational') return 'service'
-  if (isLive.value && !hasMatchedBaseline.value) return 'inventory'
-  return forecast.value?.level || 'normal'
-})
 const riskLabel = computed(() => {
   const serviceStatus = props.station?.serviceStatus
-  if (serviceStatus === 'official_inactive') return '官方未啟用'
+  if (serviceStatus === 'official_inactive') return '官方標示停用'
   if (serviceStatus === 'suspected_unavailable') return '需人工確認'
   if (isLive.value) {
     const state = props.station?.currentState
@@ -40,8 +35,25 @@ const riskLabel = computed(() => {
   return ({ normal: '穩定', medium: '觀察', high: '高風險', critical: '立即處理' }[forecast.value?.level || 'normal'])
 })
 
+const riskBadgeClass = computed(() => {
+  if (props.station?.serviceStatus !== 'operational') {
+    return 'inline-flex rounded-full border border-line-strong bg-panel-muted px-2 py-0.5 text-base font-bold text-muted'
+  }
+  if (isLive.value && !hasMatchedBaseline.value) {
+    return 'inline-flex rounded-full border border-warning bg-warning-surface px-2 py-0.5 text-base font-bold text-warning'
+  }
+  if (forecast.value?.level === 'critical') {
+    return 'inline-flex rounded-full border border-danger bg-danger-surface px-2 py-0.5 text-base font-bold text-danger'
+  }
+  if (forecast.value?.level === 'high' || forecast.value?.level === 'medium') {
+    return 'inline-flex rounded-full border border-warning bg-warning-surface px-2 py-0.5 text-base font-bold text-warning'
+  }
+  return 'inline-flex rounded-full border border-positive bg-positive-surface px-2 py-0.5 text-base font-bold text-positive'
+})
+
 const forecastHeadline = computed(() => {
   if (!isLive.value) return `${props.horizon} 分鐘後`
+  if (props.station?.serviceStatus === 'official_inactive') return '官方標示停用，不納入調度'
   if (props.station?.serviceStatus !== 'operational') return '服務狀態待人工確認'
   if (!hasMatchedBaseline.value) return '未對照歷史基線'
   return `${props.horizon} 分鐘歷史基線推估`
@@ -55,6 +67,9 @@ const forecastDescription = computed(() => {
 })
 
 const forecastCaption = computed(() => {
+  if (props.station?.serviceStatus === 'official_inactive') {
+    return '官方資料 act=0；不納入歷史預測、替代還車或自動調度，請依官方公告或現場資訊確認原因。'
+  }
   if (props.station?.serviceStatus !== 'operational') return '此狀態不等同已確認停運，請依現場或官方資訊覆核。'
   if (isLive.value && !hasMatchedBaseline.value) return '未對照到唯一歷史站點；系統不假造未來風險。'
   const score = Math.round((forecast.value?.riskScore || 0) * 100)
@@ -163,67 +178,67 @@ onBeforeUnmount(() => {
 <template>
   <Teleport to="body">
   <Transition name="detail-drawer">
-  <div v-if="station" class="station-detail-backdrop" @mousedown.self="closePanel">
-  <aside ref="panelRef" class="station-detail" role="dialog" aria-modal="true" aria-labelledby="station-detail-title" tabindex="-1">
-    <button type="button" class="close-button" aria-label="關閉站點詳情" @click="closePanel"><Icon icon="solar:close-circle-outline" /></button>
-    <div class="detail-topline"><span>{{ isLive ? '即時庫存＋歷史基線' : '站點風險卡' }}</span><span :class="`risk-badge risk-${riskBadgeTone}`">{{ riskLabel }}</span></div>
-    <h3 id="station-detail-title">{{ stationName }}</h3>
-    <p class="station-location"><Icon icon="solar:map-point-outline" /> {{ station.district || '行政區待確認' }} · {{ station.city }}</p>
+  <div v-if="station" class="fixed inset-0 z-50 flex items-end justify-end bg-black/50 sm:items-stretch" @mousedown.self="closePanel">
+  <aside ref="panelRef" class="station-detail max-h-svh w-full overflow-y-auto rounded-t-xl border border-line bg-panel p-4 pb-6 text-ink shadow-2xl outline-none sm:h-svh sm:max-w-lg sm:rounded-none sm:border-y-0 sm:border-r-0 sm:p-5" role="dialog" aria-modal="true" aria-labelledby="station-detail-title" tabindex="-1">
+    <button type="button" class="mb-3 grid h-11 w-11 place-items-center rounded-md border border-line bg-panel-muted p-0 text-ink transition-colors hover:border-accent-strong hover:bg-accent-strong hover:text-on-accent" aria-label="關閉站點詳情" @click="closePanel"><Icon class="text-2xl" icon="solar:close-circle-outline" /></button>
+    <div class="flex flex-wrap items-center justify-between gap-2 text-base font-bold text-muted"><span>{{ isLive ? '即時庫存＋歷史基線' : '站點風險卡' }}</span><span :class="riskBadgeClass">{{ riskLabel }}</span></div>
+    <h3 id="station-detail-title" class="mt-2 text-2xl font-bold tracking-tight text-ink">{{ stationName }}</h3>
+    <p class="mt-1 flex items-center gap-1 text-base text-muted"><Icon class="shrink-0 text-lg text-accent-strong" icon="solar:map-point-outline" /> {{ station.district || '行政區待確認' }} · {{ station.city }}</p>
 
-    <div class="stock-cells">
-      <div><span>可借車</span><strong>{{ station.availableBikes }}</strong></div>
-      <div><span>可還位</span><strong>{{ station.availableDocks }}</strong></div>
-      <div><span>總車柱</span><strong>{{ station.totalDocks }}</strong></div>
+    <div class="mt-4 grid grid-cols-3 gap-2">
+      <div class="grid gap-0.5 rounded-md border border-line bg-panel-muted p-2"><span class="text-base font-bold text-muted">可借車</span><strong class="font-mono text-xl text-ink">{{ station.availableBikes }}</strong></div>
+      <div class="grid gap-0.5 rounded-md border border-line bg-panel-muted p-2"><span class="text-base font-bold text-muted">可還位</span><strong class="font-mono text-xl text-ink">{{ station.availableDocks }}</strong></div>
+      <div class="grid gap-0.5 rounded-md border border-line bg-panel-muted p-2"><span class="text-base font-bold text-muted">總車柱</span><strong class="font-mono text-xl text-ink">{{ station.totalDocks }}</strong></div>
     </div>
 
-    <section v-if="baselineComparison" class="baseline-comparison" aria-label="即時庫存與歷史基線比較">
-      <div class="baseline-comparison-heading">
-        <span><Icon icon="solar:scale-outline" /> 即時與歷史基線比較</span>
-        <small>+{{ horizon }}m · {{ baselineComparison.sampleSize }} 筆樣本</small>
+    <section v-if="baselineComparison" class="mb-3 mt-4 rounded-md border border-line border-l-4 border-l-accent-strong bg-panel-muted p-3" aria-label="即時庫存與歷史基線比較">
+      <div class="flex flex-col items-start gap-0.5 text-base font-extrabold text-ink sm:flex-row sm:items-center sm:justify-between sm:gap-2">
+        <span class="inline-flex items-center gap-1.5"><Icon class="text-lg text-accent-strong" icon="solar:scale-outline" /> 即時與歷史基線比較</span>
+        <small class="text-base font-bold text-muted">+{{ horizon }}m · {{ baselineComparison.sampleSize }} 筆樣本</small>
       </div>
-      <div class="baseline-comparison-grid">
-        <div><span>現在</span><strong>{{ station.availableBikes }} 車／{{ station.availableDocks }} 位</strong></div>
-        <div><span>歷史基線</span><strong>{{ baselineComparison.baselineBikes }} 車／{{ baselineComparison.baselineDocks }} 位</strong></div>
-        <div><span>{{ horizon }}m 推估</span><strong>{{ baselineComparison.predictedBikes }} 車／{{ baselineComparison.predictedDocks }} 位</strong></div>
+      <div class="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <div class="grid min-w-0 gap-0.5 rounded-md border border-line bg-panel p-2"><span class="text-base font-bold text-muted">現在</span><strong class="font-mono text-base leading-5 text-ink">{{ station.availableBikes }} 車／{{ station.availableDocks }} 位</strong></div>
+        <div class="grid min-w-0 gap-0.5 rounded-md border border-line bg-panel p-2"><span class="text-base font-bold text-muted">歷史基線</span><strong class="font-mono text-base leading-5 text-ink">{{ baselineComparison.baselineBikes }} 車／{{ baselineComparison.baselineDocks }} 位</strong></div>
+        <div class="grid min-w-0 gap-0.5 rounded-md border border-line bg-panel p-2"><span class="text-base font-bold text-muted">{{ horizon }}m 推估</span><strong class="font-mono text-base leading-5 text-ink">{{ baselineComparison.predictedBikes }} 車／{{ baselineComparison.predictedDocks }} 位</strong></div>
       </div>
-      <p>{{ baselineComparison.delta }}</p>
+      <p class="mt-2 text-base font-extrabold leading-6 text-accent-strong">{{ baselineComparison.delta }}</p>
     </section>
 
-    <div class="forecast-note">
-      <span><Icon :icon="isLive ? 'solar:bolt-circle-outline' : 'solar:chart-2-outline'" /> {{ forecastHeadline }}</span>
-      <strong>{{ forecastDescription }}</strong>
-      <small>{{ forecastCaption }}</small>
+    <div class="mt-4 grid gap-1 rounded-md border border-line bg-panel-muted p-3">
+      <span class="inline-flex items-center gap-1.5 text-base font-extrabold text-accent-strong"><Icon class="text-lg" :icon="isLive ? 'solar:bolt-circle-outline' : 'solar:chart-2-outline'" /> {{ forecastHeadline }}</span>
+      <strong class="text-lg text-ink">{{ forecastDescription }}</strong>
+      <small class="text-base leading-6 text-muted">{{ forecastCaption }}</small>
     </div>
 
-    <section v-if="needsReturnGuidance" class="return-guidance" aria-label="附近替代還車站">
-      <div class="return-guidance-heading">
-        <span><Icon icon="solar:map-point-wave-outline" /> 替代還車站</span>
-        <small>600m 內</small>
+    <section v-if="needsReturnGuidance" class="mt-3 rounded-md border border-line border-l-4 border-l-info bg-panel-muted p-3" aria-label="附近替代還車站">
+      <div class="flex items-center justify-between gap-2 text-base font-extrabold text-ink">
+        <span class="inline-flex items-center gap-1.5"><Icon class="text-lg text-info" icon="solar:map-point-wave-outline" /> 替代還車站</span>
+        <small class="text-base font-bold text-muted">600m 內</small>
       </div>
-      <p>依現況與 {{ horizon }} 分鐘風險篩選仍保有可還位的站點。</p>
-      <div v-if="returnStations.length" class="return-station-list">
-        <button v-for="option in returnStations" :key="option.stationId" type="button" @click="emit('select', option.stationId)">
-          <span><b>{{ option.name }}</b><small>{{ option.distanceMeters }}m · {{ option.district }}</small></span>
-          <strong>{{ option.availableDocks }} 位</strong>
+      <p class="my-2 text-base leading-6 text-muted">依現況與 {{ horizon }} 分鐘風險篩選仍保有可還位的站點。</p>
+      <div v-if="returnStations.length" class="grid gap-1.5">
+        <button v-for="option in returnStations" :key="option.stationId" class="flex w-full items-center justify-between gap-2 rounded-md border border-line bg-panel px-2 py-2 text-left text-base text-ink transition-colors hover:border-accent-strong hover:bg-surface" type="button" @click="emit('select', option.stationId)">
+          <span class="grid min-w-0 gap-0.5"><b class="truncate">{{ option.name }}</b><small class="text-base text-muted">{{ option.distanceMeters }}m · {{ option.district }}</small></span>
+          <strong class="shrink-0 font-mono text-base text-info">{{ option.availableDocks }} 位</strong>
         </button>
       </div>
-      <p v-else class="return-guidance-empty">600m 內暫無穩定可還位站點，請改由調度人員處理。</p>
-      <small class="return-guidance-footnote">距離為直線估算，實際引導仍須依道路與現場狀態確認。</small>
+      <p v-else class="text-base text-muted">600m 內暫無穩定可還位站點，請改由調度人員處理。</p>
+      <small class="mt-2 block text-base leading-6 text-muted">距離為直線估算，實際引導仍須依道路與現場狀態確認。</small>
     </section>
 
-    <DisclosurePanel v-if="!isLive" class="detail-trend" title="最近 6 小時庫存趨勢">
-      <div class="detail-chart-wrap">
-        <div class="mini-heading"><span>歷史＋基線推估</span><i><b />可借車 <b class="dock-key" />可還位</i></div>
+    <DisclosurePanel v-if="!isLive" class="mt-3 rounded-md border border-line" title="最近 6 小時庫存趨勢">
+      <div class="m-3">
+        <div class="flex flex-wrap items-center justify-between gap-2 text-base font-bold text-muted"><span>歷史＋基線推估</span><i class="inline-flex items-center gap-1.5 not-italic"><b class="h-2.5 w-2.5 rounded-full bg-accent" />可借車 <b class="ml-1 h-2.5 w-2.5 rounded-full bg-warning" />可還位</i></div>
         <ForecastChart :history="history" :station-name="stationName" :capacity="station.totalDocks" :projections="chartProjections" />
       </div>
     </DisclosurePanel>
 
-    <div class="reason-list">
-      <p>{{ isLive ? '即時與基線判讀' : '模型判讀依據' }}</p>
-      <span v-for="reason in forecast?.reasons" :key="reason"><Icon icon="solar:check-read-outline" /> {{ reason }}</span>
-      <span v-for="flag in station.qualityFlags" :key="flag" class="quality-flag"><Icon icon="solar:info-circle-outline" /> {{ flag }}</span>
+    <div class="mt-4 grid gap-2">
+      <p class="m-0 text-base font-extrabold text-ink">{{ isLive ? '即時與基線判讀' : '模型判讀依據' }}</p>
+      <span v-for="reason in forecast?.reasons" :key="reason" class="flex items-start gap-1.5 text-base leading-6 text-muted"><Icon class="mt-0.5 shrink-0 text-lg text-accent-strong" icon="solar:check-read-outline" /> {{ reason }}</span>
+      <span v-for="flag in station.qualityFlags" :key="flag" class="flex items-start gap-1.5 text-base leading-6 text-warning"><Icon class="mt-0.5 shrink-0 text-lg" icon="solar:info-circle-outline" /> {{ flag }}</span>
     </div>
-    <NuxtLink v-if="!isLive" :to="detailTarget" class="detail-link">開啟完整站點視圖 <Icon icon="solar:arrow-right-outline" /></NuxtLink>
+    <NuxtLink v-if="!isLive" :to="detailTarget" class="mt-4 inline-flex items-center gap-1 text-base font-bold text-accent transition-colors hover:text-accent-strong">開啟完整站點視圖 <Icon class="text-lg" icon="solar:arrow-right-outline" /></NuxtLink>
   </aside>
   </div>
   </Transition>
@@ -231,39 +246,14 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.station-detail-backdrop { position: fixed; z-index: 1100; inset: 0; display: flex; justify-content: flex-end; background: rgb(0 0 0 / .48); }
-.station-detail { display: block; width: min(480px, 100%); height: 100%; min-height: 0; max-height: 100dvh; padding: 22px; overflow-y: auto; border: 0; border-left: 1px solid var(--line); border-radius: 0; outline: 0; box-shadow: -18px 0 44px rgb(0 0 0 / .16); }
-.station-detail .close-button { width: 44px; height: 44px; top: 10px; right: 10px; border-radius: 5px; }
-.detail-drawer-enter-active, .detail-drawer-leave-active { transition: opacity .18s ease; }
-.detail-drawer-enter-active .station-detail, .detail-drawer-leave-active .station-detail { transition: transform .18s ease; }
-.detail-drawer-enter-from, .detail-drawer-leave-to { opacity: 0; }
-.detail-drawer-enter-from .station-detail, .detail-drawer-leave-to .station-detail { transform: translateX(100%); }
-.baseline-comparison { margin: 0 0 13px; padding: 10px; background: var(--surface-muted); border: 1px solid var(--line); border-left: 3px solid var(--teal-dark); border-radius: 4px; }
-.baseline-comparison-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--ink); font-size: 16px; font-weight: 800; }
-.baseline-comparison-heading span { display: inline-flex; align-items: center; gap: 5px; }.baseline-comparison-heading svg { color: var(--teal-dark); font-size: 18px; }.baseline-comparison-heading small { color: var(--muted); font-size: 16px; font-weight: 700; }
-.baseline-comparison-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 9px; }
-.baseline-comparison-grid div { display: grid; gap: 2px; min-width: 0; padding: 7px; background: var(--panel); border: 1px solid var(--line); border-radius: 4px; }
-.baseline-comparison-grid span { color: var(--muted); font-size: 16px; font-weight: 700; }.baseline-comparison-grid strong { color: var(--ink); font-family: 'DM Mono', monospace; font-size: 16px; line-height: 1.35; }
-.risk-badge.risk-service { color: var(--muted); background: var(--surface-muted); border-color: var(--line-strong); }
-.risk-badge.risk-inventory { color: var(--orange); background: var(--surface-muted); border-color: var(--line-strong); }
-.baseline-comparison > p { margin: 8px 0 0; color: var(--teal-dark); font-size: 16px; font-weight: 800; line-height: 1.4; }
-.return-guidance { margin-top: 12px; padding: 11px; background: var(--surface-muted); border: 1px solid var(--line); border-left: 3px solid var(--blue); border-radius: 4px; }
-.return-guidance-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--ink); font-size: 16px; font-weight: 800; }
-.return-guidance-heading span { display: inline-flex; align-items: center; gap: 5px; }.return-guidance-heading svg { color: var(--blue); font-size: 18px; }.return-guidance-heading small { color: var(--muted); font-size: 16px; font-weight: 700; }
-.return-guidance > p { margin: 6px 0 8px; color: var(--muted); font-size: 16px; line-height: 1.45; }
-.return-station-list { display: grid; gap: 5px; }.return-station-list button { display: flex; align-items: center; justify-content: space-between; gap: 9px; width: 100%; padding: 7px 8px; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 4px; font: inherit; text-align: left; cursor: pointer; }.return-station-list button:hover, .return-station-list button:focus-visible { border-color: var(--teal-dark); outline: 3px solid rgb(30 111 98 / .3); outline-offset: 2px; }.return-station-list span { display: grid; min-width: 0; gap: 1px; }.return-station-list b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.return-station-list small { color: var(--muted); font-size: 16px; }.return-station-list strong { flex: 0 0 auto; color: var(--blue); font-family: 'DM Mono', monospace; font-size: 16px; }
-.return-guidance-empty { color: var(--muted); }.return-guidance-footnote { display: block; margin-top: 7px; color: var(--muted); font-size: 16px; line-height: 1.4; }
-.detail-trend { margin-top: 12px; border: 1px solid var(--line); border-radius: 4px; }.detail-trend :deep(.disclosure-trigger) { padding: 9px 10px; }.detail-trend .detail-chart-wrap { margin: 12px 10px; }
-:global(html[data-theme='dark'] .return-guidance) { border-left-color: var(--blue); }:global(html[data-theme='dark'] .return-station-list button) { color: var(--ink); background: var(--panel); border-color: var(--line); }:global(html[data-theme='dark'] .return-station-list strong) { color: var(--blue); }
-@media (max-width: 620px) {
-  .station-detail-backdrop { align-items: flex-end; }
-  .station-detail { width: 100%; height: auto; max-height: 90dvh; padding: 18px 16px calc(18px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); border-left: 0; border-radius: 12px 12px 0 0; box-shadow: 0 -18px 44px rgb(0 0 0 / .2); }
-  .detail-drawer-enter-from .station-detail, .detail-drawer-leave-to .station-detail { transform: translateY(100%); }
-  .baseline-comparison-grid { grid-template-columns: 1fr; }
-  .baseline-comparison-heading { align-items: flex-start; flex-direction: column; gap: 2px; }
-}
+.detail-drawer-enter-active .station-detail,
+.detail-drawer-leave-active .station-detail { transition: transform 160ms ease; }
 
-@media (prefers-reduced-motion: reduce) {
-  .detail-drawer-enter-active, .detail-drawer-leave-active, .detail-drawer-enter-active .station-detail, .detail-drawer-leave-active .station-detail { transition: none; }
+.detail-drawer-enter-from .station-detail,
+.detail-drawer-leave-to .station-detail { transform: translateX(100%); }
+
+@media (max-width: 639px) {
+  .detail-drawer-enter-from .station-detail,
+  .detail-drawer-leave-to .station-detail { transform: translateY(100%); }
 }
 </style>

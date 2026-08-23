@@ -23,6 +23,10 @@ const endpoint = computed(() => String(config.public.agentReviewEndpoint || '/ap
 const pending = ref(false)
 const error = ref('')
 const result = ref<ReviewResult | null>(null)
+const resultClasses = {
+  empty: '',
+  visible: 'mt-4 border-t border-line pt-4',
+} as const
 let activeController: AbortController | null = null
 let requestSequence = 0
 const reviewContextKey = computed(() => JSON.stringify({
@@ -122,29 +126,29 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section v-if="enabled" class="agent-review" aria-labelledby="agent-review-title">
-    <div class="agent-review-heading">
+  <section v-if="enabled" class="mb-4 rounded-lg border border-line border-l-4 border-l-accent bg-panel-muted p-4" aria-labelledby="agent-review-title">
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <p class="section-kicker"><Icon icon="solar:shield-check-outline" /> AWS AgentCore 覆核</p>
-        <h2 id="agent-review-title">AI 調度覆核</h2>
-        <p>只傳送畫面上的摘要事實；Agent 不重算風險，也不會自動派車。</p>
+        <p class="section-kicker text-base"><Icon icon="solar:shield-check-outline" /> AWS AgentCore 覆核</p>
+        <h2 id="agent-review-title" class="m-0 mt-1 text-lg font-bold text-ink">AI 調度覆核</h2>
+        <p class="m-0 mt-2 text-base leading-6 text-muted">只傳送畫面上的摘要事實；Agent 不重算風險，也不會自動派車。</p>
       </div>
-      <button type="button" :disabled="pending" @click="requestReview">
+      <button type="button" class="inline-flex min-h-11 w-full shrink-0 items-center justify-center gap-2 rounded-md border border-accent bg-accent px-3 text-base font-bold text-on-accent transition-colors hover:bg-accent-strong sm:w-auto" :disabled="pending" @click="requestReview">
         <Icon :icon="pending ? 'svg-spinners:3-dots-fade' : 'solar:chat-round-check-outline'" />
         {{ pending ? '覆核中' : (result ? '重新覆核' : '開始覆核') }}
       </button>
     </div>
 
-    <div class="agent-review-result" role="status" aria-live="polite" :aria-busy="pending">
-      <p v-if="error" class="agent-review-error"><Icon icon="solar:danger-triangle-outline" />{{ error }}</p>
+    <div role="status" aria-live="polite" :aria-busy="pending" :class="result || error ? resultClasses.visible : resultClasses.empty">
+      <p v-if="error" class="m-0 flex items-center gap-2 text-base font-semibold leading-6 text-danger"><Icon class="shrink-0 text-lg" icon="solar:danger-triangle-outline" />{{ error }}</p>
       <template v-else-if="result">
-        <h3>{{ result.headline }}</h3>
-        <p>{{ result.narrative }}</p>
-        <ul v-if="result.cautions.length">
+        <h3 class="m-0 text-lg font-bold text-ink">{{ result.headline }}</h3>
+        <p class="m-0 mt-2 text-base leading-6 text-muted">{{ result.narrative }}</p>
+        <ul v-if="result.cautions.length" class="m-0 mt-3 grid list-disc gap-1 pl-5 text-base leading-6 text-ink">
           <li v-for="item in result.cautions" :key="item">{{ item }}</li>
         </ul>
-        <div v-if="result.citations.length" class="agent-review-citations">
-          <span v-for="citation in result.citations" :key="`${citation.label}-${citation.source || ''}`">
+        <div v-if="result.citations.length" class="mt-3 flex flex-wrap gap-2">
+          <span v-for="citation in result.citations" :key="`${citation.label}-${citation.source || ''}`" class="inline-flex items-center gap-1 rounded-md border border-line bg-panel px-2 py-1 text-base text-ink">
             <Icon icon="solar:document-text-outline" />{{ citation.label }}<small v-if="citation.source">{{ citation.source }}</small>
           </span>
         </div>
@@ -152,20 +156,3 @@ onBeforeUnmount(() => {
     </div>
   </section>
 </template>
-
-<style scoped>
-.agent-review { margin-bottom: 14px; padding: 16px; background: var(--surface-muted); border: 1px solid var(--line); border-left: 3px solid var(--teal-dark); border-radius: 6px; }
-.agent-review-heading { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
-.agent-review h2, .agent-review h3 { margin: 0; color: var(--ink); }
-.agent-review h2 { font-size: 18px; }.agent-review h3 { font-size: 17px; }
-.agent-review-heading p:not(.section-kicker), .agent-review-result > p { margin: 6px 0 0; color: var(--muted); font-size: 16px; line-height: 1.55; }
-.agent-review button { display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 8px 11px; color: var(--on-accent); background: var(--teal-dark); border: 1px solid var(--teal-dark); border-radius: 5px; font: inherit; font-size: 16px; font-weight: 700; }
-.agent-review button:disabled { cursor: wait; opacity: .72; }
-.agent-review-result:not(:empty) { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
-.agent-review-result ul { display: grid; gap: 5px; margin: 10px 0 0; padding-left: 22px; color: var(--ink-soft); font-size: 16px; }
-.agent-review-error { display: flex; align-items: center; gap: 6px; color: var(--red) !important; }
-.agent-review-citations { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 11px; }
-.agent-review-citations span { display: inline-flex; align-items: center; gap: 4px; padding: 5px 7px; color: var(--ink-soft); background: var(--panel); border: 1px solid var(--line); border-radius: 4px; font-size: 16px; }
-.agent-review-citations small { color: var(--muted); font-size: 16px; }
-@media (max-width: 620px) { .agent-review-heading { align-items: stretch; flex-direction: column; }.agent-review button { width: 100%; } }
-</style>

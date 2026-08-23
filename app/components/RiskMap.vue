@@ -113,7 +113,7 @@ function markerStatus(station: StationRisk) {
   const tone = markerTone(station)
   if (tone === 'service-review') {
     return station.serviceStatus === 'official_inactive'
-      ? '官方未啟用（需確認）'
+      ? '官方標示停用（不納入調度）'
       : '疑似服務異常（需確認）'
   }
   if (tone === 'inventory-only') return hasBaselineLoadError.value ? '基線暫不可用，僅顯示即時庫存' : '尚無歷史基線，僅顯示即時庫存'
@@ -275,199 +275,84 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section class="panel map-panel geographic-map-panel" :class="{ 'live-map-panel': isLive }">
-    <div class="panel-heading map-heading">
+  <section class="map-panel geographic-map-panel panel overflow-hidden">
+    <div class="map-heading flex items-start justify-between gap-3 px-4 pb-3 pt-4">
       <div>
         <p class="section-kicker"><Icon :icon="isLive ? 'solar:bolt-circle-outline' : 'solar:map-point-wave-outline'" /> 站點地圖</p>
-        <h2>{{ isLive ? `${horizon} 分鐘待處理站點` : `${horizon} 分鐘預測風險分布` }}</h2>
+        <h2 class="mt-1 text-xl font-bold text-ink">{{ isLive ? `${horizon} 分鐘待處理站點` : `${horizon} 分鐘預測風險分布` }}</h2>
       </div>
-      <div class="map-summary" :class="{ 'map-summary--warning': hasBaselineLoadError }">
+      <div class="map-summary grid min-w-32 justify-items-end rounded-lg border border-line-strong bg-panel-muted px-2.5 py-2 font-bold leading-tight" :class="hasBaselineLoadError ? 'text-warning' : 'text-accent-strong'">
         <strong>{{ headerCount }}</strong>
-        <span>{{ headerLabel }}</span>
-        <small v-if="isLive">{{ hasBaselineLoadError ? '基線暫不可用' : (profileCoverage ? `已對照 ${profileCoverage.matchedStations}／${profileCoverage.liveStations}` : '正在載入基線') }}</small>
+        <span class="text-base text-ink">{{ headerLabel }}</span>
+        <small v-if="isLive" class="mt-1 text-base font-semibold text-muted">{{ hasBaselineLoadError ? '基線暫不可用' : (profileCoverage ? `已對照 ${profileCoverage.matchedStations}／${profileCoverage.liveStations}` : '正在載入基線') }}</small>
       </div>
     </div>
 
-    <div class="map-command-row" role="group" aria-label="地圖工具">
-      <div class="map-search" role="search">
-        <Icon icon="solar:magnifer-outline" />
-        <input v-model="stationQuery" type="text" inputmode="search" enterkeyhint="search" placeholder="搜尋站名或行政區" aria-label="搜尋站名或行政區" />
-        <button v-if="stationQuery" class="map-search-clear" type="button" aria-label="清除站點搜尋" @click="stationQuery = ''"><Icon icon="solar:close-circle-outline" /></button>
+    <div class="map-command-row flex items-center gap-2 px-3.5 pb-3" role="group" aria-label="地圖工具">
+      <div class="map-search flex min-h-10 min-w-0 flex-1 basis-64 items-center gap-1.5 rounded-md border border-line-strong bg-panel px-2.5 text-ink" role="search">
+        <Icon class="shrink-0 text-xl text-accent-strong" icon="solar:magnifer-outline" />
+        <input v-model="stationQuery" class="min-w-0 w-full bg-transparent py-1.5 text-base text-ink outline-none placeholder:text-muted" type="text" inputmode="search" enterkeyhint="search" placeholder="搜尋站名或行政區" aria-label="搜尋站名或行政區" />
+        <button v-if="stationQuery" class="grid h-8 w-8 shrink-0 place-items-center rounded text-muted transition-colors hover:bg-accent-strong hover:text-on-accent" type="button" aria-label="清除站點搜尋" @click="stationQuery = ''"><Icon class="text-xl" icon="solar:close-circle-outline" /></button>
       </div>
-      <div class="map-actions">
-        <button type="button" class="map-view-toggle" :aria-pressed="showAllStations" @click="toggleStationScope"><Icon :icon="showAllStations ? 'solar:filter-outline' : 'solar:map-point-outline'" /> {{ showAllStations ? '只看待處理站' : `查看全市 ${allMappedStations.length} 站` }}</button>
-        <button type="button" class="map-reset" aria-label="重設為新北市全域" title="重設為新北市全域" @click="fitNewTaipeiBounds"><Icon icon="solar:map-arrow-left-outline" /> <span class="map-reset-label">新北全域</span></button>
+      <div class="map-actions flex items-center gap-2">
+        <button type="button" class="inline-flex min-h-11 items-center gap-1.5 rounded-md border border-line-strong bg-panel px-2.5 py-1.5 text-base font-bold text-accent-strong transition-colors hover:border-accent-strong hover:bg-panel-muted" :aria-pressed="showAllStations" @click="toggleStationScope"><Icon class="text-lg" :icon="showAllStations ? 'solar:filter-outline' : 'solar:map-point-outline'" /> {{ showAllStations ? '只看待處理站' : `查看全市 ${allMappedStations.length} 站` }}</button>
+        <button type="button" class="map-reset inline-flex min-h-11 items-center gap-1.5 rounded-md border border-accent-strong bg-accent-strong px-2.5 py-1.5 text-base font-bold text-on-accent transition-colors hover:border-accent hover:bg-accent" aria-label="重設為新北市全域" title="重設為新北市全域" @click="fitNewTaipeiBounds"><Icon class="text-lg" icon="solar:map-arrow-left-outline" /> <span class="map-reset-label">新北全域</span></button>
       </div>
     </div>
 
-    <div v-if="stationQuery" class="map-search-results" role="region" aria-label="站點搜尋結果" aria-live="polite">
-      <button v-for="station in searchResults" :key="station.id" type="button" @click="chooseSearchResult(station.id)">
-        <span><strong>{{ displayStationName(station.name) }}</strong><small>{{ station.district || '新北市' }}</small></span>
-        <b>{{ station.availableBikes }} 車／{{ station.availableDocks }} 位</b>
+    <div v-if="stationQuery" class="map-search-results mx-3.5 mb-3 grid grid-cols-2 gap-1.5 rounded-lg border border-line bg-panel-muted p-2" role="region" aria-label="站點搜尋結果" aria-live="polite">
+      <button v-for="station in searchResults" :key="station.id" class="flex min-h-13 items-center justify-between gap-2 rounded-md border border-line bg-panel px-2.5 py-2 text-left text-base text-ink transition-colors hover:border-accent-strong hover:bg-surface" type="button" @click="chooseSearchResult(station.id)">
+        <span class="grid min-w-0 gap-0.5"><strong class="truncate">{{ displayStationName(station.name) }}</strong><small class="text-base text-muted">{{ station.district || '新北市' }}</small></span>
+        <b class="shrink-0 whitespace-nowrap font-mono text-base text-accent-strong">{{ station.availableBikes }} 車／{{ station.availableDocks }} 位</b>
       </button>
-      <p v-if="!searchResults.length">找不到符合的站點。</p>
-      <p v-else-if="mappedStations.length > searchResults.length">另有 {{ mappedStations.length - searchResults.length }} 站，請輸入更完整的站名或行政區。</p>
+      <p v-if="!searchResults.length" class="col-span-full m-1 text-center text-base text-muted">找不到符合的站點。</p>
+      <p v-else-if="mappedStations.length > searchResults.length" class="col-span-full m-1 text-center text-base text-muted">另有 {{ mappedStations.length - searchResults.length }} 站，請輸入更完整的站名或行政區。</p>
     </div>
 
-    <div class="geographic-map" role="region" :aria-label="isLive ? '新北市即時基線風險站點地圖' : '新北市歷史預測風險站點地圖'">
-      <div ref="mapElement" class="map-canvas" />
-      <p v-if="!mappedStations.length" class="map-empty">目前沒有可定位的站點資料。</p>
+    <div class="geographic-map map-height relative mx-3.5 min-h-112 overflow-hidden rounded-lg border border-line bg-map" role="region" :aria-label="isLive ? '新北市即時基線風險站點地圖' : '新北市歷史預測風險站點地圖'">
+      <div ref="mapElement" class="map-canvas map-height min-h-112 w-full" />
+      <p v-if="!mappedStations.length" class="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 rounded-lg border border-line-strong bg-panel p-3 text-base font-bold text-ink">目前沒有可定位的站點資料。</p>
     </div>
-    <div class="map-caption">
-      <p class="map-instruction"><Icon icon="solar:cursor-square-outline" /> 點選站點查看風險與替代還車引導</p>
-      <p v-if="baselineNotice" class="baseline-notice" :class="{ 'baseline-notice--warning': hasBaselineLoadError }">
-        <Icon :icon="hasBaselineLoadError ? 'solar:danger-triangle-outline' : 'solar:info-circle-outline'" />
+    <div class="map-caption grid gap-2 px-4 pt-3">
+      <p class="inline-flex items-center gap-1.5 text-base font-semibold text-muted"><Icon class="text-xl text-accent-strong" icon="solar:cursor-square-outline" /> 點選站點查看風險與替代還車引導</p>
+      <p v-if="baselineNotice" class="flex flex-wrap items-start gap-1.5 text-base font-semibold" :class="hasBaselineLoadError ? 'text-warning' : 'text-muted'">
+        <Icon class="mt-0.5 shrink-0 text-xl" :class="hasBaselineLoadError ? 'text-warning' : 'text-accent-strong'" :icon="hasBaselineLoadError ? 'solar:danger-triangle-outline' : 'solar:info-circle-outline'" />
         <span>{{ baselineNotice }}</span>
-        <button v-if="hasBaselineLoadError" type="button" class="baseline-retry" @click="emit('retryBaseline')"><Icon icon="solar:refresh-circle-outline" /> 重新比對</button>
+        <button v-if="hasBaselineLoadError" type="button" class="inline-flex min-h-8 shrink-0 items-center gap-1 rounded-md border border-line-strong bg-transparent px-2 py-1 text-base font-bold text-accent-strong transition-colors hover:border-accent-strong hover:bg-panel-muted hover:text-ink" @click="emit('retryBaseline')"><Icon class="text-lg" icon="solar:refresh-circle-outline" /> 重新比對</button>
       </p>
-      <div class="geographic-map-legend" aria-label="風險方向圖例">
-        <span v-if="showAllStations"><i class="legend-dot normal" />已對照、暫無處理</span>
-        <span><i class="legend-dot empty" />補車優先｜無車／缺車風險</span>
-        <span><i class="legend-dot full" />移車優先｜無位／缺位風險</span>
-        <span><i class="legend-dot unavailable" />服務狀態待確認</span>
-        <span v-if="isLive && !hasBaselineLoadError && unmatchedBaselineCount"><i class="legend-dot inventory-only" />僅即時庫存｜未納入預估</span>
+      <div class="flex flex-wrap gap-x-3 gap-y-1.5 text-base font-semibold text-muted" aria-label="風險方向圖例">
+        <span v-if="showAllStations" class="inline-flex items-center gap-1.5 whitespace-nowrap"><i class="h-2.5 w-2.5 rounded-full border border-line-strong bg-accent" />已對照、暫無處理</span>
+        <span class="inline-flex items-center gap-1.5 whitespace-nowrap"><i class="h-2.5 w-2.5 rounded-full border border-line-strong bg-danger" />補車優先｜無車／缺車風險</span>
+        <span class="inline-flex items-center gap-1.5 whitespace-nowrap"><i class="h-2.5 w-2.5 rounded-full border border-line-strong bg-info" />移車優先｜無位／缺位風險</span>
+        <span class="inline-flex items-center gap-1.5 whitespace-nowrap"><i class="h-2.5 w-2.5 rounded-full border border-line-strong bg-muted" />{{ isLive ? '官方停用／服務待確認｜不納入調度' : '服務狀態待確認' }}</span>
+        <span v-if="isLive && !hasBaselineLoadError && unmatchedBaselineCount" class="inline-flex items-center gap-1.5 whitespace-nowrap"><i class="h-2.5 w-2.5 rounded-full border border-line-strong bg-warning" />僅即時庫存｜未納入預估</span>
       </div>
     </div>
-    <p class="map-status-summary"><Icon icon="solar:info-circle-outline" /> {{ mapStatusText }}</p>
+    <p class="map-status-summary mx-4 mb-4 mt-2.5 flex items-center gap-1.5 text-base font-semibold text-muted"><Icon class="shrink-0 text-xl text-accent-strong" icon="solar:info-circle-outline" /> {{ mapStatusText }}</p>
   </section>
 </template>
 
 <style scoped>
-.geographic-map-panel { container-type: inline-size; overflow: hidden; }
-.geographic-map {
-  position: relative;
-  min-height: 440px;
-  margin: 0 14px;
-  overflow: hidden;
-  background: #e3e9e4;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-}
+ .geographic-map-panel { container-type: inline-size; }
 
-.map-summary {
-  display: grid;
-  justify-items: end;
-  min-width: 126px;
-  padding: 7px 10px;
-  color: var(--teal-dark);
-  background: var(--surface-muted);
-  border: 1px solid var(--line-strong, var(--line));
-  border-radius: 6px;
-  font-weight: 700;
-  line-height: 1.15;
-}
-.map-summary strong { font-size: 22px; }
-.map-summary span { color: var(--ink); font-size: 16px; }
-.map-summary small { margin-top: 4px; color: var(--muted); font-size: 16px; font-weight: 600; }
-.map-summary--warning { color: #9a5d07; }
-.map-canvas { width: 100%; min-height: 440px; }
-.map-instruction,
-.geographic-map-legend,
-.baseline-notice,
-.map-empty {
-  margin: 0;
-  color: var(--muted);
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.map-command-row { display: flex; align-items: center; gap: 8px; padding: 0 14px 12px; }
-.map-actions { display: flex; align-items: center; gap: 7px; }
-.map-instruction {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-.map-caption { display: grid; gap: 8px; padding: 11px 18px 0; }
-.map-instruction svg { color: var(--teal-dark); font-size: 19px; }
-.map-search {
-  display: inline-flex;
-  flex: 1 1 260px;
-  align-items: center;
-  gap: 5px;
-  min-width: 0;
-  min-height: 38px;
-  padding: 0 9px;
-  color: var(--ink);
-  background: var(--panel);
-  border: 1px solid var(--line-strong, var(--line));
-  border-radius: 5px;
-}
-.map-search svg { flex: 0 0 auto; color: var(--teal-dark); font-size: 19px; }
-.map-search input { width: 100%; min-width: 0; padding: 6px 0; color: inherit; background: transparent; border: 0; outline: 0; font: inherit; }
-.map-search input::placeholder { color: var(--muted); opacity: 1; }
-.map-search-clear { display: inline-grid; flex: 0 0 auto; width: 30px; height: 30px; place-items: center; padding: 0; color: var(--muted); background: transparent; border: 0; border-radius: 4px; font: inherit; }.map-search-clear:hover, .map-search-clear:focus-visible { color: var(--on-accent); background: var(--teal-dark); outline: 0; }.map-search-clear svg { color: currentColor; font-size: 20px; }
-.map-reset, .map-view-toggle { display: inline-flex; align-items: center; gap: 5px; min-height: 36px; padding: 6px 9px; border-radius: 5px; font: inherit; font-size: 16px; font-weight: 700; cursor: pointer; }
-.map-reset { color: var(--on-accent); background: var(--teal-dark); border: 1px solid var(--teal-dark); }
-.map-view-toggle { color: var(--teal-dark); background: var(--panel); border: 1px solid var(--line-strong, var(--line)); }
-.map-reset:hover, .map-reset:focus-visible { color: var(--on-accent); background: var(--teal); border-color: var(--teal); outline: 3px solid rgba(30, 111, 98, .28); outline-offset: 2px; }
-.map-view-toggle:hover, .map-view-toggle:focus-visible { color: var(--ink); border-color: var(--teal-dark); outline: 3px solid rgba(30, 111, 98, .18); outline-offset: 2px; }
-.map-search-results { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin: 0 14px 12px; padding: 8px; background: var(--surface-muted); border: 1px solid var(--line); border-radius: 6px; }
-.map-search-results button { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 52px; padding: 8px 10px; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 5px; font: inherit; text-align: left; }
-.map-search-results button:hover, .map-search-results button:focus-visible { border-color: var(--teal-dark); }
-.map-search-results button > span { display: grid; min-width: 0; gap: 2px; }
-.map-search-results strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; }
-.map-search-results small { color: var(--muted); font-size: 16px; }
-.map-search-results b { flex: 0 0 auto; color: var(--teal-dark); font-family: ui-monospace, Consolas, monospace; font-size: 16px; white-space: nowrap; }
-.map-search-results > p { grid-column: 1 / -1; margin: 4px; color: var(--muted); font-size: 16px; text-align: center; }
-.geographic-map-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px 13px;
-}
-.geographic-map-legend span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
-.legend-dot { width: 10px; height: 10px; border: 1px solid rgba(11, 42, 47, .62); border-radius: 50%; background: #1e6f62; }
-.legend-dot.empty { background: #a93a34; }.legend-dot.full { background: #2f648f; }.legend-dot.unavailable { background: #65706b; }.legend-dot.inventory-only { background: #8a5a09; }
-.baseline-notice { display: flex; align-items: flex-start; gap: 6px; color: var(--muted); }
-.baseline-notice svg { flex: 0 0 auto; margin-top: 1px; color: var(--teal-dark); font-size: 19px; }
-.baseline-notice--warning { color: #8b5608; }.baseline-notice--warning svg { color: #9a5d07; }
-.baseline-retry { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 4px; min-height: 30px; margin: -3px 0 -3px 4px; padding: 4px 7px; color: var(--teal-dark); background: transparent; border: 1px solid var(--line-strong, var(--line)); border-radius: 5px; font: inherit; font-weight: 700; cursor: pointer; }
-.baseline-retry svg { margin: 0; color: currentColor; font-size: 17px; }.baseline-retry:hover, .baseline-retry:focus-visible { color: var(--ink); background: var(--teal-dark); border-color: var(--teal-dark); outline: 3px solid rgba(30, 111, 98, .2); outline-offset: 2px; }
-.map-empty { position: absolute; z-index: 500; inset: 50% auto auto 50%; padding: 12px; color: var(--ink); background: var(--panel); border: 1px solid var(--line-strong, var(--line)); border-radius: 6px; font-weight: 700; transform: translate(-50%, -50%); }
-.map-status-summary { display: flex; align-items: center; gap: 6px; margin: 10px 18px 14px; color: var(--muted); font-size: 16px; font-weight: 600; }
-.map-status-summary svg { flex: 0 0 auto; color: var(--teal-dark); font-size: 19px; }
-
-:global(.geographic-map .leaflet-container) { min-height: 440px; font-family: 'Noto Sans TC', sans-serif; }
-:global(.geographic-map .leaflet-control-zoom a) { width: 35px; height: 35px; color: #1d2926; font-size: 25px; line-height: 33px; }
-:global(.geographic-map .leaflet-control-attribution) { padding: 3px 6px; color: #35433f; background: rgba(255, 255, 255, .94); font-size: 16px; }
-:global(.geographic-map .leaflet-control-attribution a) { color: #15584e; font-weight: 700; }
-:global(.geographic-map .leaflet-tooltip) { padding: 8px 10px; color: #1d2926; background: #fff; border: 1px solid #a9b7af; border-radius: 5px; box-shadow: none; font-size: 16px; }
-:global(.geographic-map .leaflet-tooltip strong), :global(.geographic-map .leaflet-tooltip span) { display: block; }
-:global(.geographic-map .leaflet-tooltip span) { margin-top: 3px; color: #55635f; font-weight: 600; }
-:global(html[data-theme='dark'] .geographic-map) { background: #18181b; border-color: var(--line-strong); }
-:global(html[data-theme='dark'] .geographic-map .leaflet-tile-pane) { filter: brightness(.66) saturate(.58); }
-:global(html[data-theme='dark'] .map-instruction), :global(html[data-theme='dark'] .geographic-map-legend), :global(html[data-theme='dark'] .baseline-notice) { color: var(--muted); }
-:global(html[data-theme='dark'] .map-search), :global(html[data-theme='dark'] .map-summary), :global(html[data-theme='dark'] .map-empty) { color: var(--ink); background: var(--panel); border-color: var(--line-strong); box-shadow: none; }
-:global(html[data-theme='dark'] .map-summary--warning) { color: #e8ba65; }
-:global(html[data-theme='dark'] .baseline-retry) { color: var(--teal); }
-:global(html[data-theme='dark'] .map-instruction svg), :global(html[data-theme='dark'] .map-search svg) { color: var(--teal); }
-:global(html[data-theme='dark'] .map-search) { color: var(--ink); }
-:global(html[data-theme='dark'] .map-search input::placeholder) { color: var(--muted); }
-:global(html[data-theme='dark'] .legend-dot) { border-color: #effbf8; }
-:global(html[data-theme='dark'] .geographic-map .leaflet-control-zoom a), :global(html[data-theme='dark'] .geographic-map .leaflet-control-attribution) { color: var(--ink); background: var(--panel); border-color: var(--line-strong); }
-:global(html[data-theme='dark'] .geographic-map .leaflet-control-attribution a) { color: var(--teal); }
-:global(html[data-theme='dark'] .geographic-map .leaflet-tooltip) { color: var(--ink); background: var(--panel); border-color: var(--line-strong); }
-:global(html[data-theme='dark'] .geographic-map .leaflet-tooltip span) { color: var(--muted); }
-
-@media (max-width: 1150px) { .geographic-map, .map-canvas, :global(.geographic-map .leaflet-container) { min-height: 400px; } }
 @container (max-width: 760px) {
-  .geographic-map, .map-canvas, :global(.geographic-map .leaflet-container) { min-height: 350px; }
+  .map-height { min-height: 22rem; }
   .map-command-row { align-items: stretch; flex-wrap: wrap; }
   .map-search { flex-basis: 100%; }
   .map-actions { width: 100%; }
-  .map-actions button { flex: 1 1 0; justify-content: center; }
+  .map-actions > button { flex: 1 1 0; justify-content: center; }
   .map-search-results { grid-template-columns: 1fr; }
-  .map-caption { gap: 7px 12px; padding: 10px 14px 0; }
-  .map-status-summary { margin-right: 14px; margin-left: 14px; }
+  .map-caption { gap: 0.5rem 0.75rem; padding: 0.625rem 0.875rem 0; }
+  .map-status-summary { margin-right: 0.875rem; margin-left: 0.875rem; }
 }
 @container (max-width: 480px) {
-  .geographic-map, .map-canvas, :global(.geographic-map .leaflet-container) { min-height: 320px; }
+  .map-height { min-height: 20rem; }
   .map-heading { display: grid; align-items: start; gap: 10px; }
   .map-summary { width: 100%; min-width: 0; justify-items: start; }
-  .map-command-row { padding-right: 10px; padding-left: 10px; }
-  .map-actions { display: grid; grid-template-columns: minmax(0, 1fr) 48px; }
-  .map-reset, .map-view-toggle { min-height: 44px; padding: 6px 7px; }
+  .map-command-row { padding-right: 0.625rem; padding-left: 0.625rem; }
+  .map-actions { display: grid; grid-template-columns: minmax(0, 1fr) 3rem; }
+  .map-actions > button { min-height: 2.75rem; padding: 0.375rem 0.4375rem; }
   .map-reset-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
-  .map-search-results { margin-right: 10px; margin-left: 10px; }
+  .map-search-results { margin-right: 0.625rem; margin-left: 0.625rem; }
 }
 </style>

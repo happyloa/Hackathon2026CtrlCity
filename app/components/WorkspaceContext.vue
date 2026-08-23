@@ -25,25 +25,14 @@ const formattedDataTime = computed(() => {
 </script>
 
 <template>
-  <nav class="workspace-context panel" aria-label="目前工作情境">
-    <div class="workspace-context__items">
-      <span><Icon :icon="mode === 'live' ? 'solar:bolt-circle-outline' : 'solar:history-outline'" />{{ mode === 'live' ? '即時調度' : '歷史演練' }}</span>
-      <span><Icon icon="solar:map-point-outline" />{{ district || '全市' }}</span>
-      <time v-if="formattedDataTime" :datetime="dataTime"><Icon icon="solar:clock-circle-outline" />資料 {{ formattedDataTime }}</time>
+  <nav class="panel flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between" aria-label="目前工作情境">
+    <div class="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2 text-base font-semibold text-muted">
+      <span class="inline-flex items-center gap-1"><Icon class="text-lg text-accent" :icon="mode === 'live' ? 'solar:bolt-circle-outline' : 'solar:history-outline'" />{{ mode === 'live' ? '即時調度' : '歷史演練' }}</span>
+      <span class="inline-flex items-center gap-1"><Icon class="text-lg text-accent" icon="solar:map-point-outline" />{{ district || '全市' }}</span>
+      <time v-if="formattedDataTime" class="inline-flex items-center gap-1" :datetime="dataTime"><Icon class="text-lg text-accent" icon="solar:clock-circle-outline" />資料 {{ formattedDataTime }}</time>
     </div>
-    <NuxtLink :to="{ path: '/', query: query || {} }" class="workspace-context__link">
+    <NuxtLink :to="{ path: '/', query: query || {} }" class="inline-flex min-h-11 w-full shrink-0 items-center justify-center gap-1 rounded-md border border-line px-3 text-base font-bold text-accent transition-colors hover:border-line-strong hover:bg-panel-muted hover:text-accent-strong sm:w-auto">
       <Icon icon="solar:tuning-2-outline" />回工作台調整篩選
     </NuxtLink>
   </nav>
 </template>
-
-<style scoped>
-.workspace-context { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 11px 14px; }
-.workspace-context__items { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; min-width: 0; }
-.workspace-context__items span, .workspace-context__items time, .workspace-context__link { display: inline-flex; align-items: center; gap: 5px; font-size: 16px; font-weight: 700; }
-.workspace-context__items span, .workspace-context__items time { color: var(--muted); }
-.workspace-context__items svg, .workspace-context__link { color: var(--teal-dark); }
-.workspace-context__link { flex: 0 0 auto; min-height: 44px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 4px; }
-.workspace-context__link:hover { color: var(--ink); border-color: var(--line-strong); background: var(--surface-muted); }
-@media (max-width: 620px) { .workspace-context { align-items: stretch; flex-direction: column; }.workspace-context__link { justify-content: center; width: 100%; } }
-</style>

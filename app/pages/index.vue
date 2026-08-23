@@ -151,26 +151,26 @@ function selectStation(stationId: string) {
 </script>
 
 <template>
-  <div class="dashboard-page" :class="{ 'live-update-flash': sourceMode === 'live' && liveUpdateState === 'updated' }">
-    <section class="command-intro">
-      <div>
-        <p class="eyebrow"><span class="live-dot" /> {{ sourceMode === 'live' ? '官方即時資料' : '歷史資料回放' }}</p>
-        <h2>{{ modeTitle }}</h2>
-        <p>{{ modeDescription }}</p>
+  <div class="mx-auto w-full max-w-screen-2xl space-y-4 px-4 py-4 sm:px-6 lg:px-8 lg:py-6" :class="{ 'motion-safe:animate-pulse': sourceMode === 'live' && liveUpdateState === 'updated' }">
+    <section class="grid gap-4 rounded-xl border border-line bg-panel p-4 shadow-sm sm:p-5 lg:grid-cols-3">
+      <div class="min-w-0 lg:col-span-2">
+        <p class="inline-flex items-center gap-2 text-base font-semibold tracking-wide text-accent"><span class="size-2 rounded-full bg-positive" aria-hidden="true" /> {{ sourceMode === 'live' ? '官方即時資料' : '歷史資料回放' }}</p>
+        <h2 class="mt-2 text-2xl font-bold tracking-tight">{{ modeTitle }}</h2>
+        <p class="mt-2 max-w-3xl text-base leading-7 text-muted">{{ modeDescription }}</p>
       </div>
-      <div class="intro-data-note">
-        <span><Icon icon="solar:calendar-date-outline" /> 資料時間</span>
-        <strong>{{ asOfLabel }}</strong>
-        <small v-if="sourceMode === 'historical_replay'">歷史回放 · {{ activeDashboard?.meta.modelVersion || '尚未載入' }}</small>
+      <div class="flex min-w-0 flex-col justify-center rounded-lg border border-line bg-surface p-4">
+        <span class="inline-flex items-center gap-2 text-base font-semibold text-muted"><Icon class="text-xl text-accent" icon="solar:calendar-date-outline" /> 資料時間</span>
+        <strong class="mt-2 text-lg leading-7">{{ asOfLabel }}</strong>
+        <span v-if="sourceMode === 'historical_replay'" class="mt-1 text-base leading-6 text-muted">歷史回放 · {{ activeDashboard?.meta.modelVersion || '尚未載入' }}</span>
       </div>
     </section>
 
-    <section v-if="activeDashboard || sourceMode === 'live'" class="control-bar panel" :class="{ 'control-bar--live': sourceMode === 'live' }">
-      <div class="source-switch" role="group" aria-label="資料模式">
-        <span>工作模式</span>
-        <div class="segmented">
-          <button type="button" :class="{ active: sourceMode === 'live' }" :aria-pressed="sourceMode === 'live'" @click="sourceMode = 'live'"><Icon icon="solar:bolt-circle-outline" /> 即時調度</button>
-          <button type="button" :class="{ active: sourceMode === 'historical_replay' }" :aria-pressed="sourceMode === 'historical_replay'" @click="sourceMode = 'historical_replay'"><Icon icon="solar:clock-circle-outline" /> 歷史演練</button>
+    <section v-if="activeDashboard || sourceMode === 'live'" class="panel grid gap-4 p-4 sm:grid-cols-2 sm:p-5 xl:grid-cols-5">
+      <div class="min-w-0 sm:col-span-2 xl:col-span-1" role="group" aria-label="資料模式">
+        <span class="block text-base font-semibold text-muted">工作模式</span>
+        <div class="mt-1 grid grid-cols-2 gap-1 rounded-lg border border-line bg-surface p-1">
+          <button class="inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-2 text-base font-semibold transition-colors" :class="sourceMode === 'live' ? 'bg-accent text-on-accent shadow-sm' : 'text-muted hover:bg-panel hover:text-ink'" type="button" :aria-pressed="sourceMode === 'live'" @click="sourceMode = 'live'"><Icon class="shrink-0 text-xl" icon="solar:bolt-circle-outline" /><span>即時調度</span></button>
+          <button class="inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-2 text-base font-semibold transition-colors" :class="sourceMode === 'historical_replay' ? 'bg-accent text-on-accent shadow-sm' : 'text-muted hover:bg-panel hover:text-ink'" type="button" :aria-pressed="sourceMode === 'historical_replay'" @click="sourceMode = 'historical_replay'"><Icon class="shrink-0 text-xl" icon="solar:clock-circle-outline" /><span>歷史演練</span></button>
         </div>
       </div>
       <ModalPicker
@@ -187,26 +187,26 @@ function selectStation(stationId: string) {
         title="選擇行政區"
         :options="districtPickerOptions"
       />
-      <div class="forecast-window" :aria-label="sourceMode === 'live' ? '即時風險時間' : '歷史演練風險時間'">
-        <span>風險時間</span>
-        <strong>60 分鐘</strong>
+      <div class="flex min-h-11 min-w-0 flex-col justify-center" :aria-label="sourceMode === 'live' ? '即時風險時間' : '歷史演練風險時間'">
+        <span class="text-base font-semibold text-muted">風險時間</span>
+        <strong class="mt-1 text-lg">60 分鐘</strong>
       </div>
-      <div v-if="sourceMode === 'live'" class="refresh-control">
-        <span>資料更新</span>
-        <button class="live-refresh-button" type="button" :disabled="livePending" @click="refreshLive({ manual: true })">
-          <Icon :icon="livePending ? 'svg-spinners:3-dots-fade' : 'solar:refresh-circle-outline'" />
+      <div v-if="sourceMode === 'live'" class="flex min-w-0 flex-col gap-1">
+        <span class="text-base font-semibold text-muted">資料更新</span>
+        <button class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-accent px-3 text-base font-semibold text-on-accent transition-colors hover:bg-accent-strong" type="button" :disabled="livePending" @click="refreshLive({ manual: true })">
+          <Icon class="text-xl" :icon="livePending ? 'svg-spinners:3-dots-fade' : 'solar:refresh-circle-outline'" />
           {{ livePending ? '比對中' : '立即更新' }}
         </button>
       </div>
-      <div class="control-note" role="status" aria-live="polite">
-        <Icon :icon="sourceMode === 'live' ? 'solar:refresh-circle-outline' : 'solar:shield-warning-outline'" />
+      <div class="flex items-start gap-2 text-base leading-6 text-muted sm:col-span-2 xl:col-span-5" role="status" aria-live="polite">
+        <Icon class="mt-1 shrink-0 text-xl text-accent" :icon="sourceMode === 'live' ? 'solar:refresh-circle-outline' : 'solar:shield-warning-outline'" />
         {{ sourceMode === 'live'
           ? (liveProfileError ? '歷史基線暫時無法載入，僅顯示即時庫存；按立即更新即可重新比對。' : (liveUpdateState === 'updated' ? '官方資料已更新，畫面已同步。' : liveComparisonStatus))
           : '歷史回放不會覆寫即時資料。' }}
       </div>
     </section>
 
-    <section v-if="activeDashboard" class="metric-grid metric-grid--tasks" aria-label="營運摘要">
+    <section v-if="activeDashboard" class="grid grid-cols-1 gap-3 md:grid-cols-3" aria-label="營運摘要">
       <MetricCard v-for="card in metricCards" :key="card.label" v-bind="card" />
     </section>
 
@@ -214,8 +214,8 @@ function selectStation(stationId: string) {
     <div v-else-if="activeError && !activeDashboard" class="loading-board error-board" role="alert"><Icon icon="solar:danger-triangle-outline" />{{ sourceMode === 'live' ? '官方即時資料暫時無法取得，請稍後再試。' : '歷史資料暫時無法取得，請重新整理後再試。' }}</div>
 
     <template v-else-if="activeDashboard">
-      <p v-if="sourceMode === 'live' && liveError" class="live-inline-error" role="alert"><Icon icon="solar:danger-triangle-outline" /> {{ liveError }}</p>
-      <section class="dashboard-grid primary-grid task-first-grid">
+      <p v-if="sourceMode === 'live' && liveError" class="live-inline-error text-base" role="alert"><Icon icon="solar:danger-triangle-outline" /> {{ liveError }}</p>
+      <section class="grid grid-cols-1 gap-4 xl:grid-cols-2 xl:items-start">
         <TaskQueue
           :alerts="activeDashboard.alerts"
           :dispatches="activeDashboard.dispatches"
@@ -250,15 +250,15 @@ function selectStation(stationId: string) {
       />
 
       <DisclosurePanel
-        class="panel supporting-details"
+        class="panel mt-4"
         title="判讀依據與交班摘要"
         description="查看資料說明、歷史驗證與情境摘要"
         icon="solar:chart-square-outline"
       >
-        <div class="supporting-details-content">
+        <div class="space-y-3 p-4 sm:p-5">
           <OperationalEvidence :as-of="activeDashboard.meta.asOf" :data-mode="sourceMode" />
-          <section class="data-footnote">
-            <Icon icon="solar:info-circle-outline" />
+          <section class="flex items-start gap-2 rounded-lg bg-surface p-3 text-base leading-6 text-muted">
+            <Icon class="mt-1 shrink-0 text-xl text-accent" icon="solar:info-circle-outline" />
             <span>{{ sourceMode === 'live'
               ? '60 分鐘風險以即時庫存對照同站、同時段歷史資料產生，不是校準後事件機率；確認與指派只存在於目前瀏覽器。'
               : '歷史演練使用已整理資料產生庫存風險與雙向調度建議；可借、可還皆為 0 時只標示為疑似服務異常，仍需人工確認。' }}</span>
@@ -268,48 +268,3 @@ function selectStation(stationId: string) {
     </template>
   </div>
 </template>
-
-<style scoped>
-.metric-grid--tasks {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.task-first-grid {
-  grid-template-columns: minmax(0, 1.12fr) minmax(340px, .88fr);
-  align-items: start;
-}
-
-.supporting-details {
-  margin-top: 14px;
-}
-
-.supporting-details-content {
-  padding: 14px;
-}
-
-.supporting-details-content :deep(.evidence-panel) {
-  margin: 0;
-}
-
-.supporting-details-content .data-footnote {
-  margin: 13px 2px 0;
-}
-
-@media (max-width: 1150px) {
-  .task-first-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-@media (max-width: 780px) {
-  .metric-grid--tasks {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 620px) {
-  .supporting-details-content {
-    padding: 12px;
-  }
-}
-</style>

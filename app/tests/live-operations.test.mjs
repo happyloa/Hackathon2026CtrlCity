@@ -96,6 +96,30 @@ test('current empty station creates a stable critical alert with an explicit saf
   assert.notEqual(first.alerts[0].id, buildLiveOperations([empty], '2026-08-09T08:05:00+08:00').alerts[0].id)
 })
 
+test('officially inactive stations are surfaced for review but never used for dispatch', () => {
+  const empty = station({
+    id: 'empty-target',
+    availableBikes: 0,
+    availableDocks: 20,
+    currentState: 'empty_now',
+    stationForecast: forecast({ predictedBikes: 0, predictedDocks: 20, emptyRisk: .9, level: 'critical' }),
+  })
+  const officialInactive = station({
+    id: 'official-inactive-source',
+    availableBikes: 12,
+    availableDocks: 8,
+    latitude: 25.001,
+    currentState: 'unavailable',
+    serviceStatus: 'official_inactive',
+    stationForecast: forecast({ unavailableRisk: .9 }),
+  })
+
+  const plan = buildLiveOperations([empty, officialInactive], OBSERVED_AT)
+
+  assert.ok(plan.alerts.some(alert => alert.stationId === 'official-inactive-source' && alert.condition === 'unavailable'))
+  assert.equal(plan.dispatches.length, 0)
+})
+
 test('forecast full risk creates a full-station alert before the station is physically full', () => {
   const fullRisk = station({
     id: 'full-risk',

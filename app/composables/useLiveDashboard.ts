@@ -150,7 +150,7 @@ function fallbackForecast(station: LiveStation, horizon: HorizonKey, observedAt:
 function qualityFlagsFor(station: LiveStation, forecasts: Record<HorizonKey, Forecast>) {
   const flags: string[] = []
   if (station.serviceStatus === 'official_inactive') {
-    flags.push('官方資料標示為未啟用；需人工確認。')
+    flags.push('官方資料 act=0，標示為停用；不納入預測或調度。')
   } else if (station.serviceStatus === 'suspected_unavailable') {
     flags.push('可借車與可還位皆為 0，疑似服務異常，需人工確認。')
   }

@@ -89,9 +89,10 @@ const chartDescription = computed(() => {
 </script>
 
 <template>
-  <figure class="forecast-chart">
-    <div class="chart-scroll">
+  <figure class="flex flex-col gap-1">
+    <div class="min-h-0 flex-1 overflow-x-auto">
     <svg
+      class="block h-auto min-w-160 w-160"
       :viewBox="`0 0 ${dimensions.width} ${dimensions.height}`"
       preserveAspectRatio="xMidYMid meet"
       role="img"
@@ -104,87 +105,83 @@ const chartDescription = computed(() => {
         <line
           v-for="tick in chart.yTicks"
           :key="`grid-${tick.value}`"
-          class="chart-grid"
+          class="stroke-line"
           :x1="dimensions.left"
           :x2="dimensions.width - dimensions.right"
           :y1="tick.y"
           :y2="tick.y"
+          stroke-width="1"
         />
         <text
           v-for="tick in chart.yTicks"
           :key="`y-label-${tick.value}`"
-          class="axis-label"
+          class="fill-muted text-base"
           :x="dimensions.left - 7"
           :y="tick.y + 4"
           text-anchor="end"
         >{{ formatValue(tick.value) }}</text>
         <line
-          class="chart-axis"
+          class="stroke-line-strong"
           :x1="dimensions.left"
           :x2="dimensions.width - dimensions.right"
           :y1="dimensions.top + plotHeight"
           :y2="dimensions.top + plotHeight"
+          stroke-width="1"
         />
         <text
           v-for="item in chart.xLabels"
           :key="`x-label-${item.index}`"
-          class="axis-label"
+          class="fill-muted text-base"
           :x="chart.x(item.index)"
           :y="dimensions.height - 9"
           text-anchor="middle"
         >{{ item.label }}</text>
       </g>
 
-      <path v-if="chart.actual.length > 1" class="trend-line bikes-line" :d="chart.actualBikePath" />
-      <path v-if="chart.actual.length > 1" class="trend-line docks-line" :d="chart.actualDockPath" />
-      <path v-if="chart.projected.length" class="trend-line projected bikes-line" :d="chart.projectedBikePath" />
-      <path v-if="chart.projected.length" class="trend-line projected docks-line" :d="chart.projectedDockPath" />
+      <path v-if="chart.actual.length > 1" class="stroke-accent" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" :d="chart.actualBikePath" />
+      <path v-if="chart.actual.length > 1" class="stroke-warning" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" :d="chart.actualDockPath" />
+      <path v-if="chart.projected.length" class="stroke-accent" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="6 4" :d="chart.projectedBikePath" />
+      <path v-if="chart.projected.length" class="stroke-warning" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="6 4" :d="chart.projectedDockPath" />
 
       <g v-for="point in chart.actual" :key="`actual-${point.index}`">
         <circle
-          class="data-point bikes-point"
+          class="fill-accent stroke-panel"
           :cx="chart.x(point.index)"
           :cy="chart.y(point.bikes)"
           r="3.2"
+          stroke-width="1.5"
         ><title>{{ point.label }}：可借車 {{ point.bikes }} 台</title></circle>
         <circle
-          class="data-point docks-point"
+          class="fill-warning stroke-panel"
           :cx="chart.x(point.index)"
           :cy="chart.y(point.docks)"
           r="3.2"
+          stroke-width="1.5"
         ><title>{{ point.label }}：可還位 {{ point.docks }} 位</title></circle>
       </g>
       <g v-for="point in chart.projected" :key="`projection-${point.index}`">
         <circle
-          class="data-point projection-point bikes-point"
+          class="fill-panel stroke-accent"
           :cx="chart.x(point.index)"
           :cy="chart.y(point.bikes)"
           r="4"
+          stroke-width="2.3"
         ><title>{{ point.label }} 基線推估：可借車 {{ point.bikes }} 台</title></circle>
         <circle
-          class="data-point projection-point docks-point"
+          class="fill-panel stroke-warning"
           :cx="chart.x(point.index)"
           :cy="chart.y(point.docks)"
           r="4"
+          stroke-width="2.3"
         ><title>{{ point.label }} 基線推估：可還位 {{ point.docks }} 位</title></circle>
       </g>
     </svg>
     </div>
 
-    <figcaption class="forecast-legend">
-      <span><i class="legend-key bikes-line" />可借車</span>
-      <span><i class="legend-key docks-line" />可還位</span>
-      <span v-if="chart.projected.length"><i class="legend-key projected" />基線推估</span>
+    <figcaption class="flex flex-wrap gap-x-3 gap-y-1 text-base leading-5 text-muted">
+      <span class="inline-flex items-center gap-1"><i class="inline-block w-3.5 border-t-2 border-accent" />可借車</span>
+      <span class="inline-flex items-center gap-1"><i class="inline-block w-3.5 border-t-2 border-warning" />可還位</span>
+      <span v-if="chart.projected.length" class="inline-flex items-center gap-1"><i class="inline-block w-3.5 border-t-2 border-dashed border-muted" />基線推估</span>
     </figcaption>
   </figure>
 </template>
-
-<style scoped>
-.forecast-chart { display: flex; flex-direction: column; gap: 4px; }
-.chart-scroll { flex: 1 1 auto; min-height: 0; overflow-x: auto; }
-.forecast-chart svg { display: block; width: 640px; min-width: 640px; height: auto; aspect-ratio: 640 / 250; }
-.chart-grid { stroke: var(--line); stroke-width: 1; }.chart-axis { stroke: var(--line-strong); stroke-width: 1; }.axis-label { fill: var(--muted); font-size: 16px; }
-.trend-line { fill: none; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }.bikes-line { stroke: var(--teal); }.docks-line { stroke: var(--orange); }.projected { stroke-dasharray: 6 4; stroke-width: 2; }
-.data-point { stroke: var(--panel); stroke-width: 1.5; }.data-point:focus { stroke: var(--ink); stroke-width: 2.5; outline: none; }.bikes-point { fill: var(--teal); }.docks-point { fill: var(--orange); }.projection-point { fill: var(--panel); stroke-width: 2.3; }.projection-point.bikes-point { stroke: var(--teal); }.projection-point.docks-point { stroke: var(--orange); }
-.forecast-legend { display: flex; flex-wrap: wrap; gap: 4px 11px; color: var(--muted); font-size: 16px; line-height: 1.3; }.forecast-legend span { display: inline-flex; align-items: center; gap: 4px; }.legend-key { display: inline-block; width: 14px; border-top: 2px solid; }.legend-key.bikes-line { border-color: var(--teal); }.legend-key.docks-line { border-color: var(--orange); }.legend-key.projected { border-color: var(--muted); border-top-style: dashed; }
-</style>
