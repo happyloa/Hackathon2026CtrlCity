@@ -1,3 +1,5 @@
+import tailwindcss from '@tailwindcss/vite'
+
 const liveFeedPath = '/api/datasets/010e5b15-3823-4b20-b401-b1cf000550c5/json?page=0&size=2000'
 
 export default defineNuxtConfig({
@@ -7,6 +9,7 @@ export default defineNuxtConfig({
   devtools: { enabled: true },
   css: ['leaflet/dist/leaflet.css', '~/assets/css/main.css'],
   vite: {
+    plugins: [tailwindcss()],
     server: {
       proxy: {
         '/api/v1/live-stations': {
@@ -22,11 +25,11 @@ export default defineNuxtConfig({
       title: '新北市 YouBike 調度工作台',
       meta: [
         { name: 'description', content: '新北市公共自行車站點庫存、風險與調度決策支援' },
-        { name: 'theme-color', content: '#f5f5f1' },
+        { name: 'theme-color', content: '#fafafa' },
       ],
       script: [{
         id: 'theme-init',
-        innerHTML: `(function(){try{var saved=localStorage.getItem('yb-ops-theme');var dark=saved==='dark'||(!saved&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=dark?'dark':'light';document.querySelector('meta[name="theme-color"]')?.setAttribute('content',dark?'#151517':'#f5f5f1')}catch(_){}})()`,
+        innerHTML: `(function(){try{var saved=localStorage.getItem('yb-ops-theme');var dark=saved==='dark'||(!saved&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=dark?'dark':'light';document.querySelector('meta[name="theme-color"]')?.setAttribute('content',dark?'#09090b':'#fafafa')}catch(_){}})()`,
       }],
       link: [
         { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
