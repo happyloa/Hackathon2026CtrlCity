@@ -159,8 +159,8 @@ onBeforeUnmount(() => {
 
     <Teleport to="body">
       <Transition name="picker">
-      <div v-if="isOpen" class="fixed inset-0 z-50 grid items-end justify-center bg-black/60 p-2.5 sm:place-items-center sm:p-5" @mousedown.self="close()">
-        <section ref="dialogRef" class="modal-picker-dialog flex max-h-svh w-full max-w-xl flex-col overflow-hidden rounded-xl border border-line-strong bg-panel text-ink shadow-2xl outline-none transition-transform duration-150" role="dialog" aria-modal="true" :aria-labelledby="dialogTitleId" tabindex="-1">
+      <div v-if="isOpen" class="fixed inset-0 z-50 flex min-h-0 items-end justify-center bg-black/60 p-4 sm:items-center sm:p-8" @mousedown.self="close()">
+        <section ref="dialogRef" class="modal-picker-dialog flex min-h-0 max-h-full w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-line-strong bg-panel text-ink shadow-2xl outline-none transition-transform duration-150" role="dialog" aria-modal="true" :aria-labelledby="dialogTitleId" tabindex="-1">
           <header class="flex items-start justify-between gap-4 border-b border-line p-4 sm:p-5">
             <div>
               <span class="mb-1 block text-base font-bold text-muted">{{ label }}</span>

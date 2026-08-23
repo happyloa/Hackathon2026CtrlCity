@@ -178,8 +178,8 @@ onBeforeUnmount(() => {
 <template>
   <Teleport to="body">
   <Transition name="detail-drawer">
-  <div v-if="station" class="fixed inset-0 z-50 flex items-end justify-end bg-black/50 sm:items-stretch" @mousedown.self="closePanel">
-  <aside ref="panelRef" class="station-detail max-h-svh w-full overflow-y-auto rounded-t-xl border border-line bg-panel p-4 pb-6 text-ink shadow-2xl outline-none sm:h-svh sm:max-w-lg sm:rounded-none sm:border-y-0 sm:border-r-0 sm:p-5" role="dialog" aria-modal="true" aria-labelledby="station-detail-title" tabindex="-1">
+  <div v-if="station" class="fixed inset-0 z-50 flex min-h-0 items-end justify-end bg-black/50 p-3 sm:items-stretch sm:p-0" @mousedown.self="closePanel">
+  <aside ref="panelRef" class="station-detail max-h-full w-full overflow-y-auto rounded-xl border border-line bg-panel p-4 pb-6 text-ink shadow-2xl outline-none sm:h-svh sm:max-w-lg sm:rounded-none sm:border-y-0 sm:border-r-0 sm:p-5" role="dialog" aria-modal="true" aria-labelledby="station-detail-title" tabindex="-1">
     <button type="button" class="mb-3 grid h-11 w-11 place-items-center rounded-md border border-line bg-panel-muted p-0 text-ink transition-colors hover:border-accent-strong hover:bg-accent-strong hover:text-on-accent" aria-label="關閉站點詳情" @click="closePanel"><Icon class="text-2xl" icon="solar:close-circle-outline" /></button>
     <div class="flex flex-wrap items-center justify-between gap-2 text-base font-bold text-muted"><span>{{ isLive ? '即時庫存＋歷史基線' : '站點風險卡' }}</span><span :class="riskBadgeClass">{{ riskLabel }}</span></div>
     <h3 id="station-detail-title" class="mt-2 text-2xl font-bold tracking-tight text-ink">{{ stationName }}</h3>
