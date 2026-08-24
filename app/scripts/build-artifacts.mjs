@@ -538,7 +538,7 @@ function makeForecast(snapshot, history, profileStats) {
         ? `已以回放時點庫存對照同站、同時段歷史基線（${observations} 筆樣本）。`
         : '此站此時段缺少歷史基線樣本，僅依回放時點庫存判讀。',
     ]
-    if (snapshot.currentState === 'unavailable') reasons.push('場站同時無車與無可還位，屬疑似服務異常，需人工確認')
+    if (snapshot.currentState === 'unavailable') reasons.push('場站同時無車與無可還位，可能是服務異常')
     if (snapshot.currentState === 'empty') reasons.push('目前已無可借車')
     if (snapshot.currentState === 'full') reasons.push('目前已無可還位')
     if (snapshot.availableBikes <= lowThreshold && snapshot.currentState !== 'empty') reasons.push('目前可借車低於預警門檻')
@@ -632,7 +632,7 @@ function makeAlerts(stations, persistenceByStation, scenarioAt) {
         durationMinutes: persistence?.durationMinutes ?? (isCurrentInventoryFailure ? 30 : 60),
         message:
           type === 'unavailable'
-            ? '站點呈現疑似服務異常，需先確認設備或營運狀態。'
+            ? '站點可能服務異常，不納入搬運規劃。'
             : type === 'empty'
               ? '未來 60 分鐘可借車不足風險偏高。'
               : '未來 60 分鐘可還位不足風險偏高。',
@@ -864,7 +864,7 @@ function makeBriefingFacts(summary, alerts, dispatches) {
   const facts = [
     `回放時點 ${summary.at}，共覆蓋 ${summary.totalStations} 個場站。`,
     `目前無車 ${summary.emptyStations} 站、無位 ${summary.fullStations} 站、疑似服務異常 ${summary.unavailableStations} 站。`,
-    `已依 60 分鐘風險產生 ${summary.dispatchRecommendations} 筆人工覆核調度建議（補車 ${deliveryCount}、移車 ${removalCount}）。`,
+    `已依 60 分鐘風險產生 ${summary.dispatchRecommendations} 筆搬運建議（補車 ${deliveryCount}、移車 ${removalCount}）。`,
   ]
   if (alerts[0]) {
     facts.push(`最高優先告警為 ${alerts[0].stationName}（${alerts[0].district}），風險指標 ${Math.round(alerts[0].risk * 100)}／100。`)

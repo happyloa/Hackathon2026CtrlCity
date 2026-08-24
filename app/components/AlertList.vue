@@ -28,8 +28,8 @@ const visibleAlerts = computed(() => props.compact
   ? props.alerts.slice(0, props.maxItems || 3)
   : props.alerts.slice(0, visibleCount.value))
 const remainingCount = computed(() => Math.max(0, props.alerts.length - visibleAlerts.value.length))
-const allAlertsTarget = computed(() => ({ path: '/alerts', query: props.contextQuery || {} }))
-const sectionTitle = computed(() => props.title || (props.kind === 'service' ? '服務狀態異常' : '庫存風險排序'))
+const allAlertsTarget = computed(() => ({ path: '/stations', query: props.contextQuery || {} }))
+const sectionTitle = computed(() => props.title || (props.kind === 'service' ? '服務異常' : '需注意站點'))
 
 watch(() => props.alerts, () => { visibleCount.value = props.pageSize })
 
@@ -80,7 +80,7 @@ function inventoryIcon(score: number) {
 
 function scorePartsLabel(alert: Alert) {
   const parts = alert.scoreParts
-  return `風險 ${parts.forecast}＋現況 ${parts.current}＋缺口 ${parts.gap}＋品質 ${parts.quality}`
+  return `60 分風險 ${parts.forecast}・當下空滿 ${parts.current}・缺口 ${parts.gap}・基線 ${parts.quality}`
 }
 </script>
 
@@ -88,7 +88,7 @@ function scorePartsLabel(alert: Alert) {
   <section :class="embedded ? 'overflow-hidden border-0 bg-transparent shadow-none' : 'panel overflow-hidden'">
     <div v-if="!embedded" class="flex flex-col gap-3 border-b border-line p-4 sm:flex-row sm:items-start sm:justify-between">
       <div>
-        <p class="section-kicker text-base"><Icon :icon="kind === 'service' ? 'solar:settings-minimalistic-outline' : 'solar:bell-bing-outline'" /> {{ kind === 'service' ? '營運狀態' : '告警中心' }}</p>
+        <p class="section-kicker text-base"><Icon :icon="kind === 'service' ? 'solar:settings-minimalistic-outline' : 'solar:bell-bing-outline'" /> {{ kind === 'service' ? '營運狀態' : '需注意站點' }}</p>
         <h2 class="m-0 mt-1 text-xl font-bold tracking-tight text-ink">{{ sectionTitle }}</h2>
       </div>
       <NuxtLink v-if="compact" :to="allAlertsTarget" class="text-link min-h-11 text-base">查看全部 <Icon icon="solar:arrow-right-up-outline" /></NuxtLink>
@@ -109,13 +109,13 @@ function scorePartsLabel(alert: Alert) {
             <strong class="block break-words font-bold">{{ stationNameFor(alert) }}</strong>
             <span class="mt-1 block text-muted">{{ conditionLabel(alert) }} · {{ stationFor(alert)?.district || '行政區未標示' }}</span>
             <small v-if="kind === 'inventory'" class="mt-1 block text-base leading-6 text-muted">{{ scorePartsLabel(alert) }}</small>
-            <small v-else class="mt-1 block text-base leading-6 text-muted">僅供營運狀態查驗，不納入搬運路線。</small>
+            <small v-else class="mt-1 block text-base leading-6 text-muted">服務異常，不排入搬運路線。</small>
           </button>
           <div v-if="kind === 'inventory'" class="ml-auto flex w-full items-center justify-between gap-2 text-base sm:w-auto sm:flex-col sm:items-end">
             <span class="rounded-md border bg-panel px-2 py-1 font-bold" :class="priorityClasses(alert.priorityScore)">{{ priorityLabel(alert.priorityScore) }}</span>
             <strong class="font-mono text-lg text-ink">{{ Math.round(alert.priorityScore) }} 分</strong>
           </div>
-          <span v-else class="ml-auto rounded-md border border-line-strong bg-panel px-2 py-1 text-base font-bold text-muted">不納入調度</span>
+          <span v-else class="ml-auto rounded-md border border-line-strong bg-panel px-2 py-1 text-base font-bold text-muted">不排路線</span>
         </article>
       </div>
       <div v-if="!compact && remainingCount" class="border-t border-line p-3 text-center">

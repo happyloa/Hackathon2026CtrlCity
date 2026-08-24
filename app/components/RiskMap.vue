@@ -2,6 +2,11 @@
 import { Icon } from '@iconify/vue'
 import { safetyStockFor } from '~/shared/live-operations'
 import { displayStationName, type DataMode, type HorizonKey, type PredictionCoverage, type StationRisk } from '~/shared/ops'
+import {
+  clusterNearbyRiskStations,
+  stableInventoryTone,
+  type StableInventoryTone,
+} from '~/shared/risk-map-visuals'
 
 const props = defineProps<{
   stations: StationRisk[]
@@ -50,27 +55,24 @@ const headerLabel = computed(() => stationQuery.value
   ? '個搜尋結果'
   : showAllStations.value
     ? `個${props.district || '全市'}站點`
-    : '個待處理站點')
+    : '個需注意站點')
 const scopeName = computed(() => props.district || '新北市')
 const stationScopeActionLabel = computed(() => showAllStations.value
-  ? '只看待處理站'
+  ? '只看需注意'
   : `查看全部 ${allMappedStations.value.length} 站`)
 const mapAriaLabel = computed(() => `${scopeName.value}${isLive.value ? '即時基線風險站點地圖' : '歷史預測風險站點地圖'}`)
 const baselineNotice = computed(() => {
   if (!isLive.value) return ''
-  if (hasBaselineLoadError.value) return '歷史基線暫時無法載入，現在僅顯示官方即時庫存；按「立即更新」即可重新比對。'
-  if (unmatchedBaselineCount.value) return `${unmatchedBaselineCount.value} 個新增或改名站尚無同站歷史基線，僅顯示即時庫存，不納入 60 分鐘預估。`
+  if (hasBaselineLoadError.value) return '歷史基線暫時無法載入，目前只看即時庫存。'
+  if (unmatchedBaselineCount.value) return `${unmatchedBaselineCount.value} 站沒有歷史基線，只顯示即時庫存。`
   return ''
-})
-const mapStatusText = computed(() => {
-  if (stationQuery.value) return `搜尋結果共 ${mappedStations.value.length} 站；點選站點查看即時庫存與判讀。`
-  if (showAllStations.value) return `顯示${scopeName.value} ${allMappedStations.value.length} 站；顏色標示需要優先處理的狀態。`
-  return `預設只顯示 ${actionableCount.value} 個待處理站點；可切換查看${scopeName.value}全部站點或搜尋站名。`
 })
 
 let leaflet: LeafletModule | null = null
 let leafletMap: LeafletMap | null = null
+let hotspotLayer: LeafletLayerGroup | null = null
 let markerLayer: LeafletLayerGroup | null = null
+let hotspotRenderer: LeafletRenderer | null = null
 let canvasRenderer: LeafletRenderer | null = null
 let resizeObserver: ResizeObserver | null = null
 const markerById = new globalThis.Map<string, LeafletCircleMarker>()
@@ -83,6 +85,20 @@ const htmlEntities: Record<string, string> = {
 }
 
 type MarkerTone = 'stable' | 'empty-risk' | 'full-risk' | 'service-review' | 'inventory-only'
+
+const STABLE_MARKER_COLORS: Record<StableInventoryTone, string> = {
+  balanced: '#1e6f62',
+  'bike-heavy': '#7357c7',
+  'dock-heavy': '#1787a0',
+}
+const MARKER_COLORS: Record<Exclude<MarkerTone, 'stable'>, string> = {
+  'empty-risk': '#a93a34',
+  'full-risk': '#2f648f',
+  'service-review': '#65706b',
+  'inventory-only': '#8a5a09',
+}
+const HOTSPOT_FILL = '#ec4899'
+const HOTSPOT_STROKE = '#f472b6'
 
 function forecastFor(station: StationRisk) {
   return station.forecast.horizons[props.horizon]
@@ -105,30 +121,48 @@ function isActionable(station: StationRisk) {
   return tone === 'empty-risk' || tone === 'full-risk' || tone === 'service-review'
 }
 
+function isInventoryRisk(station: StationRisk) {
+  const tone = markerTone(station)
+  return tone === 'empty-risk' || tone === 'full-risk'
+}
+
+const riskProximityClusters = computed(() => clusterNearbyRiskStations(
+  mappedStations.value.filter(isInventoryRisk),
+))
+const riskClusterSizeByStationId = computed(() => new Map(riskProximityClusters.value.flatMap(
+  cluster => cluster.memberIds.map(stationId => [stationId, cluster.memberIds.length] as const),
+)))
+const hasVisibleStableStations = computed(() => mappedStations.value.some(station => markerTone(station) === 'stable'))
+const hasVisibleInventoryOnlyStations = computed(() => mappedStations.value.some(station => markerTone(station) === 'inventory-only'))
+
 function markerColor(station: StationRisk) {
-  const colors: Record<MarkerTone, string> = {
-    stable: '#1e6f62',
-    'empty-risk': '#a93a34',
-    'full-risk': '#2f648f',
-    'service-review': '#65706b',
-    'inventory-only': '#8a5a09',
-  }
-  return colors[markerTone(station)]
+  const tone = markerTone(station)
+  return tone === 'stable'
+    ? STABLE_MARKER_COLORS[stableInventoryTone(station)]
+    : MARKER_COLORS[tone]
+}
+
+function stableInventoryStatus(station: StationRisk) {
+  const tone = stableInventoryTone(station)
+  const capacity = Math.max(1, station.totalDocks)
+  if (tone === 'bike-heavy') return `穩定・可借約 ${Math.round(Math.min(1, station.availableBikes / capacity) * 100)}%`
+  if (tone === 'dock-heavy') return `穩定・可還約 ${Math.round(Math.min(1, station.availableDocks / capacity) * 100)}%`
+  return '穩定・供需均衡'
 }
 
 function markerStatus(station: StationRisk) {
   const tone = markerTone(station)
   if (tone === 'service-review') {
     return station.serviceStatus === 'official_inactive'
-      ? '官方標示停用（不納入調度）'
-      : '疑似服務異常（不納入調度）'
+      ? '官方停用・不排路線'
+      : '服務異常・不排路線'
   }
-  if (tone === 'inventory-only') return hasBaselineLoadError.value ? '基線暫不可用，僅顯示即時庫存' : '尚無歷史基線，僅顯示即時庫存'
+  if (tone === 'inventory-only') return '沒有歷史基線・只看即時庫存'
   if (station.currentState === 'empty_now') return '目前無車可借'
   if (station.currentState === 'full_now') return '目前無位可還'
   if (tone === 'empty-risk') return isLive.value ? '60 分鐘缺車風險' : '預測缺車風險'
   if (tone === 'full-risk') return isLive.value ? '60 分鐘缺位風險' : '預測缺位風險'
-  return isLive.value ? '即時庫存與基線穩定' : '預測風險低'
+  return stableInventoryStatus(station)
 }
 
 function interventionGap(station: StationRisk) {
@@ -153,14 +187,18 @@ function tooltipContent(station: StationRisk) {
     : station.currentState === 'full_now'
       ? '官方即時：目前無位可還'
       : tone === 'empty-risk'
-        ? `${props.horizon} 分鐘缺車模型風險指標 ${Math.round(forecast.emptyRisk * 100)}／100`
+        ? `${props.horizon} 分鐘缺車風險 ${Math.round(forecast.emptyRisk * 100)}／100`
         : tone === 'full-risk'
-          ? `${props.horizon} 分鐘缺位模型風險指標 ${Math.round(forecast.fullRisk * 100)}／100`
+          ? `${props.horizon} 分鐘缺位風險 ${Math.round(forecast.fullRisk * 100)}／100`
           : markerStatus(station)
   const context = forecast.baselineStatus === 'matched' || station.currentState !== 'normal'
     ? direction
     : markerStatus(station)
-  return `<strong>${escapeHtml(displayStationName(station.name))}</strong><span>${escapeHtml(station.district || '新北市')}・${inventory}</span><span>${escapeHtml(context)}</span>`
+  const clusterSize = riskClusterSizeByStationId.value.get(station.id) || 0
+  const clusterContext = clusterSize > 1
+    ? `<span>300 公尺鄰近群組・共 ${clusterSize} 站</span>`
+    : ''
+  return `<strong>${escapeHtml(displayStationName(station.name))}</strong><span>${escapeHtml(station.district || '新北市')}・${inventory}</span><span>${escapeHtml(context)}</span>${clusterContext}`
 }
 
 function markerOptions(station: StationRisk) {
@@ -175,8 +213,28 @@ function markerOptions(station: StationRisk) {
   }
 }
 
+function renderRiskHotspots() {
+  if (!leaflet || !leafletMap || !hotspotLayer || !hotspotRenderer) return
+  hotspotLayer.clearLayers()
+  for (const cluster of riskProximityClusters.value) {
+    leaflet.circle([cluster.latitude, cluster.longitude], {
+      renderer: hotspotRenderer,
+      pane: 'risk-hotspots',
+      radius: cluster.radiusMeters,
+      color: HOTSPOT_STROKE,
+      weight: 1.25,
+      opacity: .46,
+      fillColor: HOTSPOT_FILL,
+      fillOpacity: .14,
+      interactive: false,
+      bubblingMouseEvents: false,
+    }).addTo(hotspotLayer)
+  }
+}
+
 function renderMarkers() {
   if (!leaflet || !leafletMap || !markerLayer || !canvasRenderer) return
+  renderRiskHotspots()
 
   const visibleIds = new Set<string>()
   for (const station of mappedStations.value) {
@@ -264,10 +322,15 @@ async function initialiseMap() {
     maxZoom: 19,
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors',
   }).addTo(leafletMap)
+  const hotspotPane = leafletMap.createPane('risk-hotspots')
+  hotspotPane.style.zIndex = '350'
+  hotspotPane.style.pointerEvents = 'none'
+  hotspotRenderer = leaflet.canvas({ pane: 'risk-hotspots', padding: .5 })
   canvasRenderer = leaflet.canvas({ padding: .5 })
+  hotspotLayer = leaflet.layerGroup().addTo(leafletMap)
   markerLayer = leaflet.layerGroup().addTo(leafletMap)
-  renderMarkers()
   fitCurrentScope()
+  renderMarkers()
 
   resizeObserver = new ResizeObserver(() => leafletMap?.invalidateSize({ pan: false }))
   resizeObserver.observe(mapElement.value)
@@ -276,7 +339,7 @@ async function initialiseMap() {
 const stationSignature = computed(() => `${hasBaselineLoadError.value}|${mappedStations.value
   .map((station) => {
     const forecast = forecastFor(station)
-    return `${station.id}:${station.latitude}:${station.longitude}:${station.availableBikes}:${station.availableDocks}:${station.currentState}:${station.serviceStatus}:${forecast.emptyRisk}:${forecast.fullRisk}:${forecast.predictedBikes}:${forecast.predictedDocks}:${forecast.baselineStatus}`
+    return `${station.id}:${station.latitude}:${station.longitude}:${station.totalDocks}:${station.availableBikes}:${station.availableDocks}:${station.currentState}:${station.serviceStatus}:${forecast.emptyRisk}:${forecast.fullRisk}:${forecast.predictedBikes}:${forecast.predictedDocks}:${forecast.baselineStatus}`
   })
   .join('|')}`)
 
@@ -299,6 +362,8 @@ onBeforeUnmount(() => {
   markerById.clear()
   leafletMap?.remove()
   leafletMap = null
+  hotspotLayer = null
+  hotspotRenderer = null
 })
 </script>
 
@@ -307,7 +372,7 @@ onBeforeUnmount(() => {
     <div class="map-heading flex items-start justify-between gap-3 px-4 pb-3 pt-4">
       <div>
         <p class="section-kicker"><Icon :icon="isLive ? 'solar:bolt-circle-outline' : 'solar:map-point-wave-outline'" /> 站點地圖</p>
-        <h2 class="mt-1 text-xl font-bold text-ink">{{ isLive ? `${horizon} 分鐘待處理站點` : `${horizon} 分鐘預測風險分布` }}</h2>
+        <h2 class="mt-1 text-xl font-bold text-ink">{{ isLive ? `${horizon} 分鐘站況` : `${horizon} 分鐘預測` }}</h2>
       </div>
       <div class="map-summary grid min-w-32 justify-items-end rounded-lg border border-line-strong bg-panel-muted px-2.5 py-2 font-bold leading-tight" :class="hasBaselineLoadError ? 'text-warning' : 'text-accent-strong'">
         <strong>{{ headerCount }}</strong>
@@ -342,21 +407,26 @@ onBeforeUnmount(() => {
       <p v-if="!mappedStations.length" class="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 rounded-lg border border-line-strong bg-panel p-3 text-base font-bold text-ink">目前沒有可定位的站點資料。</p>
     </div>
     <div class="map-caption grid gap-2 px-4 pt-3">
-      <p class="inline-flex items-center gap-1.5 text-base font-semibold text-muted"><Icon class="text-xl text-accent-strong" icon="solar:cursor-square-outline" /> 點選站點查看風險與替代還車引導</p>
+      <p class="inline-flex items-center gap-1.5 text-base font-semibold text-muted"><Icon class="text-xl text-accent-strong" icon="solar:cursor-square-outline" /> 點選站點查看詳情</p>
       <p v-if="baselineNotice" class="flex flex-wrap items-start gap-1.5 text-base font-semibold" :class="hasBaselineLoadError ? 'text-warning' : 'text-muted'">
         <Icon class="mt-0.5 shrink-0 text-xl" :class="hasBaselineLoadError ? 'text-warning' : 'text-accent-strong'" :icon="hasBaselineLoadError ? 'solar:danger-triangle-outline' : 'solar:info-circle-outline'" />
         <span>{{ baselineNotice }}</span>
         <button v-if="hasBaselineLoadError" type="button" class="inline-flex min-h-8 shrink-0 items-center gap-1 rounded-md border border-line-strong bg-transparent px-2 py-1 text-base font-bold text-accent-strong transition-colors hover:border-accent-strong hover:bg-panel-muted hover:text-ink" @click="emit('retryBaseline')"><Icon class="text-lg" icon="solar:refresh-circle-outline" /> 重新比對</button>
       </p>
       <div class="flex flex-wrap gap-x-3 gap-y-1.5 text-base font-semibold text-muted" aria-label="風險方向圖例">
-        <span v-if="showAllStations" class="inline-flex items-center gap-1.5 whitespace-nowrap"><i class="h-2.5 w-2.5 rounded-full border border-line-strong bg-accent" />已對照、暫無處理</span>
-        <span class="inline-flex items-center gap-1.5 whitespace-nowrap"><i class="h-2.5 w-2.5 rounded-full border border-line-strong bg-danger" />補車優先｜無車／缺車風險</span>
-        <span class="inline-flex items-center gap-1.5 whitespace-nowrap"><i class="h-2.5 w-2.5 rounded-full border border-line-strong bg-info" />移車優先｜無位／缺位風險</span>
-        <span class="inline-flex items-center gap-1.5 whitespace-nowrap"><i class="h-2.5 w-2.5 rounded-full border border-line-strong bg-muted" />{{ isLive ? '官方停用／服務異常｜不納入調度' : '服務狀態待查驗' }}</span>
-        <span v-if="isLive && !hasBaselineLoadError && unmatchedBaselineCount" class="inline-flex items-center gap-1.5 whitespace-nowrap"><i class="h-2.5 w-2.5 rounded-full border border-line-strong bg-warning" />僅即時庫存｜未納入預估</span>
+        <span v-if="riskProximityClusters.length" class="inline-flex items-center gap-1.5"><i class="h-3 w-5 shrink-0 rounded-full border" :style="{ backgroundColor: `${HOTSPOT_FILL}24`, borderColor: HOTSPOT_STROKE }" />粉紅底｜300 公尺鄰近群</span>
+        <template v-if="hasVisibleStableStations">
+          <span class="inline-flex min-w-0 items-center gap-1.5 leading-snug"><i class="h-2.5 w-2.5 shrink-0 rounded-full border border-line-strong" :style="{ backgroundColor: STABLE_MARKER_COLORS.balanced }" />綠｜穩定均衡</span>
+          <span class="inline-flex min-w-0 items-center gap-1.5 leading-snug"><i class="h-2.5 w-2.5 shrink-0 rounded-full border border-line-strong" :style="{ backgroundColor: STABLE_MARKER_COLORS['bike-heavy'] }" />紫｜可借 ≥ 2/3</span>
+          <span class="inline-flex min-w-0 items-center gap-1.5 leading-snug"><i class="h-2.5 w-2.5 shrink-0 rounded-full border border-line-strong" :style="{ backgroundColor: STABLE_MARKER_COLORS['dock-heavy'] }" />藍綠｜可還 ≥ 2/3</span>
+        </template>
+        <span class="inline-flex min-w-0 items-center gap-1.5 leading-snug"><i class="h-2.5 w-2.5 shrink-0 rounded-full border border-line-strong" :style="{ backgroundColor: MARKER_COLORS['empty-risk'] }" />紅｜缺車風險</span>
+        <span class="inline-flex min-w-0 items-center gap-1.5 leading-snug"><i class="h-2.5 w-2.5 shrink-0 rounded-full border border-line-strong" :style="{ backgroundColor: MARKER_COLORS['full-risk'] }" />藍｜缺位風險</span>
+        <span class="inline-flex min-w-0 items-center gap-1.5 leading-snug"><i class="h-2.5 w-2.5 shrink-0 rounded-full border border-line-strong" :style="{ backgroundColor: MARKER_COLORS['service-review'] }" />灰｜服務異常</span>
+        <span v-if="isLive && !hasBaselineLoadError && hasVisibleInventoryOnlyStations" class="inline-flex min-w-0 items-center gap-1.5 leading-snug"><i class="h-2.5 w-2.5 shrink-0 rounded-full border border-line-strong" :style="{ backgroundColor: MARKER_COLORS['inventory-only'] }" />黃｜沒有基線</span>
       </div>
     </div>
-    <p class="map-status-summary mx-4 mb-4 mt-2.5 flex items-center gap-1.5 text-base font-semibold text-muted"><Icon class="shrink-0 text-xl text-accent-strong" icon="solar:info-circle-outline" /> {{ mapStatusText }}</p>
+    <div class="h-4" aria-hidden="true" />
   </section>
 </template>
 

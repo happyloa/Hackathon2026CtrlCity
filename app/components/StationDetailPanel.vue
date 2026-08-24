@@ -25,14 +25,14 @@ const hasMatchedBaseline = computed(() => forecast.value?.baselineStatus === 'ma
 const riskLabel = computed(() => {
   const serviceStatus = props.station?.serviceStatus
   if (serviceStatus === 'official_inactive') return '官方標示停用'
-  if (serviceStatus === 'suspected_unavailable') return '需人工確認'
+  if (serviceStatus === 'suspected_unavailable') return '疑似異常'
   if (isLive.value) {
     const state = props.station?.currentState
     if (state === 'empty_now') return '目前無車'
     if (state === 'full_now') return '目前無位'
     if (forecast.value?.baselineStatus !== 'matched') return '僅即時庫存'
   }
-  return ({ normal: '穩定', medium: '觀察', high: '高風險', critical: '立即處理' }[forecast.value?.level || 'normal'])
+  return ({ normal: '穩定', medium: '留意', high: '高風險', critical: '高度風險' }[forecast.value?.level || 'normal'])
 })
 
 const riskBadgeClass = computed(() => {
@@ -54,7 +54,7 @@ const riskBadgeClass = computed(() => {
 const forecastHeadline = computed(() => {
   if (!isLive.value) return `${props.horizon} 分鐘後`
   if (props.station?.serviceStatus === 'official_inactive') return '官方標示停用，不納入調度'
-  if (props.station?.serviceStatus !== 'operational') return '服務狀態待人工確認'
+  if (props.station?.serviceStatus !== 'operational') return '服務狀態異常'
   if (!hasMatchedBaseline.value) return '未對照歷史基線'
   return `${props.horizon} 分鐘歷史基線推估`
 })
@@ -68,14 +68,14 @@ const forecastDescription = computed(() => {
 
 const forecastCaption = computed(() => {
   if (props.station?.serviceStatus === 'official_inactive') {
-    return '官方資料 act=0；不納入歷史預測、替代還車或自動調度，請依官方公告或現場資訊確認原因。'
+    return '官方標示停用，不納入預測與路線。'
   }
-  if (props.station?.serviceStatus !== 'operational') return '此狀態不等同已確認停運，請依現場或官方資訊覆核。'
-  if (isLive.value && !hasMatchedBaseline.value) return '未對照到唯一歷史站點；系統不假造未來風險。'
+  if (props.station?.serviceStatus !== 'operational') return '請查看官方公告或現場狀態。'
+  if (isLive.value && !hasMatchedBaseline.value) return '找不到可用的歷史資料，目前只顯示即時庫存。'
   const score = Math.round((forecast.value?.riskScore || 0) * 100)
   const sample = forecast.value?.sampleSize || 0
   const coverage = forecast.value?.baselineCoverage === 'sufficient' ? '歷史樣本充足' : '歷史樣本較少'
-  return `風險分數 ${score}／100 · ${coverage}（${sample} 筆）· 需人工覆核`
+  return `風險 ${score}／100 · ${coverage} · ${sample} 筆樣本`
 })
 
 const baselineComparison = computed(() => {
@@ -100,6 +100,7 @@ const baselineComparison = computed(() => {
     predictedBikes: value.predictedBikes,
     predictedDocks: value.predictedDocks,
     sampleSize: value.sampleSize,
+    score: Math.round(value.riskScore * 100),
     delta,
   }
 })
@@ -181,9 +182,9 @@ onBeforeUnmount(() => {
   <div v-if="station" class="fixed inset-0 z-50 flex min-h-0 items-end justify-end bg-black/50 p-3 sm:items-stretch sm:p-0" @mousedown.self="closePanel">
   <aside ref="panelRef" class="station-detail max-h-full w-full overflow-y-auto rounded-xl border border-line bg-panel p-4 pb-6 text-ink shadow-2xl outline-none sm:h-svh sm:max-w-lg sm:rounded-none sm:border-y-0 sm:border-r-0 sm:p-5" role="dialog" aria-modal="true" aria-labelledby="station-detail-title" tabindex="-1">
     <button type="button" class="mb-3 grid h-11 w-11 place-items-center rounded-md border border-line bg-panel-muted p-0 text-ink transition-colors hover:border-accent-strong hover:bg-accent-strong hover:text-on-accent" aria-label="關閉站點詳情" @click="closePanel"><Icon class="text-2xl" icon="solar:close-circle-outline" /></button>
-    <div class="flex flex-wrap items-center justify-between gap-2 text-base font-bold text-muted"><span>{{ isLive ? '即時庫存＋歷史基線' : '站點風險卡' }}</span><span :class="riskBadgeClass">{{ riskLabel }}</span></div>
+    <div class="flex flex-wrap items-center justify-between gap-2 text-base font-bold text-muted"><span>{{ isLive ? '即時站況' : '歷史站況' }}</span><span :class="riskBadgeClass">{{ riskLabel }}</span></div>
     <h3 id="station-detail-title" class="mt-2 text-2xl font-bold tracking-tight text-ink">{{ stationName }}</h3>
-    <p class="mt-1 flex items-center gap-1 text-base text-muted"><Icon class="shrink-0 text-lg text-accent-strong" icon="solar:map-point-outline" /> {{ station.district || '行政區待確認' }} · {{ station.city }}</p>
+    <p class="mt-1 flex items-center gap-1 text-base text-muted"><Icon class="shrink-0 text-lg text-accent-strong" icon="solar:map-point-outline" /> {{ station.district || '行政區未提供' }} · {{ station.city }}</p>
 
     <div class="mt-4 grid grid-cols-3 gap-2">
       <div class="grid gap-0.5 rounded-md border border-line bg-panel-muted p-2"><span class="text-base font-bold text-muted">可借車</span><strong class="font-mono text-xl text-ink">{{ station.availableBikes }}</strong></div>
@@ -193,18 +194,18 @@ onBeforeUnmount(() => {
 
     <section v-if="baselineComparison" class="mb-3 mt-4 rounded-md border border-line border-l-4 border-l-accent-strong bg-panel-muted p-3" aria-label="即時庫存與歷史基線比較">
       <div class="flex flex-col items-start gap-0.5 text-base font-extrabold text-ink sm:flex-row sm:items-center sm:justify-between sm:gap-2">
-        <span class="inline-flex items-center gap-1.5"><Icon class="text-lg text-accent-strong" icon="solar:scale-outline" /> 即時與歷史基線比較</span>
-        <small class="text-base font-bold text-muted">+{{ horizon }}m · {{ baselineComparison.sampleSize }} 筆樣本</small>
+        <span class="inline-flex items-center gap-1.5"><Icon class="text-lg text-accent-strong" icon="solar:scale-outline" /> {{ horizon }} 分鐘預估</span>
+        <small class="text-base font-bold text-muted">風險 {{ baselineComparison.score }}／100 · {{ baselineComparison.sampleSize }} 筆</small>
       </div>
       <div class="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
         <div class="grid min-w-0 gap-0.5 rounded-md border border-line bg-panel p-2"><span class="text-base font-bold text-muted">現在</span><strong class="font-mono text-base leading-5 text-ink">{{ station.availableBikes }} 車／{{ station.availableDocks }} 位</strong></div>
         <div class="grid min-w-0 gap-0.5 rounded-md border border-line bg-panel p-2"><span class="text-base font-bold text-muted">歷史基線</span><strong class="font-mono text-base leading-5 text-ink">{{ baselineComparison.baselineBikes }} 車／{{ baselineComparison.baselineDocks }} 位</strong></div>
-        <div class="grid min-w-0 gap-0.5 rounded-md border border-line bg-panel p-2"><span class="text-base font-bold text-muted">{{ horizon }}m 推估</span><strong class="font-mono text-base leading-5 text-ink">{{ baselineComparison.predictedBikes }} 車／{{ baselineComparison.predictedDocks }} 位</strong></div>
+        <div class="grid min-w-0 gap-0.5 rounded-md border border-line bg-panel p-2"><span class="text-base font-bold text-muted">{{ horizon }} 分鐘</span><strong class="font-mono text-base leading-5 text-ink">{{ baselineComparison.predictedBikes }} 車／{{ baselineComparison.predictedDocks }} 位</strong></div>
       </div>
       <p class="mt-2 text-base font-extrabold leading-6 text-accent-strong">{{ baselineComparison.delta }}</p>
     </section>
 
-    <div class="mt-4 grid gap-1 rounded-md border border-line bg-panel-muted p-3">
+    <div v-if="!baselineComparison" class="mt-4 grid gap-1 rounded-md border border-line bg-panel-muted p-3">
       <span class="inline-flex items-center gap-1.5 text-base font-extrabold text-accent-strong"><Icon class="text-lg" :icon="isLive ? 'solar:bolt-circle-outline' : 'solar:chart-2-outline'" /> {{ forecastHeadline }}</span>
       <strong class="text-lg text-ink">{{ forecastDescription }}</strong>
       <small class="text-base leading-6 text-muted">{{ forecastCaption }}</small>
@@ -215,15 +216,13 @@ onBeforeUnmount(() => {
         <span class="inline-flex items-center gap-1.5"><Icon class="text-lg text-info" icon="solar:map-point-wave-outline" /> 替代還車站</span>
         <small class="text-base font-bold text-muted">600m 內</small>
       </div>
-      <p class="my-2 text-base leading-6 text-muted">依現況與 {{ horizon }} 分鐘風險篩選仍保有可還位的站點。</p>
-      <div v-if="returnStations.length" class="grid gap-1.5">
+      <div v-if="returnStations.length" class="mt-2 grid gap-1.5">
         <button v-for="option in returnStations" :key="option.stationId" class="flex w-full items-center justify-between gap-2 rounded-md border border-line bg-panel px-2 py-2 text-left text-base text-ink transition-colors hover:border-accent-strong hover:bg-surface" type="button" @click="emit('select', option.stationId)">
           <span class="grid min-w-0 gap-0.5"><b class="truncate">{{ option.name }}</b><small class="text-base text-muted">{{ option.distanceMeters }}m · {{ option.district }}</small></span>
           <strong class="shrink-0 font-mono text-base text-info">{{ option.availableDocks }} 位</strong>
         </button>
       </div>
-      <p v-else class="text-base text-muted">600m 內暫無穩定可還位站點，請改由調度人員處理。</p>
-      <small class="mt-2 block text-base leading-6 text-muted">距離為直線估算，實際引導仍須依道路與現場狀態確認。</small>
+      <p v-else class="mt-2 text-base text-muted">600m 內沒有合適的替代站。</p>
     </section>
 
     <DisclosurePanel v-if="!isLive" class="mt-3 rounded-md border border-line" title="最近 6 小時庫存趨勢">
@@ -233,11 +232,12 @@ onBeforeUnmount(() => {
       </div>
     </DisclosurePanel>
 
-    <div class="mt-4 grid gap-2">
-      <p class="m-0 text-base font-extrabold text-ink">{{ isLive ? '即時與基線判讀' : '模型判讀依據' }}</p>
-      <span v-for="reason in forecast?.reasons" :key="reason" class="flex items-start gap-1.5 text-base leading-6 text-muted"><Icon class="mt-0.5 shrink-0 text-lg text-accent-strong" icon="solar:check-read-outline" /> {{ reason }}</span>
-      <span v-for="flag in station.qualityFlags" :key="flag" class="flex items-start gap-1.5 text-base leading-6 text-warning"><Icon class="mt-0.5 shrink-0 text-lg" icon="solar:info-circle-outline" /> {{ flag }}</span>
-    </div>
+    <DisclosurePanel v-if="forecast?.reasons.length || station.qualityFlags.length" class="mt-3 rounded-md border border-line" title="判斷依據">
+      <div class="grid gap-2 p-3">
+        <span v-for="reason in forecast?.reasons" :key="reason" class="flex items-start gap-1.5 text-base leading-6 text-muted"><Icon class="mt-0.5 shrink-0 text-lg text-accent-strong" icon="solar:check-read-outline" /> {{ reason }}</span>
+        <span v-for="flag in station.qualityFlags" :key="flag" class="flex items-start gap-1.5 text-base leading-6 text-warning"><Icon class="mt-0.5 shrink-0 text-lg" icon="solar:info-circle-outline" /> {{ flag }}</span>
+      </div>
+    </DisclosurePanel>
     <NuxtLink v-if="!isLive" :to="detailTarget" class="mt-4 inline-flex items-center gap-1 text-base font-bold text-accent transition-colors hover:text-accent-strong">開啟完整站點視圖 <Icon class="text-lg" icon="solar:arrow-right-outline" /></NuxtLink>
   </aside>
   </div>

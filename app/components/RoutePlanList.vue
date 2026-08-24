@@ -34,8 +34,8 @@ function actionClasses(action: 'pickup' | 'dropoff' | 'mixed') {
   <section :class="embedded ? 'overflow-hidden border-0 bg-transparent shadow-none' : 'panel overflow-hidden'">
     <header v-if="!embedded" class="flex flex-col gap-3 border-b border-line p-4 sm:flex-row sm:items-start sm:justify-between">
       <div>
-        <p class="section-kicker text-base"><Icon icon="solar:routing-2-outline" /> 多站物流規劃</p>
-        <h2 class="m-0 mt-1 text-xl font-bold tracking-tight text-ink">{{ planning.routes.length }} 條啟發式建議路線</h2>
+        <p class="section-kicker text-base"><Icon icon="solar:routing-2-outline" /> 多站路線</p>
+        <h2 class="m-0 mt-1 text-xl font-bold tracking-tight text-ink">{{ planning.routes.length }} 條建議路線</h2>
       </div>
       <NuxtLink v-if="compact" :to="allRoutesTarget" class="text-link min-h-11 text-base">查看規劃 <Icon icon="solar:arrow-right-up-outline" /></NuxtLink>
     </header>
@@ -45,12 +45,12 @@ function actionClasses(action: 'pickup' | 'dropoff' | 'mixed') {
         <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div class="min-w-0">
             <span class="inline-flex items-center gap-2 text-base font-bold text-accent"><Icon icon="solar:streets-map-point-outline" /> 路線 {{ routeIndex + 1 }}</span>
-            <h3 class="m-0 mt-1 text-lg font-bold text-ink">{{ route.stops.length }} 站 · {{ route.taskCount }} 筆需求 · 搬運 {{ route.totalTransferBikes }} 台</h3>
+            <h3 class="m-0 mt-1 text-lg font-bold text-ink">{{ route.stops.length }} 站 · 搬運 {{ route.totalTransferBikes }} 台</h3>
           </div>
           <div class="flex flex-wrap gap-2 text-base text-muted sm:justify-end">
             <span class="rounded-md border border-line bg-panel-muted px-2 py-1">約 {{ route.totalDistanceKm.toFixed(1) }} km</span>
             <span class="rounded-md border border-line bg-panel-muted px-2 py-1">載量 {{ route.peakVehicleLoad }}/{{ route.vehicleCapacity }}</span>
-            <span class="rounded-md border border-line bg-panel-muted px-2 py-1">優先 {{ Math.round(route.highestPriorityScore) }}</span>
+            <span class="rounded-md border border-line bg-panel-muted px-2 py-1">{{ route.taskCount }} 筆需求 · 優先 {{ Math.round(route.highestPriorityScore) }}</span>
           </div>
         </div>
 
@@ -72,12 +72,10 @@ function actionClasses(action: 'pickup' | 'dropoff' | 'mixed') {
             </div>
           </li>
         </ol>
-
-        <p class="m-0 mt-3 flex items-start gap-2 text-base leading-6 text-muted"><Icon class="mt-1 shrink-0 text-lg text-info" icon="solar:info-circle-outline" />{{ route.reasons[0] }}</p>
       </article>
     </div>
     <div v-else class="flex min-h-24 items-center justify-center gap-2 p-4 text-center text-base font-semibold text-positive"><Icon class="text-lg" icon="solar:check-circle-outline" />目前沒有可行的搬運路線。</div>
 
-    <p v-if="planning.unplannedDispatches.length" class="m-0 border-t border-line bg-panel-muted p-4 text-base leading-6 text-muted"><Icon class="mr-1 inline text-warning" icon="solar:shield-warning-outline" />另有 {{ planning.unplannedDispatches.length }} 筆建議因容量、距離、座標或安全庫存限制未排入路線。</p>
+    <p v-if="planning.unplannedDispatches.length" class="m-0 border-t border-line bg-panel-muted p-4 text-base leading-6 text-muted"><Icon class="mr-1 inline text-warning" icon="solar:shield-warning-outline" />另有 {{ planning.unplannedDispatches.length }} 筆受距離、容量或安全量限制，未排入路線。</p>
   </section>
 </template>

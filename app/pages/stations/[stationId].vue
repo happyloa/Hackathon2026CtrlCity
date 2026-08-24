@@ -41,17 +41,17 @@ const canShowPrediction = computed(() => mode.value !== 'live' || (
 ))
 const unavailableForecastTitle = computed(() => {
   if (record.value?.station.serviceStatus === 'official_inactive') return '官方標示站點未啟用'
-  if (record.value?.station.serviceStatus === 'suspected_unavailable') return '站點服務狀態需人工確認'
-  return '尚未匹配歷史基線'
+  if (record.value?.station.serviceStatus === 'suspected_unavailable') return '服務狀態異常'
+  return '找不到歷史資料'
 })
 const unavailableForecastExplanation = computed(() => {
-  if (record.value?.station.serviceStatus !== 'operational') return '目前只呈現官方即時庫存，不產生 60 分鐘風險或數量預估；請依現場或官方資訊覆核。'
-  return '目前未對照到唯一的同站歷史資料，因此只呈現官方即時庫存，不推算未來數量。'
+  if (record.value?.station.serviceStatus !== 'operational') return '目前只顯示官方即時庫存，不做 60 分鐘預估。'
+  return '找不到可用的同站歷史資料，目前只顯示即時庫存。'
 })
 const stationDescription = computed(() => {
-  if (mode.value === 'historical_replay') return '這是歷史回放時點的庫存與風險資料，可用來解釋調度優先順序。'
+  if (mode.value === 'historical_replay') return '查看這個歷史時點的庫存與風險。'
   if (!canShowPrediction.value) return unavailableForecastExplanation.value
-  return '這是最新官方庫存結合同站歷史基線的 60 分鐘風險資料，可用來覆核即時調度優先順序。'
+  return '最新官方庫存與未來 60 分鐘站況。'
 })
 
 function retryDashboard() {
@@ -86,9 +86,9 @@ watch([mode, requestedAsOf], ([nextMode, nextAsOf]) => {
         <ForecastChart :history="record.history" :station-name="stationName" :capacity="record.station.totalDocks" :projections="chartProjections" />
       </section>
       <section class="panel overflow-hidden">
-        <div class="border-b border-line px-4 py-4 sm:px-5"><p class="section-kicker text-base">{{ mode === 'live' ? '即時庫存＋歷史基線' : '歷史資料推估' }}</p><h2 class="mt-2 text-xl font-bold tracking-tight">{{ mode === 'live' ? '60 分鐘風險細節' : '風險細節' }}</h2></div>
+        <div class="border-b border-line px-4 py-4 sm:px-5"><p class="section-kicker text-base">{{ mode === 'live' ? '即時預估' : '歷史預估' }}</p><h2 class="mt-2 text-xl font-bold tracking-tight">{{ mode === 'live' ? '60 分鐘站況' : '風險細節' }}</h2></div>
         <template v-if="canShowPrediction">
-          <div class="mx-4 mt-4 flex flex-wrap items-end gap-x-3 gap-y-1 rounded-lg bg-warning-surface p-4 text-warning sm:mx-5"><strong class="text-3xl leading-none">{{ Math.round((forecast?.riskScore || 0) * 100) }}</strong><span class="text-base font-semibold leading-6">風險指標／100（需人工覆核）</span></div>
+          <div class="mx-4 mt-4 flex flex-wrap items-end gap-x-3 gap-y-1 rounded-lg bg-warning-surface p-4 text-warning sm:mx-5"><strong class="text-3xl leading-none">{{ Math.round((forecast?.riskScore || 0) * 100) }}</strong><span class="text-base font-semibold leading-6">風險排序分／100</span></div>
           <dl class="grid grid-cols-2 gap-3 px-4 py-4 sm:px-5"><div class="rounded-lg border border-line p-3"><dt class="text-base font-semibold text-muted">預估可借車</dt><dd class="mt-1 text-2xl font-bold">{{ forecast?.predictedBikes }}</dd></div><div class="rounded-lg border border-line p-3"><dt class="text-base font-semibold text-muted">預估可還位</dt><dd class="mt-1 text-2xl font-bold">{{ forecast?.predictedDocks }}</dd></div></dl>
         </template>
         <template v-else>

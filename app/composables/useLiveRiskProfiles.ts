@@ -193,11 +193,11 @@ function makeForecast(
   emptyRisk = clamp(emptyRisk)
   fullRisk = clamp(fullRisk)
   const riskScore = Math.max(emptyRisk, fullRisk)
-  const reasons = [`已將官方即時庫存與同站、同時段歷史基線比對（${sampleSize} 筆樣本）。`]
+  const reasons = [`已比對同站、同時段的 ${sampleSize} 筆歷史資料。`]
   if (station.availableBikes <= lowThreshold) reasons.push('目前可借車偏低。')
   if (station.availableDocks <= lowThreshold) reasons.push('目前可還位偏低。')
-  if (momentum) reasons.push('已納入本頁約 30 分鐘的庫存變化。')
-  if (reasons.length === 1) reasons.push('目前庫存與歷史基線型態穩定。')
+  if (momentum) reasons.push('已納入最近約 30 分鐘的庫存變化。')
+  if (reasons.length === 1) reasons.push('目前站況穩定。')
 
   return {
     targetAt: targetAt(observedAt, horizon),
@@ -387,13 +387,13 @@ export function useLiveRiskProfiles() {
 
         for (const horizon of HORIZONS) {
           if (station.serviceStatus !== 'operational') {
-            horizons[horizon] = inventoryOnlyForecast(station, horizon, '來源顯示疑似服務異常，需人工確認；不產生未來庫存風險。', 'not_applicable', observedAt)
+            horizons[horizon] = inventoryOnlyForecast(station, horizon, '服務狀態異常，不做未來預估。', 'not_applicable', observedAt)
             continue
           }
           const profile = historicalIndex === null ? null : slots[horizon]?.profiles[historicalIndex] || null
           horizons[horizon] = profile
             ? makeForecast(station, profile, horizon, profileManifest.riskPolicy.alertThresholds[horizon], momentum, observedAt)
-            : inventoryOnlyForecast(station, horizon, '未對照到唯一且有樣本的歷史站點基線；僅顯示即時庫存。', 'unmatched', observedAt)
+            : inventoryOnlyForecast(station, horizon, '找不到可用的歷史資料，目前只顯示即時庫存。', 'unmatched', observedAt)
         }
         results.set(station.id, horizons)
         rememberSnapshot(station, observedAt)
@@ -411,7 +411,7 @@ export function useLiveRiskProfiles() {
       }
       error.value = ''
     } catch (caught) {
-      error.value = caught instanceof Error ? caught.message : '無法載入歷史基線，因此只顯示即時庫存。'
+      error.value = caught instanceof Error ? caught.message : '歷史資料載入失敗，目前只顯示即時庫存。'
       const notApplicableStations = stations.filter(station => station.serviceStatus !== 'operational').length
       coverage.value = {
         asOf: observedAt,
@@ -426,9 +426,9 @@ export function useLiveRiskProfiles() {
       }
       for (const station of stations) {
         results.set(station.id, {
-          '30': inventoryOnlyForecast(station, '30', '歷史基線暫時無法載入；僅顯示即時庫存。', station.serviceStatus === 'operational' ? 'unmatched' : 'not_applicable', observedAt),
-          '60': inventoryOnlyForecast(station, '60', '歷史基線暫時無法載入；僅顯示即時庫存。', station.serviceStatus === 'operational' ? 'unmatched' : 'not_applicable', observedAt),
-          '120': inventoryOnlyForecast(station, '120', '歷史基線暫時無法載入；僅顯示即時庫存。', station.serviceStatus === 'operational' ? 'unmatched' : 'not_applicable', observedAt),
+          '30': inventoryOnlyForecast(station, '30', '歷史資料暫時無法載入，目前只顯示即時庫存。', station.serviceStatus === 'operational' ? 'unmatched' : 'not_applicable', observedAt),
+          '60': inventoryOnlyForecast(station, '60', '歷史資料暫時無法載入，目前只顯示即時庫存。', station.serviceStatus === 'operational' ? 'unmatched' : 'not_applicable', observedAt),
+          '120': inventoryOnlyForecast(station, '120', '歷史資料暫時無法載入，目前只顯示即時庫存。', station.serviceStatus === 'operational' ? 'unmatched' : 'not_applicable', observedAt),
         })
       }
     }

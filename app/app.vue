@@ -2,15 +2,15 @@
 const socialImage = '/og.png'
 
 useSeoMeta({
-  title: '新北市 YouBike 調度工作台',
-  description: '新北市公共自行車站點庫存、風險與調度決策支援',
-  ogTitle: '新北市 YouBike 調度工作台',
-  ogDescription: '以即時站況、歷史基線與多站路線規劃協助檢視庫存風險。',
+  title: '新北市 YouBike 營運工作台',
+  description: '掌握即時站況、未來風險與多站搬運路線',
+  ogTitle: '新北市 YouBike 營運工作台',
+  ogDescription: '掌握即時站況、未來風險與多站搬運路線。',
   ogImage: socialImage,
-  ogImageAlt: '新北市 YouBike 調度工作台',
+  ogImageAlt: '新北市 YouBike 營運工作台',
   twitterCard: 'summary_large_image',
-  twitterTitle: '新北市 YouBike 調度工作台',
-  twitterDescription: '新北市站點庫存與調度決策支援。',
+  twitterTitle: '新北市 YouBike 營運工作台',
+  twitterDescription: '即時站況、未來風險與搬運路線。',
   twitterImage: socialImage,
 })
 </script>

@@ -2,11 +2,10 @@
 import { Icon } from '@iconify/vue'
 
 const route = useRoute()
-const isDark = ref(false)
 
 const navigation = [
-  { to: '/', label: '調度中心', icon: 'solar:radar-2-outline' },
-  { to: '/alerts', label: '全部風險', icon: 'solar:danger-triangle-outline' },
+  { to: '/', label: '營運總覽', icon: 'solar:radar-2-outline' },
+  { to: '/stations', label: '站點總覽', icon: 'solar:map-point-wave-outline' },
   { to: '/dispatch', label: '調度規劃', icon: 'solar:routing-2-outline' },
 ]
 
@@ -17,24 +16,6 @@ const navigationQuery = computed(() => Object.fromEntries(
     .filter((entry): entry is [string, string] => typeof entry[1] === 'string' && Boolean(entry[1])),
 ))
 const navigationTarget = (path: string) => ({ path, query: navigationQuery.value })
-
-function applyTheme() {
-  document.documentElement.dataset.theme = isDark.value ? 'dark' : 'light'
-  localStorage.setItem('yb-ops-theme', isDark.value ? 'dark' : 'light')
-  document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
-    ?.setAttribute('content', isDark.value ? '#09090b' : '#fafafa')
-}
-
-function toggleTheme() {
-  isDark.value = !isDark.value
-  applyTheme()
-}
-
-onMounted(() => {
-  const savedTheme = localStorage.getItem('yb-ops-theme')
-  isDark.value = savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)
-  applyTheme()
-})
 </script>
 
 <template>
@@ -45,7 +26,7 @@ onMounted(() => {
           <span class="grid size-10 shrink-0 place-items-center rounded-lg border border-line bg-surface text-xl text-accent"><Icon icon="solar:wheel-angle-outline" /></span>
           <span class="min-w-0">
             <strong class="block truncate text-lg leading-6">新北市 YouBike</strong>
-            <span class="block text-base leading-6 text-muted">調度工作台</span>
+            <span class="block text-base leading-6 text-muted">營運工作台</span>
           </span>
         </NuxtLink>
       </div>
@@ -71,8 +52,8 @@ onMounted(() => {
         <div class="flex items-start gap-3">
           <span class="mt-2 size-2 shrink-0 rounded-full bg-positive" aria-hidden="true" />
           <div>
-            <span class="block text-base text-muted">資料範圍</span>
-            <strong class="mt-1 block text-base leading-6">即時站況／歷史基線</strong>
+            <span class="block text-base text-muted">資料狀態</span>
+            <strong class="mt-1 block text-base leading-6">官方即時站況</strong>
           </div>
         </div>
         <p class="mt-4 text-base leading-6 text-muted">平台提供分析與路線建議，不會送出派車命令。</p>
@@ -83,15 +64,11 @@ onMounted(() => {
       <header class="border-b border-line bg-canvas">
         <div class="mx-auto flex w-full max-w-screen-2xl flex-col gap-3 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8 lg:py-5">
           <div class="min-w-0">
-            <p class="inline-flex items-center gap-2 text-base font-semibold tracking-wide text-accent">公共自行車營運調度</p>
+            <p class="inline-flex items-center gap-2 text-base font-semibold tracking-wide text-accent">新北市公共自行車</p>
             <h1 class="mt-1 text-2xl font-bold tracking-tight">{{ activeLabel }}</h1>
           </div>
           <div class="flex flex-wrap items-center gap-2">
-            <span class="inline-flex min-h-11 items-center gap-2 rounded-lg bg-surface px-3 text-base font-semibold text-muted"><Icon class="text-xl text-accent" icon="solar:map-point-outline" /> 新北市服務範圍</span>
-            <button class="inline-flex min-h-11 items-center gap-2 rounded-lg border border-line bg-panel px-3 text-base font-semibold text-ink transition-colors hover:bg-surface" type="button" :aria-pressed="isDark" :aria-label="isDark ? '切換為淺色模式' : '切換為深色模式'" @click="toggleTheme">
-              <Icon class="text-xl text-accent" :icon="isDark ? 'solar:sun-2-outline' : 'solar:moon-outline'" />
-              <span>{{ isDark ? '淺色模式' : '深色模式' }}</span>
-            </button>
+            <span class="inline-flex min-h-11 items-center gap-2 rounded-lg bg-surface px-3 text-base font-semibold text-muted"><Icon class="text-xl text-accent" icon="solar:map-point-outline" /> 新北市</span>
           </div>
         </div>
       </header>

@@ -138,21 +138,21 @@ function fallbackForecast(station: LiveStation, horizon: HorizonKey, observedAt:
     baselineCoverage: station.serviceStatus === 'operational' ? 'unmatched' : 'not_applicable',
     method: 'inventory_only',
     sampleSize: 0,
-    reasons: ['尚未取得歷史基線；僅顯示即時庫存。'],
+    reasons: ['尚未取得歷史資料，目前只顯示即時庫存。'],
   }
 }
 
 function qualityFlagsFor(station: LiveStation, forecasts: Record<HorizonKey, Forecast>) {
   const flags: string[] = []
   if (station.serviceStatus === 'official_inactive') {
-    flags.push('官方資料 act=0，標示為停用；不納入預測或調度。')
+    flags.push('官方標示停用，已排除預測與路線。')
   } else if (station.serviceStatus === 'suspected_unavailable') {
-    flags.push('可借車與可還位皆為 0，疑似服務或資料異常；不納入調度規劃。')
+    flags.push('可借與可還都是 0，可能是服務或資料異常；已排除路線。')
   }
   if (station.serviceStatus === 'operational' && forecasts['60'].baselineStatus === 'unmatched') {
-    flags.push('未對照到唯一的歷史站點基線；未產生未來風險。')
+    flags.push('找不到可用的歷史資料，不做 60 分鐘預估。')
   }
-  if (station.capacityGap !== 0) flags.push('即時庫存與總車柱未完全相符，請依官方資料覆核。')
+  if (station.capacityGap !== 0) flags.push('庫存與總車柱不一致，請以官方資料為準。')
   return flags
 }
 
@@ -230,11 +230,11 @@ function createLiveDashboard(
         unavailableRate: stations.length ? summary.unavailableNow / stations.length : 0,
         capacityMismatchRate: stations.length ? stations.filter(station => station.capacityGap !== 0).length / stations.length : 0,
         notes: [
-          '資料來源：新北市政府 Open Data；官方資料更新後才替換畫面。',
+          '資料來源：新北市政府 Open Data。',
           riskPolicy
-            ? '60 分鐘為主要判讀窗：即時庫存會與同站歷史時段基線比對；風險指標不是校準後事件機率，需人工覆核。'
-            : '歷史基線暫不可用，僅顯示即時庫存。',
-          '平台只提供風險分析與路線建議，不會送出真實車隊命令。',
+            ? '用即時庫存和同站歷史資料估算 60 分鐘站況；分數只用來排序。'
+            : '歷史資料暫不可用，目前只顯示即時庫存。',
+          '平台只提供分析與路線建議，不會派車。',
         ],
       },
     },

@@ -272,8 +272,8 @@ function normalizeDispatch(raw, alerts) {
     distanceKm: Math.max(0, round(number(source.distanceKm), 2)),
     priorityScore: Math.max(0, Math.min(100, number(source.priorityScore, priority === 'high' ? 90 : priority === 'medium' ? 65 : 45))),
     reasons: rationale ? [rationale] : [operation === 'remove_bikes'
-      ? '依據滿站風險、可還位與距離提供人工覆核用的移車建議。'
-      : '依據缺車風險、可借車與距離提供人工覆核用的補車建議。'],
+      ? '依滿站風險、可還位與距離提出移車建議。'
+      : '依缺車風險、可借車與距離提出補車建議。'],
     status: 'proposed',
     requiresOperatorReview: true,
   }
@@ -296,7 +296,7 @@ function briefingFacts(rawFacts, summary, alerts, dispatches) {
   return [
     { label: '60 分鐘高風險站', value: summary.highRiskNext60m },
     { label: '待處理告警', value: alerts.length },
-    { label: '待人工覆核調度', value: dispatches.length },
+    { label: '搬運建議', value: dispatches.length },
   ]
 }
 

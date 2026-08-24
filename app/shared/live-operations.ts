@@ -224,7 +224,7 @@ function actionableAlert(
         scoreParts: { forecast: 0, current: 0, gap: 0, quality: 0 },
         dispatchEligible: false,
         status: 'open',
-        reasons: ['站點目前不是可確認的正常營運狀態，需先由值班人員覆核，不自動產生調度任務。'],
+        reasons: ['服務狀態異常，已排除預測與路線。'],
       },
     }
   }
@@ -267,8 +267,8 @@ function actionableAlert(
   const reason = currentFailure
     ? `${timingLabel}${inventoryLabel}已為 0，低於 ${safetyStock} 的安全庫存。`
     : gap > 0
-      ? `${timingLabel}${inventoryLabel}為 ${Math.round(inventory)}，低於 ${safetyStock} 的安全庫存；風險分數為 ${Math.round(riskScore * 100)}／100。`
-      : `${timingLabel}${inventoryLabel}為 ${Math.round(inventory)}；風險分數 ${Math.round(riskScore * 100)}／100 已達告警門檻，但預測庫存尚未低於安全庫存。`
+      ? `${timingLabel}${inventoryLabel}為 ${Math.round(inventory)}，低於安全量 ${safetyStock}。`
+      : `${timingLabel}${inventoryLabel}為 ${Math.round(inventory)}，風險已達提醒門檻。`
   const score = scoreAlertPriority({
     riskScore,
     currentFailure,
@@ -543,8 +543,8 @@ export function buildLiveOperations(
     const allocationReason = !eligibleAlertIds.has(task.alert.id)
       ? `未找到 ${policy.maximumDistanceKm} 公里內、保留安全庫存後仍有${resource}的可行站點。`
       : allocated > 0
-        ? `已優先分配 ${allocated} 輛，剩餘 ${remainingGap} 輛缺口需由值班人員覆核。`
-        : '可用供給已優先配置給風險較高或距離較短的任務，請人工覆核。'
+        ? `已安排 ${allocated} 輛，剩餘 ${remainingGap} 輛沒有排入建議。`
+        : '可用供給已優先留給風險較高或距離較近的站點。'
     task.alert = {
       ...task.alert,
       reasons: [...task.alert.reasons, allocationReason],

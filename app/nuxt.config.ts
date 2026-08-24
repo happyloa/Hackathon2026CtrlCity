@@ -22,15 +22,11 @@ export default defineNuxtConfig({
   },
   app: {
     head: {
-      title: '新北市 YouBike 調度工作台',
+      title: '新北市 YouBike 營運工作台',
       meta: [
-        { name: 'description', content: '新北市公共自行車站點庫存、風險與調度決策支援' },
-        { name: 'theme-color', content: '#fafafa' },
+        { name: 'description', content: '掌握即時站況、未來風險與多站搬運路線' },
+        { name: 'theme-color', content: '#09090b' },
       ],
-      script: [{
-        id: 'theme-init',
-        innerHTML: `(function(){try{var saved=localStorage.getItem('yb-ops-theme');var dark=saved==='dark'||(!saved&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=dark?'dark':'light';document.querySelector('meta[name="theme-color"]')?.setAttribute('content',dark?'#09090b':'#fafafa')}catch(_){}})()`,
-      }],
       link: [
         { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
       ],

@@ -31,7 +31,7 @@ let activeController: AbortController | null = null
 let requestSequence = 0
 const reviewContextKey = computed(() => JSON.stringify({
   asOf: props.asOf,
-  district: props.district || '新北市',
+  district: props.district || '全新北市',
   horizon: props.horizon,
   summary: {
     recommendedMoves: props.summary.recommendedMoves,
@@ -69,7 +69,7 @@ async function requestReview() {
       signal: controller.signal,
       body: JSON.stringify({
         asOf: props.asOf,
-        district: props.district || '新北市',
+        district: props.district || '全新北市',
         horizonMinutes: Number(props.horizon),
         summary: {
           recommendedMoves: props.summary.recommendedMoves,
@@ -91,16 +91,16 @@ async function requestReview() {
     try {
       payload = JSON.parse(responseText)
     } catch {
-      throw new Error(response.ok ? 'AWS AgentCore 回傳格式無法讀取。' : 'AWS AgentCore 暫時無法產生分析說明。')
+      throw new Error(response.ok ? 'AI 回覆格式有誤。' : 'AI 說明暫時無法使用。')
     }
     if (sequence !== requestSequence) return
-    if (!response.ok || !validReview(payload)) throw new Error('AWS AgentCore 暫時無法產生分析說明。')
+    if (!response.ok || !validReview(payload)) throw new Error('AI 說明暫時無法使用。')
     result.value = payload.data
   } catch (cause) {
     if (sequence !== requestSequence) return
     error.value = cause instanceof DOMException && cause.name === 'AbortError'
-      ? '分析說明逾時，請稍後再試。'
-      : cause instanceof Error ? cause.message : '分析說明暫時無法使用。'
+      ? '等候時間過久，請再試一次。'
+      : cause instanceof Error ? cause.message : 'AI 說明暫時無法使用。'
   } finally {
     window.clearTimeout(timeout)
     if (sequence === requestSequence) {
@@ -129,13 +129,12 @@ onBeforeUnmount(() => {
   <section v-if="enabled" class="mb-4 rounded-lg border border-line border-l-4 border-l-accent bg-panel-muted p-4" aria-labelledby="agent-review-title">
     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <p class="section-kicker text-base"><Icon icon="solar:chat-round-dots-outline" /> AWS AgentCore 說明</p>
-        <h2 id="agent-review-title" class="m-0 mt-1 text-lg font-bold text-ink">AI 風險分析說明</h2>
-        <p class="m-0 mt-2 text-base leading-6 text-muted">只解釋畫面上的摘要事實；Agent 不重算風險、不確認案件，也不會自動派車。</p>
+        <p class="section-kicker text-base"><Icon icon="solar:chat-round-dots-outline" /> AWS AgentCore</p>
+        <h2 id="agent-review-title" class="m-0 mt-1 text-lg font-bold text-ink">AI 站況摘要</h2>
       </div>
       <button type="button" class="inline-flex min-h-11 w-full shrink-0 items-center justify-center gap-2 rounded-md border border-accent bg-accent px-3 text-base font-bold text-on-accent transition-colors hover:bg-accent-strong sm:w-auto" :disabled="pending" @click="requestReview">
         <Icon :icon="pending ? 'svg-spinners:3-dots-fade' : 'solar:chat-round-check-outline'" />
-        {{ pending ? '產生中' : (result ? '重新產生' : '產生說明') }}
+        {{ pending ? '整理中' : (result ? '重新整理' : '產生摘要') }}
       </button>
     </div>
 
