@@ -165,8 +165,8 @@ function selectStation(stationId: string) {
       </div>
     </section>
 
-    <section v-if="activeDashboard || sourceMode === 'live'" class="panel grid gap-4 p-4 sm:grid-cols-2 sm:p-5 xl:grid-cols-5">
-      <div class="min-w-0 sm:col-span-2 xl:col-span-1" role="group" aria-label="資料模式">
+    <section v-if="activeDashboard || sourceMode === 'live'" class="panel grid gap-4 p-4 sm:grid-cols-2 sm:p-5 lg:grid-cols-3 2xl:grid-cols-5">
+      <div class="min-w-0 sm:col-span-2 2xl:col-span-2" role="group" aria-label="資料模式">
         <span class="block text-base font-semibold text-muted">工作模式</span>
         <div class="mt-1 grid grid-cols-2 gap-1 rounded-lg border border-line bg-surface p-1">
           <button class="inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-2 text-base font-semibold transition-colors" :class="sourceMode === 'live' ? 'bg-accent text-on-accent shadow-sm' : 'text-muted hover:bg-panel hover:text-ink'" type="button" :aria-pressed="sourceMode === 'live'" @click="sourceMode = 'live'"><Icon class="shrink-0 text-xl" icon="solar:bolt-circle-outline" /><span>即時調度</span></button>
@@ -198,7 +198,7 @@ function selectStation(stationId: string) {
           {{ livePending ? '比對中' : '立即更新' }}
         </button>
       </div>
-      <div class="flex items-start gap-2 text-base leading-6 text-muted sm:col-span-2 xl:col-span-5" role="status" aria-live="polite">
+      <div class="flex items-start gap-2 text-base leading-6 text-muted sm:col-span-2 lg:col-span-3 2xl:col-span-5" role="status" aria-live="polite">
         <Icon class="mt-1 shrink-0 text-xl text-accent" :icon="sourceMode === 'live' ? 'solar:refresh-circle-outline' : 'solar:shield-warning-outline'" />
         {{ sourceMode === 'live'
           ? (liveProfileError ? '歷史基線暫時無法載入，僅顯示即時庫存；按立即更新即可重新比對。' : (liveUpdateState === 'updated' ? '官方資料已更新，畫面已同步。' : liveComparisonStatus))
