@@ -1,7 +1,9 @@
 @import "tailwindcss";
 
 @theme inline {
-  --font-sans: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", ui-sans-serif, system-ui, sans-serif;
+  --font-sans:
+    "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", ui-sans-serif,
+    system-ui, sans-serif;
   --color-canvas: var(--canvas);
   --color-surface: var(--surface);
   --color-panel: var(--panel);
@@ -49,45 +51,158 @@
 }
 
 @layer base {
-  html { @apply min-w-80 bg-canvas font-sans text-base text-ink antialiased; }
-  body { @apply m-0 min-w-80 bg-canvas leading-6; }
-  #__nuxt { @apply min-h-svh; }
-  button, input { font: inherit; }
-  button:not(:disabled), [role='button'] { @apply cursor-pointer; }
-  button:disabled { @apply cursor-not-allowed opacity-60; }
-  a { @apply text-inherit; }
-  button:focus-visible, a:focus-visible, input:focus-visible { @apply outline-2 outline-offset-2 outline-accent; }
+  html {
+    @apply min-w-80 bg-canvas font-sans text-base text-ink antialiased;
+  }
+  body {
+    @apply m-0 min-w-80 bg-canvas leading-6;
+  }
+  #__nuxt {
+    @apply min-h-svh;
+  }
+  button,
+  input {
+    font: inherit;
+  }
+  button:not(:disabled),
+  [role="button"] {
+    @apply cursor-pointer;
+  }
+  button:disabled {
+    @apply cursor-not-allowed opacity-60;
+  }
+  a {
+    @apply text-inherit;
+  }
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible {
+    @apply outline-2 outline-offset-2 outline-accent;
+  }
 }
 
 @layer components {
-  .panel { @apply rounded-xl border border-line bg-panel shadow-sm; }
-  .section-kicker, .eyebrow { @apply inline-flex items-center gap-1.5 text-base font-semibold tracking-wide text-accent; }
-  .text-link { @apply inline-flex items-center gap-1 font-semibold text-accent transition-colors hover:text-accent-strong; }
-  .loading-board { @apply flex min-h-48 items-center justify-center gap-2 rounded-xl border border-line bg-panel p-6 text-center font-semibold text-muted; }
-  .error-board { @apply border-danger bg-danger-surface text-danger; }
-  .live-inline-error { @apply flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-warning bg-warning-surface px-3 py-2 text-base font-semibold text-warning; }
+  .panel {
+    @apply rounded-xl border border-line bg-panel shadow-sm;
+  }
+  .section-kicker,
+  .eyebrow {
+    @apply inline-flex items-center gap-1.5 text-base font-semibold tracking-wide text-accent;
+  }
+  .text-link {
+    @apply inline-flex items-center gap-1 font-semibold text-accent transition-colors hover:text-accent-strong;
+  }
+  .loading-board {
+    @apply flex min-h-48 items-center justify-center gap-2 rounded-xl border border-line bg-panel p-6 text-center font-semibold text-muted;
+  }
+  .error-board {
+    @apply border-danger bg-danger-surface text-danger;
+  }
+  .live-inline-error {
+    @apply flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-warning bg-warning-surface px-3 py-2 text-base font-semibold text-warning;
+  }
 }
 
-* { scrollbar-color: var(--line-strong) var(--surface); scrollbar-width: thin; }
-*::-webkit-scrollbar { width: 0.25rem; height: 0.25rem; }
-*::-webkit-scrollbar-track { background: var(--surface); }
-*::-webkit-scrollbar-thumb { background: var(--line-strong); border: 0; border-radius: 9999px; }
-*::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+* {
+  scrollbar-color: var(--line-strong) var(--surface);
+  scrollbar-width: thin;
+}
+*::-webkit-scrollbar {
+  width: 0.25rem;
+  height: 0.25rem;
+}
+*::-webkit-scrollbar-track {
+  background: var(--surface);
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border: 0;
+  border-radius: 9999px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+}
 
-.geographic-map .leaflet-container { min-height: inherit; height: 100%; background: var(--map); font-family: var(--font-sans); }
-.geographic-map .leaflet-control-zoom a { width: 2.25rem; height: 2.25rem; color: var(--ink); background: var(--panel); border-color: var(--line); font-size: 1.5rem; line-height: 2.125rem; }
-.geographic-map .leaflet-control-attribution { padding: 0.1875rem 0.375rem; color: var(--muted); background: color-mix(in srgb, var(--panel) 94%, transparent); font-size: 1rem; }
-.geographic-map .leaflet-control-attribution a { color: var(--accent-strong); font-weight: 700; }
-.geographic-map .leaflet-tooltip { padding: 0.5rem 0.625rem; color: var(--ink); background: var(--panel); border-color: var(--line-strong); border-radius: 0.5rem; box-shadow: none; font-size: 1rem; }
-.geographic-map .leaflet-tooltip strong, .geographic-map .leaflet-tooltip span { display: block; }
-.geographic-map .leaflet-tooltip span { margin-top: 0.1875rem; color: var(--muted); font-weight: 600; }
-.geographic-map .leaflet-tile-pane { filter: brightness(0.66) saturate(0.58); }
+.geographic-map .leaflet-container {
+  min-height: inherit;
+  height: 100%;
+  background: var(--map);
+  font-family: var(--font-sans);
+}
+.geographic-map .leaflet-control-zoom a {
+  width: 2.25rem;
+  height: 2.25rem;
+  color: var(--ink);
+  background: var(--panel);
+  border-color: var(--line);
+  font-size: 1.5rem;
+  line-height: 2.125rem;
+}
+.geographic-map .leaflet-control-attribution {
+  padding: 0.1875rem 0.375rem;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--panel) 94%, transparent);
+  font-size: 1rem;
+}
+.geographic-map .leaflet-control-attribution a {
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+.geographic-map .leaflet-tooltip {
+  padding: 0.5rem 0.625rem;
+  color: var(--ink);
+  background: var(--panel);
+  border-color: var(--line-strong);
+  border-radius: 0.5rem;
+  box-shadow: none;
+  font-size: 1rem;
+}
+.geographic-map .leaflet-tooltip strong,
+.geographic-map .leaflet-tooltip span {
+  display: block;
+}
+.geographic-map .leaflet-tooltip span {
+  margin-top: 0.1875rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+.geographic-map .leaflet-tile-pane {
+  filter: brightness(0.66) saturate(0.58);
+}
 
-.picker-enter-active, .picker-leave-active, .detail-drawer-enter-active, .detail-drawer-leave-active, .disclosure-enter-active, .disclosure-leave-active { transition: opacity 160ms ease, transform 160ms ease; }
-.picker-enter-from, .picker-leave-to, .detail-drawer-enter-from, .detail-drawer-leave-to, .disclosure-enter-from, .disclosure-leave-to { opacity: 0; }
-.picker-enter-from .modal-picker-dialog, .picker-leave-to .modal-picker-dialog { transform: translateY(0.75rem) scale(0.98); }
-.detail-drawer-enter-from .station-detail, .detail-drawer-leave-to .station-detail { transform: translateX(1rem); }
+.picker-enter-active,
+.picker-leave-active,
+.detail-drawer-enter-active,
+.detail-drawer-leave-active,
+.disclosure-enter-active,
+.disclosure-leave-active {
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease;
+}
+.picker-enter-from,
+.picker-leave-to,
+.detail-drawer-enter-from,
+.detail-drawer-leave-to,
+.disclosure-enter-from,
+.disclosure-leave-to {
+  opacity: 0;
+}
+.picker-enter-from .modal-picker-dialog,
+.picker-leave-to .modal-picker-dialog {
+  transform: translateY(0.75rem) scale(0.98);
+}
+.detail-drawer-enter-from .station-detail,
+.detail-drawer-leave-to .station-detail {
+  transform: translateX(1rem);
+}
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0ms !important; animation-duration: 0ms !important; }
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0ms !important;
+    animation-duration: 0ms !important;
+  }
 }
