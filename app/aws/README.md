@@ -6,14 +6,14 @@
 
 ```text
 CloudFront
-├─ 私有 S3：Nuxt dist、歷史回放、即時基線
+├─ 私有 S3：Nuxt dist、歷史基線
 └─ /api/* → HTTP API → Lambda
    ├─ GET  /api/health
    ├─ GET  /api/v1/live-stations → 新北市官方資料
    └─ POST /api/v1/agent-review → AgentCore Harness（選配）
 ```
 
-不建立 DynamoDB、排程 worker、SageMaker 或常駐向量資料庫。現有預測使用靜態歷史 artifact、官方即時快照與瀏覽器端可測試邏輯。
+不建立 DynamoDB、排程 worker、SageMaker 或常駐向量資料庫。現有預測使用靜態歷史基線、官方即時快照與可測試的前端邏輯。
 
 ## AgentCore
 

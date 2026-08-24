@@ -483,21 +483,22 @@ function metricRow(label, result) {
 function markdownFor(evaluation) {
   const validation = evaluation.validation.horizons
   const test = evaluation.test.horizons
-  return `# 歷史 × 即時庫存風險基線：時間切分評估
+  return `# 歷史風險基線評估
 
-本文件由 \`npm run model:evaluate\` 自動產生；原始 CSV 不會被複製或輸出至 Git。
+此檔由 \`npm run model:evaluate\` 產生；原始 CSV 不會進入 Git。
 
 ## 做法
 
-- 資料契約：\`${evaluation.model.version}\`。主要判讀窗為 **60 分鐘**：以當前站點庫存、前一個 30 分鐘桶的動量，以及「站點 × 半小時槽」的訓練期歷史空車／滿位率產生風險分數。此離線評估以歷史快照模擬當前庫存；正式即時模式才會將同一套基線與官方即時庫存逐站唯一對照。
-- 靜態 profile 只包含每站每半小時槽的樣本數、平均庫存與風險率；不包含原始 CSV、單筆快照或使用者資料。樣本數少於 ${SUFFICIENT_BASELINE_MIN_SAMPLES} 的對照會標記為基線覆蓋有限，${HIGH_CONFIDENCE_MIN_SAMPLES} 筆以上只表示歷史樣本較充足，不代表事件機率已校準。
-- 時間切分：訓練為 ${SPLITS.train.period}；閾值僅用 ${SPLITS.validation.period} 選擇；${SPLITS.test.period} 完全保留至最後測試。
-- 評估事件：預測未來 30／60／120 分鐘後，站點是否為「空車或滿位」。目前或目標時點同時無車且無位的疑似服務異常快照不納入此二元庫存事件評分，會另列排除量；現有歷史資料不足以確認其為停運。
-- 評估樣本：以站點規格化鍵的 SHA-256 取模固定抽樣，\`hash mod ${COHORT_MODULUS} = ${COHORT_REMAINDER}\`；本次涵蓋 ${evaluation.cohort.stationCount.toLocaleString()} 個站點。抽樣規則固定，重跑可重現。
+- 資料契約為 \`${evaluation.model.version}\`，主判讀窗為 **60 分鐘**。模型使用目前庫存、前一個 30 分鐘時槽的變化，以及同站歷史空／滿率。
+- 離線評估用歷史快照模擬即時庫存；網站則把同一套基線逐站對照官方即時資料。
+- 靜態基線只含樣本數、平均庫存與風險率，不含原始 CSV 或單筆快照。少於 ${SUFFICIENT_BASELINE_MIN_SAMPLES} 筆會標示樣本有限；${HIGH_CONFIDENCE_MIN_SAMPLES} 筆以上只代表資料較多，不代表機率已校準。
+- 時間切分：${SPLITS.train.period} 訓練、${SPLITS.validation.period} 選閾值、${SPLITS.test.period} 最後測試。
+- 目標是判斷 30／60／120 分鐘後是否空車或滿位。可借、可還皆為 0 的服務異常快照會排除，不當成庫存事件。
+- 以站點鍵的 SHA-256 固定抽樣 \`hash mod ${COHORT_MODULUS} = ${COHORT_REMAINDER}\`，共 ${evaluation.cohort.stationCount.toLocaleString()} 站；重跑可得到相同樣本。
 
 ## 驗證集：閾值選擇
 
-以 F1 最大化選擇每個預測視窗的警示閾值；同分時依序偏好較高 precision、較高 recall、較高閾值。
+各視窗選擇 F1 最高的閾值；同分時依序比較 precision、recall 與閾值。
 
 | 視窗 | 選定閾值 | F1 | Precision | Recall |
 | --- | ---: | ---: | ---: | ---: |
@@ -509,15 +510,15 @@ ${Object.entries(validation).map(([horizon, result]) => `| ${horizon} 分鐘 | $
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 ${Object.entries(test).map(([horizon, result]) => metricRow(`${horizon} 分鐘`, result)).join('\n')}
 
-60 分鐘視窗的保留測試：F1 **${percent(test['60'].inventoryIssue.f1)}**，precision **${percent(test['60'].inventoryIssue.precision)}**，recall **${percent(test['60'].inventoryIssue.recall)}**；共 ${test['60'].inventoryIssue.predictionCount.toLocaleString()} 筆可評估預測。
+60 分鐘保留測試共有 ${test['60'].inventoryIssue.predictionCount.toLocaleString()} 筆：F1 **${percent(test['60'].inventoryIssue.f1)}**、precision **${percent(test['60'].inventoryIssue.precision)}**、recall **${percent(test['60'].inventoryIssue.recall)}**。
 
 ## 限制與下一步
 
-- 這是可解釋的啟發式基線，不是經校準的機率模型；風險分數的 Brier score 與 log loss 已輸出在 JSON 供後續模型比較。
-- 訓練特徵刻意只使用 1 至 4 月資料，避免把 5、6 月資訊洩漏進驗證或測試。正式部署時應採滾動式重訓與相同的時間外測試。
-- 固定抽樣降低本機評估的記憶體成本；上線前應在可控的批次環境對全站點重跑，並依行政區、尖離峰與空車／滿位類型檢視公平性與誤差。
-- 保留測試會使用前一個歷史半小時桶，因此較接近頁面已開啟一段時間的 warm-start 情況；首次開啟即時頁時沒有頁面內動量，會採較保守的無動量判讀，後續應另行評估 cold-start 指標。
-- 本評估沒有使用天氣、活動、捷運班次、調度紀錄或即時事件特徵，亦未評估「服務不可用」的成因。這些資料可作為後續 Amazon SageMaker 模型的特徵與獨立標籤。
+- 這是可解釋的啟發式基線，不是校準後的機率模型。Brier score 與 log loss 留在 JSON 供後續比較。
+- 時間切分可避免資料洩漏；正式上線後仍需滾動重訓與時間外測試。
+- 固定抽樣是為了降低本機記憶體用量。上線前應重跑全站，並分行政區、尖離峰及空／滿類型檢查誤差。
+- 首次開頁沒有前一時槽的頁面內變化量，會採較保守的判讀；仍需另測 cold start。
+- 目前未納入天氣、活動、捷運班次、道路、調度紀錄或服務異常成因。
 `
 }
 
