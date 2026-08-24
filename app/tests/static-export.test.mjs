@@ -53,6 +53,15 @@ test('static export preserves dual-direction dispatches and shards live profiles
     const operations = new Set(replay.dispatches.map(dispatch => dispatch.operation))
     assert.ok(operations.has('deliver_bikes'))
     assert.ok(operations.has('remove_bikes'))
+    for (const alert of replay.alerts) {
+      assert.ok(Number.isFinite(alert.priorityScore) && alert.priorityScore >= 0 && alert.priorityScore <= 100)
+      assert.deepEqual(Object.keys(alert.scoreParts).sort(), ['current', 'forecast', 'gap', 'quality'])
+      assert.equal(typeof alert.dispatchEligible, 'boolean')
+      if (alert.condition === 'unavailable') {
+        assert.equal(alert.priorityScore, 0)
+        assert.equal(alert.dispatchEligible, false)
+      }
+    }
     for (const dispatch of replay.dispatches) {
       const alert = dispatch.alertId ? replay.alerts.find(candidate => candidate.id === dispatch.alertId) : null
       if (!alert) continue

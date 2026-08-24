@@ -7,12 +7,12 @@ const isDark = ref(false)
 const navigation = [
   { to: '/', label: '調度中心', icon: 'solar:radar-2-outline' },
   { to: '/alerts', label: '全部風險', icon: 'solar:danger-triangle-outline' },
-  { to: '/dispatch', label: '全部任務', icon: 'solar:routing-2-outline' },
+  { to: '/dispatch', label: '調度規劃', icon: 'solar:routing-2-outline' },
 ]
 
 const activeLabel = computed(() => navigation.find(item => item.to === route.path)?.label || '站點資訊')
 const navigationQuery = computed(() => Object.fromEntries(
-  ['mode', 'at', 'district']
+  ['district']
     .map(key => [key, route.query[key]])
     .filter((entry): entry is [string, string] => typeof entry[1] === 'string' && Boolean(entry[1])),
 ))
@@ -72,10 +72,10 @@ onMounted(() => {
           <span class="mt-2 size-2 shrink-0 rounded-full bg-positive" aria-hidden="true" />
           <div>
             <span class="block text-base text-muted">資料範圍</span>
-            <strong class="mt-1 block text-base leading-6">即時站況／歷史回放</strong>
+            <strong class="mt-1 block text-base leading-6">即時站況／歷史基線</strong>
           </div>
         </div>
-        <p class="mt-4 text-base leading-6 text-muted">庫存風險與調度建議均需由值班人員覆核。</p>
+        <p class="mt-4 text-base leading-6 text-muted">平台提供分析與路線建議，不會送出派車命令。</p>
       </div>
     </aside>
 

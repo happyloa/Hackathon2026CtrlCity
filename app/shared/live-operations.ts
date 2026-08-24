@@ -6,6 +6,12 @@ import {
   type HorizonKey,
   type StationRisk,
 } from './ops.ts'
+import {
+  DEFAULT_LIVE_OPERATION_POLICY as SHARED_DEFAULT_LIVE_OPERATION_POLICY,
+  alertDataQuality as sharedAlertDataQuality,
+  safetyStockFor as sharedSafetyStockFor,
+  scoreAlertPriority as sharedScoreAlertPriority,
+} from './operational-policy.mjs'
 
 export interface LiveOperationPolicy {
   horizon: HorizonKey
@@ -40,27 +46,25 @@ interface DispatchCandidate {
   distanceKm: number
   available: number
   competingRisk: number
-  score: number
 }
 
 type ActionableTask = AlertCandidate & { condition: ActionableCondition }
 
 interface DispatchEdge extends DispatchCandidate {
   task: ActionableTask
+  pairedTask: ActionableTask | null
   operation: DispatchOperation
   utility: number
 }
 
-export const DEFAULT_LIVE_OPERATION_POLICY: Readonly<LiveOperationPolicy> = Object.freeze({
-  horizon: '60',
-  safetyStockRatio: 0.15,
-  minimumSafetyStock: 2,
-  minimumTransferBikes: 1,
-  maximumTransferBikes: 8,
-  maximumDistanceKm: 8,
-  maximumAlerts: 80,
-  maximumDispatches: 16,
-})
+export interface AlertPriorityInput {
+  riskScore: number
+  currentFailure: boolean
+  gap: number
+  quality: number
+}
+
+export const DEFAULT_LIVE_OPERATION_POLICY: Readonly<LiveOperationPolicy> = SHARED_DEFAULT_LIVE_OPERATION_POLICY
 
 const SEVERITY_ORDER: Record<Alert['severity'], number> = {
   medium: 1,
@@ -121,12 +125,7 @@ export function safetyStockFor(
   station: Pick<StationRisk, 'totalDocks'>,
   options: Pick<Partial<LiveOperationPolicy>, 'safetyStockRatio' | 'minimumSafetyStock'> = {},
 ): number {
-  const policy = normalizedPolicy(options)
-  const capacity = Math.max(0, Math.round(finiteNumber(station.totalDocks)))
-  return Math.min(capacity, Math.max(
-    policy.minimumSafetyStock,
-    Math.ceil(capacity * policy.safetyStockRatio),
-  ))
+  return sharedSafetyStockFor(station, options)
 }
 
 function validCoordinates(station: StationRisk): station is StationRisk & { latitude: number, longitude: number } {
@@ -154,6 +153,19 @@ export function distanceKmBetween(left: StationRisk, right: StationRisk): number
 
 function alertThreshold(forecast: Forecast): number {
   return clamp(finiteNumber(forecast.alertThreshold, 0.45), 0, 1)
+}
+
+/**
+ * Convert independent operational signals into additive points. The returned
+ * parts are point contributions, so the UI can explain the total without
+ * presenting the model risk as a calibrated probability.
+ */
+export function scoreAlertPriority(input: AlertPriorityInput): Pick<Alert, 'priorityScore' | 'scoreParts'> {
+  return sharedScoreAlertPriority(input)
+}
+
+export function alertDataQuality(station: StationRisk, forecast: Forecast): number {
+  return sharedAlertDataQuality(station, forecast)
 }
 
 function severityFor(score: number, forecast: Forecast, currentFailure: boolean): Alert['severity'] {
@@ -208,6 +220,9 @@ function actionableAlert(
         startedAt: observedAt,
         durationMinutes: 0,
         riskScore,
+        priorityScore: 0,
+        scoreParts: { forecast: 0, current: 0, gap: 0, quality: 0 },
+        dispatchEligible: false,
         status: 'open',
         reasons: ['站點目前不是可確認的正常營運狀態，需先由值班人員覆核，不自動產生調度任務。'],
       },
@@ -220,11 +235,11 @@ function actionableAlert(
 
   if (station.currentState === 'empty_now') {
     condition = 'empty_now'
-    riskScore = Math.max(1, finiteNumber(forecast.emptyRisk))
+    riskScore = finiteNumber(forecast.emptyRisk)
     currentFailure = true
   } else if (station.currentState === 'full_now') {
     condition = 'full_now'
-    riskScore = Math.max(1, finiteNumber(forecast.fullRisk))
+    riskScore = finiteNumber(forecast.fullRisk)
     currentFailure = true
   } else {
     const emptyRisk = clamp(finiteNumber(forecast.emptyRisk), 0, 1)
@@ -254,6 +269,12 @@ function actionableAlert(
     : gap > 0
       ? `${timingLabel}${inventoryLabel}為 ${Math.round(inventory)}，低於 ${safetyStock} 的安全庫存；風險分數為 ${Math.round(riskScore * 100)}／100。`
       : `${timingLabel}${inventoryLabel}為 ${Math.round(inventory)}；風險分數 ${Math.round(riskScore * 100)}／100 已達告警門檻，但預測庫存尚未低於安全庫存。`
+  const score = scoreAlertPriority({
+    riskScore,
+    currentFailure,
+    gap,
+    quality: alertDataQuality(station, forecast),
+  })
 
   return {
     station,
@@ -269,6 +290,8 @@ function actionableAlert(
       startedAt: observedAt,
       durationMinutes: 0,
       riskScore,
+      ...score,
+      dispatchEligible: gap >= policy.minimumTransferBikes,
       status: 'open',
       reasons: [reason, ...forecast.reasons.slice(0, 2)],
     },
@@ -281,13 +304,37 @@ function operationFor(condition: ActionableCondition): DispatchOperation {
     : 'remove_bikes'
 }
 
+function conditionIsEmpty(condition: ActionableCondition): boolean {
+  return condition === 'empty_now' || condition === 'empty_forecast'
+}
+
+function conditionsAreComplementary(left: ActionableCondition, right: ActionableCondition): boolean {
+  return conditionIsEmpty(left) !== conditionIsEmpty(right)
+}
+
+function taskComesFirst(left: ActionableTask, right: ActionableTask): boolean {
+  return left.alert.priorityScore > right.alert.priorityScore
+    || (left.alert.priorityScore === right.alert.priorityScore && left.station.id.localeCompare(right.station.id) < 0)
+}
+
 function candidateRisk(station: StationRisk, operation: DispatchOperation, horizon: HorizonKey): number {
   const forecast = station.forecast.horizons[horizon]
   return clamp(operation === 'deliver_bikes' ? forecast.emptyRisk : forecast.fullRisk, 0, 1)
 }
 
-function candidateIsStable(station: StationRisk, operation: DispatchOperation, horizon: HorizonKey): boolean {
-  if (station.serviceStatus !== 'operational' || station.currentState !== 'normal') return false
+function candidateCanSupport(
+  station: StationRisk,
+  operation: DispatchOperation,
+  horizon: HorizonKey,
+  pairedTask: ActionableTask | undefined,
+): boolean {
+  if (station.serviceStatus !== 'operational' || station.currentState === 'unavailable') return false
+  if (pairedTask) {
+    return operation === 'deliver_bikes'
+      ? !conditionIsEmpty(pairedTask.condition)
+      : conditionIsEmpty(pairedTask.condition)
+  }
+  if (station.currentState !== 'normal') return false
   const forecast = station.forecast.horizons[horizon]
   if (forecast.baselineStatus !== 'matched') return false
   return candidateRisk(station, operation, horizon) < alertThreshold(forecast)
@@ -300,15 +347,17 @@ function candidateIsStable(station: StationRisk, operation: DispatchOperation, h
 function dispatchEdgesForTask(
   task: ActionableTask,
   stations: readonly StationRisk[],
-  taskStationIds: Set<string>,
+  taskByStationId: ReadonlyMap<string, ActionableTask>,
   policy: LiveOperationPolicy,
 ): DispatchEdge[] {
   const operation = operationFor(task.condition)
   const candidates: DispatchEdge[] = []
 
   for (const station of stations) {
-    if (station.id === task.station.id || taskStationIds.has(station.id)) continue
-    if (!candidateIsStable(station, operation, policy.horizon)) continue
+    if (station.id === task.station.id) continue
+    const pairedTask = taskByStationId.get(station.id)
+    if (pairedTask && (!conditionsAreComplementary(task.condition, pairedTask.condition) || !taskComesFirst(task, pairedTask))) continue
+    if (!candidateCanSupport(station, operation, policy.horizon, pairedTask)) continue
 
     const available = operation === 'deliver_bikes'
       ? Math.max(0, Math.floor(station.availableBikes - safetyStockFor(station, policy)))
@@ -318,56 +367,61 @@ function dispatchEdgesForTask(
     const distanceKm = distanceKmBetween(station, task.station)
     if (distanceKm === null || distanceKm > policy.maximumDistanceKm) continue
     const competingRisk = candidateRisk(station, operation, policy.horizon)
-    const score = distanceKm + competingRisk * 3
+    const fulfillmentRatio = task.gap > 0 ? Math.min(1, available / task.gap) : 0
     candidates.push({
       task,
+      pairedTask: pairedTask || null,
       operation,
       station,
       distanceKm,
       available,
       competingRisk,
-      score,
-      utility: priorityScore(task, distanceKm) * 100 - score * 10,
+      utility: dispatchPriorityScore(task, distanceKm) * 100
+        + fulfillmentRatio * 120
+        + (pairedTask ? 250 : 0)
+        - competingRisk * 10,
     })
   }
 
   return candidates
 }
 
-function priorityScore(task: AlertCandidate, distanceKm: number): number {
-  const value = task.alert.riskScore * 65
-    + Math.min(20, task.gap * 3)
-    + (task.currentFailure ? 15 : 0)
-    - Math.min(15, distanceKm * 1.5)
-  return rounded(clamp(value, 0, 100), 1)
+function dispatchPriorityScore(task: AlertCandidate, distanceKm: number): number {
+  const distancePenalty = Math.min(15, Math.max(0, distanceKm) * 1.5)
+  return rounded(clamp(task.alert.priorityScore - distancePenalty, 0, 100), 1)
 }
 
 function dispatchReasons(
   operation: DispatchOperation,
   task: AlertCandidate,
-  candidate: DispatchCandidate,
+  candidate: DispatchEdge,
   bikeCount: number,
-  candidateSafetyStock: number,
+  policy: LiveOperationPolicy,
 ): string[] {
   const source = operation === 'deliver_bikes' ? candidate.station : task.station
   const destination = operation === 'deliver_bikes' ? task.station : candidate.station
-  const inventoryReason = operation === 'deliver_bikes'
-    ? `供給站調度後仍保留至少 ${candidateSafetyStock} 輛可借車。`
-    : `接收站調度後仍保留至少 ${candidateSafetyStock} 個可還位。`
+  const sourceSafetyStock = safetyStockFor(source, policy)
+  const destinationSafetyStock = safetyStockFor(destination, policy)
+  const inventoryReason = `搬運後來源站仍保留至少 ${sourceSafetyStock} 輛可借車，目的站仍保留至少 ${destinationSafetyStock} 個可還位。`
+
+  const pairedReason = candidate.pairedTask
+    ? `此站對站搬運同時減輕「${displayStationName(task.station.name)}」與「${displayStationName(candidate.pairedTask.station.name)}」的相反庫存壓力。`
+    : `供需配對同時考量優先分數、可搬運量與站點距離。`
 
   return [
     `建議將 ${bikeCount} 輛由「${displayStationName(source.name)}」移至「${displayStationName(destination.name)}」，處理「${displayStationName(task.station.name)}」的 ${task.alert.condition} 告警。`,
     inventoryReason,
-    `兩站直線距離約 ${rounded(candidate.distanceKm, 1)} 公里；執行前仍需人工確認道路、載運與現場狀態。`,
+    pairedReason,
+    `兩站直線距離約 ${rounded(candidate.distanceKm, 1)} 公里；本平台未納入道路時間、車隊位置或班表。`,
   ]
 }
 
 /**
  * Produces a deterministic, side-effect-free live operations plan.
  *
- * Stable stations can support multiple same-direction dispatches in a plan.
- * Urgent stations are never reused as supply candidates, and every recommendation
- * preserves the configured bike or dock safety stock at the supporting station.
+ * Stable stations can support multiple same-direction dispatches. Complementary
+ * full/empty risks can be paired directly, and every recommendation preserves
+ * configured bike and dock safety stock at both endpoints.
  */
 export function buildLiveOperations(
   stations: readonly StationRisk[],
@@ -377,19 +431,28 @@ export function buildLiveOperations(
   if (!observedAt.trim()) throw new TypeError('observedAt must be a non-empty timestamp')
   const policy = normalizedPolicy(options)
   const orderedStations = [...stations].sort((left, right) => left.id.localeCompare(right.id))
-  const alertCandidates = orderedStations
+  const allAlertCandidates = orderedStations
     .map(station => actionableAlert(station, observedAt, policy))
     .filter((candidate): candidate is AlertCandidate => candidate !== null)
-    .sort((left, right) => SEVERITY_ORDER[right.alert.severity] - SEVERITY_ORDER[left.alert.severity]
+  const inventoryAlertCandidates = allAlertCandidates
+    .filter(candidate => candidate.condition !== 'unavailable')
+    .sort((left, right) => right.alert.priorityScore - left.alert.priorityScore
+      || SEVERITY_ORDER[right.alert.severity] - SEVERITY_ORDER[left.alert.severity]
       || right.alert.riskScore - left.alert.riskScore
       || Number(right.currentFailure) - Number(left.currentFailure)
       || right.gap - left.gap
       || left.station.id.localeCompare(right.station.id))
-    .slice(0, policy.maximumAlerts)
+  const serviceAlertCandidates = allAlertCandidates
+    .filter(candidate => candidate.condition === 'unavailable')
+    .sort((left, right) => left.station.id.localeCompare(right.station.id))
+  const alertCandidates = [...inventoryAlertCandidates, ...serviceAlertCandidates]
 
-  const actionableTasks = alertCandidates.filter((candidate): candidate is ActionableTask =>
-    candidate.condition !== 'unavailable' && candidate.gap >= policy.minimumTransferBikes)
-  const taskStationIds = new Set(actionableTasks.map(task => task.station.id))
+  const actionableTasks = inventoryAlertCandidates
+    .filter((candidate): candidate is ActionableTask => candidate.alert.dispatchEligible
+      && candidate.condition !== 'unavailable'
+      && candidate.gap >= policy.minimumTransferBikes)
+    .slice(0, policy.maximumAlerts)
+  const taskByStationId = new Map(actionableTasks.map(task => [task.station.id, task]))
   const bikeSupply = new Map(orderedStations.map(station => [
     station.id,
     Math.max(0, Math.floor(station.availableBikes - safetyStockFor(station, policy))),
@@ -398,65 +461,62 @@ export function buildLiveOperations(
     station.id,
     Math.max(0, Math.floor(station.availableDocks - safetyStockFor(station, policy))),
   ]))
-  const targetBikeSupply = new Map(actionableTasks.map(task => [
-    task.station.id,
-    Math.max(0, Math.floor(finiteNumber(task.station.availableBikes))),
-  ]))
-  const targetDockCapacity = new Map(actionableTasks.map(task => [
-    task.station.id,
-    Math.max(0, Math.floor(finiteNumber(task.station.availableDocks))),
-  ]))
   const remainingByAlertId = new Map(actionableTasks.map(task => [task.alert.id, task.gap]))
   const allocatedByAlertId = new Map<string, number>()
   const eligibleAlertIds = new Set<string>()
-  const stationRoles = new Map<string, DispatchOperation>()
+  const stationFlowRoles = new Map<string, 'source' | 'destination'>()
   const dispatches: DispatchRecommendation[] = []
 
   const edges = actionableTasks
-    .flatMap(task => dispatchEdgesForTask(task, orderedStations, taskStationIds, policy))
+    .flatMap(task => dispatchEdgesForTask(task, orderedStations, taskByStationId, policy))
     .sort((left, right) => right.utility - left.utility
-      || right.task.alert.riskScore - left.task.alert.riskScore
+      || right.task.alert.priorityScore - left.task.alert.priorityScore
       || left.distanceKm - right.distanceKm
       || left.task.station.id.localeCompare(right.task.station.id)
       || left.station.id.localeCompare(right.station.id))
 
   for (const edge of edges) {
-    if (dispatches.length >= policy.maximumDispatches) break
-    const { task, operation, station: candidate } = edge
-    eligibleAlertIds.add(task.alert.id)
+    eligibleAlertIds.add(edge.task.alert.id)
+    if (edge.pairedTask) eligibleAlertIds.add(edge.pairedTask.alert.id)
+  }
 
+  for (const edge of edges) {
+    if (dispatches.length >= policy.maximumDispatches) break
+    const { task, pairedTask, operation, station: candidate } = edge
     const remainingGap = remainingByAlertId.get(task.alert.id) ?? 0
     if (remainingGap < policy.minimumTransferBikes) continue
-    const assignedRole = stationRoles.get(candidate.id)
-    if (assignedRole && assignedRole !== operation) continue
+    const pairedRemainingGap = pairedTask
+      ? remainingByAlertId.get(pairedTask.alert.id) ?? 0
+      : Number.POSITIVE_INFINITY
+    if (pairedRemainingGap < policy.minimumTransferBikes) continue
 
-    const sourceAvailableBikes = operation === 'deliver_bikes'
-      ? bikeSupply.get(candidate.id) ?? 0
-      : targetBikeSupply.get(task.station.id) ?? 0
-    const destinationAvailableDocks = operation === 'deliver_bikes'
-      ? targetDockCapacity.get(task.station.id) ?? 0
-      : dockSupply.get(candidate.id) ?? 0
+    const fromStation = operation === 'deliver_bikes' ? candidate : task.station
+    const toStation = operation === 'deliver_bikes' ? task.station : candidate
+    const sourceRole = stationFlowRoles.get(fromStation.id)
+    const destinationRole = stationFlowRoles.get(toStation.id)
+    if (sourceRole === 'destination' || destinationRole === 'source') continue
+
+    const sourceAvailableBikes = bikeSupply.get(fromStation.id) ?? 0
+    const destinationAvailableDocks = dockSupply.get(toStation.id) ?? 0
     const bikeCount = Math.min(
       remainingGap,
+      pairedRemainingGap,
       policy.maximumTransferBikes,
       sourceAvailableBikes,
       destinationAvailableDocks,
     )
     if (bikeCount < policy.minimumTransferBikes) continue
-    const candidateSafetyStock = safetyStockFor(candidate, policy)
-    const fromStation = operation === 'deliver_bikes' ? candidate : task.station
-    const toStation = operation === 'deliver_bikes' ? task.station : candidate
 
-    if (operation === 'deliver_bikes') {
-      bikeSupply.set(candidate.id, sourceAvailableBikes - bikeCount)
-      targetDockCapacity.set(task.station.id, destinationAvailableDocks - bikeCount)
-    } else {
-      targetBikeSupply.set(task.station.id, sourceAvailableBikes - bikeCount)
-      dockSupply.set(candidate.id, destinationAvailableDocks - bikeCount)
-    }
-    stationRoles.set(candidate.id, operation)
+    bikeSupply.set(fromStation.id, sourceAvailableBikes - bikeCount)
+    dockSupply.set(toStation.id, destinationAvailableDocks - bikeCount)
+    stationFlowRoles.set(fromStation.id, 'source')
+    stationFlowRoles.set(toStation.id, 'destination')
     remainingByAlertId.set(task.alert.id, remainingGap - bikeCount)
     allocatedByAlertId.set(task.alert.id, (allocatedByAlertId.get(task.alert.id) ?? 0) + bikeCount)
+    if (pairedTask) {
+      remainingByAlertId.set(pairedTask.alert.id, pairedRemainingGap - bikeCount)
+      allocatedByAlertId.set(pairedTask.alert.id, (allocatedByAlertId.get(pairedTask.alert.id) ?? 0) + bikeCount)
+    }
 
     dispatches.push({
       id: dispatchId(observedAt, operation, policy.horizon, fromStation.id, toStation.id),
@@ -466,8 +526,8 @@ export function buildLiveOperations(
       toStationId: toStation.id,
       bikeCount,
       distanceKm: rounded(edge.distanceKm, 2),
-      priorityScore: priorityScore(task, edge.distanceKm),
-      reasons: dispatchReasons(operation, task, edge, bikeCount, candidateSafetyStock),
+      priorityScore: dispatchPriorityScore(task, edge.distanceKm),
+      reasons: dispatchReasons(operation, task, edge, bikeCount, policy),
       status: 'proposed',
       requiresOperatorReview: true,
     })

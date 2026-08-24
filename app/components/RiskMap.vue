@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
+import { safetyStockFor } from '~/shared/live-operations'
 import { displayStationName, type DataMode, type HorizonKey, type PredictionCoverage, type StationRisk } from '~/shared/ops'
 
 const props = defineProps<{
@@ -120,7 +121,7 @@ function markerStatus(station: StationRisk) {
   if (tone === 'service-review') {
     return station.serviceStatus === 'official_inactive'
       ? '官方標示停用（不納入調度）'
-      : '疑似服務異常（需確認）'
+      : '疑似服務異常（不納入調度）'
   }
   if (tone === 'inventory-only') return hasBaselineLoadError.value ? '基線暫不可用，僅顯示即時庫存' : '尚無歷史基線，僅顯示即時庫存'
   if (station.currentState === 'empty_now') return '目前無車可借'
@@ -132,7 +133,7 @@ function markerStatus(station: StationRisk) {
 
 function interventionGap(station: StationRisk) {
   const forecast = forecastFor(station)
-  const buffer = Math.max(2, Math.ceil(station.totalDocks * .35))
+  const buffer = safetyStockFor(station)
   const tone = markerTone(station)
   if (tone === 'empty-risk') return Math.max(1, buffer - Math.min(station.availableBikes, forecast.predictedBikes))
   if (tone === 'full-risk') return Math.max(1, buffer - Math.min(station.availableDocks, forecast.predictedDocks))
@@ -147,12 +148,18 @@ function tooltipContent(station: StationRisk) {
   const forecast = forecastFor(station)
   const tone = markerTone(station)
   const inventory = `可借 ${station.availableBikes}・可還 ${station.availableDocks}`
-  const direction = tone === 'empty-risk' ? `無車風險分數 ${Math.round(forecast.emptyRisk * 100)}／100，建議補車` : tone === 'full-risk'
-    ? `無位風險分數 ${Math.round(forecast.fullRisk * 100)}／100，建議移車`
+  const direction = station.currentState === 'empty_now'
+    ? '官方即時：目前無車可借'
+    : station.currentState === 'full_now'
+      ? '官方即時：目前無位可還'
+      : tone === 'empty-risk'
+        ? `${props.horizon} 分鐘缺車模型風險指標 ${Math.round(forecast.emptyRisk * 100)}／100`
+        : tone === 'full-risk'
+          ? `${props.horizon} 分鐘缺位模型風險指標 ${Math.round(forecast.fullRisk * 100)}／100`
+          : markerStatus(station)
+  const context = forecast.baselineStatus === 'matched' || station.currentState !== 'normal'
+    ? direction
     : markerStatus(station)
-  const context = forecast.baselineStatus === 'matched'
-    ? `${props.horizon} 分鐘 · ${direction}`
-    : direction
   return `<strong>${escapeHtml(displayStationName(station.name))}</strong><span>${escapeHtml(station.district || '新北市')}・${inventory}</span><span>${escapeHtml(context)}</span>`
 }
 
@@ -345,7 +352,7 @@ onBeforeUnmount(() => {
         <span v-if="showAllStations" class="inline-flex items-center gap-1.5 whitespace-nowrap"><i class="h-2.5 w-2.5 rounded-full border border-line-strong bg-accent" />已對照、暫無處理</span>
         <span class="inline-flex items-center gap-1.5 whitespace-nowrap"><i class="h-2.5 w-2.5 rounded-full border border-line-strong bg-danger" />補車優先｜無車／缺車風險</span>
         <span class="inline-flex items-center gap-1.5 whitespace-nowrap"><i class="h-2.5 w-2.5 rounded-full border border-line-strong bg-info" />移車優先｜無位／缺位風險</span>
-        <span class="inline-flex items-center gap-1.5 whitespace-nowrap"><i class="h-2.5 w-2.5 rounded-full border border-line-strong bg-muted" />{{ isLive ? '官方停用／服務待確認｜不納入調度' : '服務狀態待確認' }}</span>
+        <span class="inline-flex items-center gap-1.5 whitespace-nowrap"><i class="h-2.5 w-2.5 rounded-full border border-line-strong bg-muted" />{{ isLive ? '官方停用／服務異常｜不納入調度' : '服務狀態待查驗' }}</span>
         <span v-if="isLive && !hasBaselineLoadError && unmatchedBaselineCount" class="inline-flex items-center gap-1.5 whitespace-nowrap"><i class="h-2.5 w-2.5 rounded-full border border-line-strong bg-warning" />僅即時庫存｜未納入預估</span>
       </div>
     </div>

@@ -19,11 +19,6 @@ import type {
 export type LiveResponse = ApiEnvelope<LiveStationsPayload>
 type NtpRawStation = Record<string, unknown>
 
-type LiveActionState = {
-  acknowledgedAlertIds: string[]
-  acceptedDispatchIds: string[]
-}
-
 type LiveProfilePolicy = {
   riskPolicy: {
     version: string
@@ -152,7 +147,7 @@ function qualityFlagsFor(station: LiveStation, forecasts: Record<HorizonKey, For
   if (station.serviceStatus === 'official_inactive') {
     flags.push('官方資料 act=0，標示為停用；不納入預測或調度。')
   } else if (station.serviceStatus === 'suspected_unavailable') {
-    flags.push('可借車與可還位皆為 0，疑似服務異常，需人工確認。')
+    flags.push('可借車與可還位皆為 0，疑似服務或資料異常；不納入調度規劃。')
   }
   if (station.serviceStatus === 'operational' && forecasts['60'].baselineStatus === 'unmatched') {
     flags.push('未對照到唯一的歷史站點基線；未產生未來風險。')
@@ -171,27 +166,15 @@ function summarize(stations: StationRisk[], alerts: Alert[], dispatches: Dispatc
       const level = station.forecast.horizons['60'].level
       return station.serviceStatus === 'operational' && (level === 'high' || level === 'critical')
     }).length,
-    persistentAlerts: alerts.filter(alert => alert.status === 'open').length,
-    recommendedMoves: dispatches.filter(dispatch => dispatch.status === 'proposed').length,
+    inventoryAlerts: alerts.filter(alert => alert.condition !== 'unavailable').length,
+    recommendedMoves: dispatches.length,
   }
-}
-
-function withAlertState(alert: Alert, actions: LiveActionState): Alert {
-  return alert.status === 'open' && actions.acknowledgedAlertIds.includes(alert.id)
-    ? { ...alert, status: 'acknowledged' }
-    : alert
-}
-
-function withDispatchState(dispatch: DispatchRecommendation, actions: LiveActionState): DispatchRecommendation {
-  return dispatch.status === 'proposed' && actions.acceptedDispatchIds.includes(dispatch.id)
-    ? { ...dispatch, status: 'assigned' }
-    : dispatch
 }
 
 function briefingFacts(summary: DashboardSummary) {
   return [
-    { label: '即時待確認告警', value: summary.persistentAlerts },
-    { label: '即時待覆核搬運', value: summary.recommendedMoves },
+    { label: '即時庫存風險', value: summary.inventoryAlerts },
+    { label: '可行搬運建議', value: summary.recommendedMoves },
     { label: '60 分鐘高風險站', value: summary.highRiskNext60m },
   ]
 }
@@ -251,7 +234,7 @@ function createLiveDashboard(
           riskPolicy
             ? '60 分鐘為主要判讀窗：即時庫存會與同站歷史時段基線比對；風險指標不是校準後事件機率，需人工覆核。'
             : '歷史基線暫不可用，僅顯示即時庫存。',
-          '告警與調度指派只保存在目前瀏覽器工作階段，不會送出真實車隊命令。',
+          '平台只提供風險分析與路線建議，不會送出真實車隊命令。',
         ],
       },
     },
@@ -283,14 +266,14 @@ function profileSignature(error: string, coverage: PredictionCoverage | null) {
   ].join('|')
 }
 
-function scopedDashboard(dashboard: DashboardArtifact | null, district: string, actions: LiveActionState): DashboardArtifact | null {
+function scopedDashboard(dashboard: DashboardArtifact | null, district: string): DashboardArtifact | null {
   if (!dashboard) return null
   const stations = district ? dashboard.stations.filter(station => station.district === district) : dashboard.stations
   const plan = district
     ? buildLiveOperations(stations, dashboard.meta.asOf)
     : { alerts: dashboard.alerts, dispatches: dashboard.dispatches }
-  const alerts = plan.alerts.map(alert => withAlertState(alert, actions))
-  const dispatches = plan.dispatches.map(dispatch => withDispatchState(dispatch, actions))
+  const alerts = plan.alerts
+  const dispatches = plan.dispatches
   const summary = summarize(stations, alerts, dispatches)
   return {
     ...dashboard,
@@ -311,19 +294,12 @@ export function useLiveDashboard() {
   const updated = useState('live-dashboard-updated', () => false)
   const signature = useState('live-dashboard-signature', () => '')
   const baselineSignature = useState('live-dashboard-baseline-signature', () => '')
-  const acknowledgedAlertIds = useState<string[]>('live-dashboard-acknowledged-alerts', () => [])
-  const acceptedDispatchIds = useState<string[]>('live-dashboard-accepted-dispatches', () => [])
   const {
     manifest: profileManifest,
     error: profileError,
     coverage: profileCoverage,
     forecastsFor,
   } = useLiveRiskProfiles()
-
-  const actions = computed<LiveActionState>(() => ({
-    acknowledgedAlertIds: acknowledgedAlertIds.value,
-    acceptedDispatchIds: acceptedDispatchIds.value,
-  }))
 
   async function refresh(options: { manual?: boolean } = {}) {
     if (pending.value) return
@@ -349,8 +325,6 @@ export function useLiveDashboard() {
       baselineSignature.value = nextBaselineSignature
 
       if (changed) {
-        acknowledgedAlertIds.value = []
-        acceptedDispatchIds.value = []
         updated.value = true
         if (updateResetTimer) clearTimeout(updateResetTimer)
         updateResetTimer = setTimeout(() => { updated.value = false }, 6_000)
@@ -364,16 +338,8 @@ export function useLiveDashboard() {
     }
   }
 
-  function acknowledge(alertId: string) {
-    if (!acknowledgedAlertIds.value.includes(alertId)) acknowledgedAlertIds.value = [...acknowledgedAlertIds.value, alertId]
-  }
-
-  function acceptDispatch(dispatchId: string) {
-    if (!acceptedDispatchIds.value.includes(dispatchId)) acceptedDispatchIds.value = [...acceptedDispatchIds.value, dispatchId]
-  }
-
   function dashboardForDistrict(district = '') {
-    return scopedDashboard(dashboard.value, district, actions.value)
+    return scopedDashboard(dashboard.value, district)
   }
 
   return {
@@ -384,10 +350,7 @@ export function useLiveDashboard() {
     updated,
     profileError,
     profileCoverage,
-    actions,
     refresh,
-    acknowledge,
-    acceptDispatch,
     dashboardForDistrict,
   }
 }

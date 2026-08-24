@@ -12,7 +12,7 @@ const validRequest = {
   horizonMinutes: 60,
   summary: {
     recommendedMoves: 2,
-    persistentAlerts: 3,
+    inventoryAlerts: 3,
     emptyNow: 1,
     fullNow: 1,
   },
@@ -55,13 +55,13 @@ test('rejects unknown fields and non-60-minute horizons', () => {
 
 test('normalizes a structured AgentCore response to the public contract', () => {
   assert.deepEqual(parseAgentReviewOutput(JSON.stringify({
-    headline: '需人工覆核',
-    narrative: '根據畫面事實，先處理持續空站。',
+    headline: '風險分析說明',
+    narrative: '根據畫面事實，先說明即時庫存風險。',
     cautions: ['未表示已完成派車'],
     citations: [{ label: '站點可借車', source: '500101001' }],
   })), {
-    headline: '需人工覆核',
-    narrative: '根據畫面事實，先處理持續空站。',
+    headline: '風險分析說明',
+    narrative: '根據畫面事實，先說明即時庫存風險。',
     cautions: ['未表示已完成派車'],
     citations: [{ label: '站點可借車', source: '500101001' }],
   })
@@ -89,8 +89,8 @@ test('returns the exact success envelope through an injected AgentCore boundary'
       invokeAgent: async () => ({
         requestId: 'agent-request-1',
         text: JSON.stringify({
-          headline: '需人工覆核',
-          narrative: '先覆核高優先任務。',
+          headline: '風險分析說明',
+          narrative: '先說明高優先風險。',
           cautions: ['不會自動派車'],
           citations: [],
         }),
@@ -100,8 +100,8 @@ test('returns the exact success envelope through an injected AgentCore boundary'
     assert.equal(response.statusCode, 200)
     assert.deepEqual(JSON.parse(response.body), {
       data: {
-        headline: '需人工覆核',
-        narrative: '先覆核高優先任務。',
+        headline: '風險分析說明',
+        narrative: '先說明高優先風險。',
         cautions: ['不會自動派車'],
         citations: [],
       },

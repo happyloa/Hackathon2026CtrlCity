@@ -4,6 +4,7 @@ import test from 'node:test'
 import {
   buildLiveOperations,
   safetyStockFor,
+  scoreAlertPriority,
 } from '../shared/live-operations.ts'
 
 const OBSERVED_AT = '2026-08-09T08:00:00+08:00'
@@ -90,6 +91,16 @@ test('current empty station creates a stable critical alert with an explicit saf
   assert.equal(first.alerts.length, 1)
   assert.equal(first.alerts[0].condition, 'empty_now')
   assert.equal(first.alerts[0].severity, 'critical')
+  assert.equal(first.alerts[0].riskScore, 0.9)
+  assert.equal(first.alerts[0].priorityScore, 83.5)
+  assert.deepEqual(first.alerts[0].scoreParts, {
+    forecast: 22.5,
+    current: 50,
+    gap: 7.5,
+    quality: 3.5,
+  })
+  assert.equal(first.alerts[0].dispatchEligible, true)
+  assert.ok(first.alerts[0].priorityScore < 100)
   assert.match(first.alerts[0].reasons.join(' '), /安全庫存/)
   assert.match(first.alerts[0].id, /^live-alert:2026-08-09T08%3A00%3A00%2B08%3A00:60:empty-now:empty_now$/)
   assert.deepEqual(first, second)
@@ -116,8 +127,91 @@ test('officially inactive stations are surfaced for review but never used for di
 
   const plan = buildLiveOperations([empty, officialInactive], OBSERVED_AT)
 
-  assert.ok(plan.alerts.some(alert => alert.stationId === 'official-inactive-source' && alert.condition === 'unavailable'))
+  const serviceAlert = plan.alerts.find(alert => alert.stationId === 'official-inactive-source')
+  assert.equal(serviceAlert.condition, 'unavailable')
+  assert.equal(serviceAlert.priorityScore, 0)
+  assert.deepEqual(serviceAlert.scoreParts, { forecast: 0, current: 0, gap: 0, quality: 0 })
+  assert.equal(serviceAlert.dispatchEligible, false)
   assert.equal(plan.dispatches.length, 0)
+})
+
+test('service anomalies remain visible outside the inventory alert limit', () => {
+  const service = station({
+    id: 'service-outside-limit',
+    availableBikes: 0,
+    availableDocks: 0,
+    currentState: 'unavailable',
+    serviceStatus: 'official_inactive',
+  })
+  const emptyA = station({
+    id: 'limited-empty-a',
+    availableBikes: 0,
+    availableDocks: 20,
+    currentState: 'empty_now',
+    stationForecast: forecast({ emptyRisk: 0.9, predictedBikes: 0, predictedDocks: 20, level: 'critical' }),
+  })
+  const emptyB = station({
+    id: 'limited-empty-b',
+    availableBikes: 0,
+    availableDocks: 20,
+    currentState: 'empty_now',
+    stationForecast: forecast({ emptyRisk: 0.8, predictedBikes: 0, predictedDocks: 20, level: 'critical' }),
+  })
+  const source = station({
+    id: 'alert-limit-source',
+    totalDocks: 30,
+    availableBikes: 20,
+    availableDocks: 10,
+  })
+
+  const plan = buildLiveOperations([service, emptyA, emptyB, source], OBSERVED_AT, { maximumAlerts: 1 })
+
+  assert.equal(plan.alerts.filter(alert => alert.condition !== 'unavailable').length, 2)
+  assert.ok(plan.alerts.some(alert => alert.stationId === service.id && alert.condition === 'unavailable'))
+  assert.equal(plan.dispatches.length, 1)
+})
+
+test('alert priority is additive, monotonic, bounded, and only saturates when every component does', () => {
+  const base = {
+    riskScore: 0,
+    currentFailure: false,
+    gap: 0,
+    quality: 0,
+  }
+
+  assert.equal(scoreAlertPriority(base).priorityScore, 0)
+  assert.equal(scoreAlertPriority({ ...base, riskScore: 1 }).priorityScore, 25)
+  assert.equal(scoreAlertPriority({ ...base, currentFailure: true }).priorityScore, 50)
+  assert.equal(scoreAlertPriority({ ...base, gap: 8 }).priorityScore, 20)
+  assert.equal(scoreAlertPriority({ ...base, quality: 1 }).priorityScore, 5)
+  assert.equal(scoreAlertPriority({ ...base, riskScore: 1, currentFailure: true, gap: 8, quality: 1 }).priorityScore, 100)
+
+  const ordinary = scoreAlertPriority({ ...base, riskScore: 0.7, currentFailure: true, gap: 3, quality: 0.7 })
+  const higherRisk = scoreAlertPriority({ ...base, riskScore: 0.8, currentFailure: true, gap: 3, quality: 0.7 })
+  const largerGap = scoreAlertPriority({ ...base, riskScore: 0.7, currentFailure: true, gap: 4, quality: 0.7 })
+  assert.ok(ordinary.priorityScore < 100)
+  assert.ok(higherRisk.priorityScore > ordinary.priorityScore)
+  assert.ok(largerGap.priorityScore > ordinary.priorityScore)
+  assert.equal(scoreAlertPriority({ ...base, gap: 80, quality: 5 }).priorityScore, 25)
+})
+
+test('any current empty or full failure outranks the strongest forecast-only alert', () => {
+  const currentFailure = scoreAlertPriority({
+    riskScore: 0,
+    currentFailure: true,
+    gap: 2,
+    quality: 0,
+  })
+  const forecastOnlyMaximum = scoreAlertPriority({
+    riskScore: 1,
+    currentFailure: false,
+    gap: 8,
+    quality: 1,
+  })
+
+  assert.equal(currentFailure.priorityScore, 55)
+  assert.equal(forecastOnlyMaximum.priorityScore, 50)
+  assert.ok(currentFailure.priorityScore > forecastOnlyMaximum.priorityScore)
 })
 
 test('forecast full risk creates a full-station alert before the station is physically full', () => {
@@ -152,7 +246,7 @@ test('forecast empty risk creates an early alert without pretending the station 
   assert.match(plan.alerts[0].reasons.join(' '), /60 分鐘預測可借車為 1/)
 })
 
-test('pairs empty and full demand with separate nearby supply while preserving safety stock', () => {
+test('uses separate nearby supply when complementary risks are outside the pairing radius', () => {
   const empty = station({
     id: 'empty-target',
     availableBikes: 0,
@@ -183,8 +277,8 @@ test('pairs empty and full demand with separate nearby supply while preserving s
   })
   const stations = [empty, bikeSource, full, dockSource]
 
-  const plan = buildLiveOperations(stations, OBSERVED_AT, { maximumDistanceKm: 5 })
-  const reversed = buildLiveOperations([...stations].reverse(), OBSERVED_AT, { maximumDistanceKm: 5 })
+  const plan = buildLiveOperations(stations, OBSERVED_AT, { maximumDistanceKm: 0.5 })
+  const reversed = buildLiveOperations([...stations].reverse(), OBSERVED_AT, { maximumDistanceKm: 0.5 })
 
   assert.equal(plan.dispatches.length, 2)
   const delivery = plan.dispatches.find(item => item.operation === 'deliver_bikes')
@@ -204,6 +298,128 @@ test('pairs empty and full demand with separate nearby supply while preserving s
   const stationAssignments = plan.dispatches.flatMap(item => [item.fromStationId, item.toStationId])
   assert.equal(new Set(stationAssignments).size, stationAssignments.length)
   assert.deepEqual(plan.dispatches.map(item => item.id), reversed.dispatches.map(item => item.id))
+})
+
+test('directly pairs complementary full and empty risks without duplicate reverse dispatches', () => {
+  const empty = station({
+    id: 'direct-empty',
+    availableBikes: 0,
+    availableDocks: 20,
+    latitude: 25,
+    currentState: 'empty_now',
+    stationForecast: forecast({ predictedBikes: 0, predictedDocks: 20, emptyRisk: 0.9, level: 'critical' }),
+  })
+  const full = station({
+    id: 'direct-full',
+    availableBikes: 20,
+    availableDocks: 0,
+    latitude: 25.001,
+    currentState: 'full_now',
+    stationForecast: forecast({ predictedBikes: 20, predictedDocks: 0, fullRisk: 0.9, level: 'critical' }),
+  })
+
+  const plan = buildLiveOperations([empty, full], OBSERVED_AT)
+
+  assert.equal(plan.dispatches.length, 1)
+  assert.equal(plan.dispatches[0].fromStationId, full.id)
+  assert.equal(plan.dispatches[0].toStationId, empty.id)
+  assert.equal(plan.dispatches[0].bikeCount, 3)
+  assert.match(plan.dispatches[0].reasons.join(' '), /相反庫存壓力/)
+  assert.ok(full.availableBikes - plan.dispatches[0].bikeCount >= safetyStockFor(full))
+  assert.ok(empty.availableDocks - plan.dispatches[0].bikeCount >= safetyStockFor(empty))
+})
+
+test('accounts for both gaps after a partial complementary transfer before using fallback supply', () => {
+  const empty = station({
+    id: 'partial-empty',
+    totalDocks: 40,
+    availableBikes: 0,
+    availableDocks: 40,
+    latitude: 25,
+    currentState: 'empty_now',
+    stationForecast: forecast({ predictedBikes: 0, predictedDocks: 40, emptyRisk: 0.9, level: 'critical' }),
+  })
+  const full = station({
+    id: 'partial-full',
+    availableBikes: 20,
+    availableDocks: 0,
+    latitude: 25.001,
+    currentState: 'full_now',
+    stationForecast: forecast({ predictedBikes: 20, predictedDocks: 0, fullRisk: 0.9, level: 'critical' }),
+  })
+  const fallback = station({
+    id: 'partial-fallback',
+    availableBikes: 12,
+    availableDocks: 8,
+    latitude: 25.002,
+  })
+
+  const plan = buildLiveOperations([empty, full, fallback], OBSERVED_AT)
+  const deliveries = plan.dispatches.filter(item => item.toStationId === empty.id)
+
+  assert.equal(deliveries.length, 2)
+  assert.equal(deliveries.reduce((total, item) => total + item.bikeCount, 0), 6)
+  assert.equal(deliveries.filter(item => item.fromStationId === full.id).length, 1)
+  assert.equal(plan.dispatches.filter(item => item.fromStationId === empty.id && item.toStationId === full.id).length, 0)
+})
+
+test('nearer feasible supply produces a higher dispatch priority than farther supply', () => {
+  const target = station({
+    id: 'distance-target',
+    availableBikes: 0,
+    availableDocks: 20,
+    latitude: 25,
+    currentState: 'empty_now',
+    stationForecast: forecast({ predictedBikes: 0, predictedDocks: 20, emptyRisk: 0.7, level: 'critical' }),
+  })
+  const near = station({
+    id: 'near-source',
+    availableBikes: 12,
+    availableDocks: 8,
+    latitude: 25.001,
+  })
+  const far = station({
+    id: 'far-source',
+    availableBikes: 12,
+    availableDocks: 8,
+    latitude: 25.02,
+  })
+
+  const combined = buildLiveOperations([target, far, near], OBSERVED_AT, { maximumDistanceKm: 5 })
+  const nearOnly = buildLiveOperations([target, near], OBSERVED_AT, { maximumDistanceKm: 5 }).dispatches[0]
+  const farOnly = buildLiveOperations([target, far], OBSERVED_AT, { maximumDistanceKm: 5 }).dispatches[0]
+
+  assert.equal(combined.dispatches[0].fromStationId, 'near-source')
+  assert.ok(nearOnly.distanceKm < farOnly.distanceKm)
+  assert.ok(nearOnly.priorityScore > farOnly.priorityScore)
+})
+
+test('prefers a slightly farther source when it covers the whole gap instead of one bike', () => {
+  const target = station({
+    id: 'coverage-target',
+    availableBikes: 0,
+    availableDocks: 20,
+    latitude: 25,
+    currentState: 'empty_now',
+    stationForecast: forecast({ predictedBikes: 0, predictedDocks: 20, emptyRisk: 0.8, level: 'critical' }),
+  })
+  const nearPartial = station({
+    id: 'near-partial-source',
+    availableBikes: 4,
+    availableDocks: 16,
+    latitude: 25.0005,
+  })
+  const fartherComplete = station({
+    id: 'farther-complete-source',
+    availableBikes: 10,
+    availableDocks: 10,
+    latitude: 25.002,
+  })
+
+  const plan = buildLiveOperations([target, nearPartial, fartherComplete], OBSERVED_AT)
+
+  assert.equal(plan.dispatches[0].fromStationId, fartherComplete.id)
+  assert.equal(plan.dispatches[0].bikeCount, 3)
 })
 
 test('allocates one stable source across multiple urgent stations before it is exhausted', () => {
@@ -285,13 +501,14 @@ test('keeps a current inventory alert but does not use an unmatched station as f
   assert.equal(plan.dispatches.length, 0)
 })
 
-test('never recommends moving more bikes than the physical source or destination can support', () => {
-  const futureFullWithOneBike = station({
-    id: 'future-full-one-bike',
-    availableBikes: 1,
-    availableDocks: 19,
+test('never recommends moving more than the one bike or dock available above safety stock', () => {
+  const futureFullWithOneSurplusBike = station({
+    id: 'future-full-one-surplus-bike',
+    totalDocks: 10,
+    availableBikes: 3,
+    availableDocks: 7,
     latitude: 25,
-    stationForecast: forecast({ predictedBikes: 20, predictedDocks: 0, fullRisk: 0.9, level: 'critical' }),
+    stationForecast: forecast({ predictedBikes: 10, predictedDocks: 0, fullRisk: 0.9, level: 'critical' }),
   })
   const dockReceiver = station({
     id: 'dock-receiver',
@@ -299,10 +516,10 @@ test('never recommends moving more bikes than the physical source or destination
     availableDocks: 15,
     latitude: 25.001,
   })
-  const futureEmptyWithOneDock = station({
-    id: 'future-empty-one-dock',
-    availableBikes: 19,
-    availableDocks: 1,
+  const futureEmptyWithOneSurplusDock = station({
+    id: 'future-empty-one-surplus-dock',
+    availableBikes: 16,
+    availableDocks: 4,
     latitude: 25.01,
     stationForecast: forecast({ predictedBikes: 0, predictedDocks: 20, emptyRisk: 0.9, level: 'critical' }),
   })
@@ -313,8 +530,8 @@ test('never recommends moving more bikes than the physical source or destination
     latitude: 25.011,
   })
 
-  const removal = buildLiveOperations([futureFullWithOneBike, dockReceiver], OBSERVED_AT).dispatches[0]
-  const delivery = buildLiveOperations([futureEmptyWithOneDock, bikeSource], OBSERVED_AT).dispatches[0]
+  const removal = buildLiveOperations([futureFullWithOneSurplusBike, dockReceiver], OBSERVED_AT).dispatches[0]
+  const delivery = buildLiveOperations([futureEmptyWithOneSurplusDock, bikeSource], OBSERVED_AT).dispatches[0]
 
   assert.equal(removal.operation, 'remove_bikes')
   assert.equal(removal.bikeCount, 1)

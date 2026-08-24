@@ -43,9 +43,9 @@ const percent = (value: number) => `${(value * 100).toFixed(1)}%`
           <p class="m-0 mt-2 text-base leading-6 text-muted">{{ scenario.feasibleMoves }} 筆可行搬運、共 {{ scenario.bikesMoved }} 台；當下空／滿站由 {{ scenario.beforeIssueStations }} 降至 {{ scenario.afterIssueStations }}（{{ percent(scenario.reductionRate) }}）。</p>
         </article>
         <article v-else-if="dataMode === 'live'" class="min-w-0 bg-panel p-4">
-          <span class="mb-2 block text-base font-semibold text-muted">即時決策閉環</span>
-          <strong class="block text-2xl font-bold leading-tight text-ink sm:text-3xl">人工覆核</strong>
-          <p class="m-0 mt-2 text-base leading-6 text-muted">即時風險會轉成告警與搬運建議；確認與指派只保存在目前瀏覽器工作階段。</p>
+          <span class="mb-2 block text-base font-semibold text-muted">即時分析輸出</span>
+          <strong class="block text-2xl font-bold leading-tight text-ink sm:text-3xl">風險＋路線</strong>
+          <p class="m-0 mt-2 text-base leading-6 text-muted">即時風險會轉成可解釋的優先排序與多站路線建議，不會直接操作真實車隊。</p>
         </article>
         <article v-else class="min-w-0 bg-panel p-4">
           <span class="mb-2 block text-base font-semibold text-muted">情境調度試算</span>

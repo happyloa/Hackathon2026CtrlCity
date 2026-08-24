@@ -5,7 +5,7 @@ useSeoMeta({
   title: '新北市 YouBike 調度工作台',
   description: '新北市公共自行車站點庫存、風險與調度決策支援',
   ogTitle: '新北市 YouBike 調度工作台',
-  ogDescription: '以即時站況與歷史回放協助檢視站點庫存風險。',
+  ogDescription: '以即時站況、歷史基線與多站路線規劃協助檢視庫存風險。',
   ogImage: socialImage,
   ogImageAlt: '新北市 YouBike 調度工作台',
   twitterCard: 'summary_large_image',

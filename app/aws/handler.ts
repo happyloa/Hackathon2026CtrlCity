@@ -45,7 +45,7 @@ export interface AgentReviewRequest {
   horizonMinutes: 60
   summary: {
     recommendedMoves: number
-    persistentAlerts: number
+    inventoryAlerts: number
     emptyNow: number
     fullNow: number
   }
@@ -232,12 +232,12 @@ export function parseAgentReviewRequest(event: HttpApiEvent): AgentReviewRequest
 
   const summaryValue = strictObject(
     root.summary,
-    ['recommendedMoves', 'persistentAlerts', 'emptyNow', 'fullNow'],
+    ['recommendedMoves', 'inventoryAlerts', 'emptyNow', 'fullNow'],
     'summary',
   )
   const summary = {
     recommendedMoves: boundedInteger(summaryValue.recommendedMoves, 'summary.recommendedMoves'),
-    persistentAlerts: boundedInteger(summaryValue.persistentAlerts, 'summary.persistentAlerts'),
+    inventoryAlerts: boundedInteger(summaryValue.inventoryAlerts, 'summary.inventoryAlerts'),
     emptyNow: boundedInteger(summaryValue.emptyNow, 'summary.emptyNow'),
     fullNow: boundedInteger(summaryValue.fullNow, 'summary.fullNow'),
   }
@@ -316,7 +316,7 @@ export function createAgentPrompt(request: AgentReviewRequest): string {
     '請只依據下列 JSON 事實，輸出一個 JSON 物件，不要使用 Markdown 或程式碼區塊。',
     '欄位必須是 headline、narrative、cautions、citations。',
     'headline 與 narrative 使用繁體中文；cautions 是最多 4 個短句；citations 是最多 8 筆 {label, source?}。',
-    '不得新增站點、數值、時間、成因或宣稱已派車；所有調度都要標示需人工覆核。',
+    '不得新增站點、數值、時間、成因或宣稱已派車；所有調度建議都要標示僅供人員查驗。',
     JSON.stringify(request),
   ].join('\n')
 }
@@ -329,9 +329,9 @@ export function parseAgentReviewOutput(raw: string): AgentReviewPayload {
     value = JSON.parse(normalized)
   } catch {
     return {
-      headline: 'AI 調度覆核',
+      headline: 'AI 風險分析說明',
       narrative: boundedOutputText(normalized, 1_200) || 'AgentCore 未回傳可顯示內容。',
-      cautions: ['回應格式未完整解析，請由調度人員人工覆核。'],
+      cautions: ['回應格式未完整解析，請由調度人員依畫面資料查驗。'],
       citations: [],
     }
   }
@@ -362,7 +362,7 @@ export function parseAgentReviewOutput(raw: string): AgentReviewPayload {
   return {
     headline,
     narrative,
-    cautions: cautions.length ? cautions : ['調度建議需由人員依現場狀況覆核。'],
+    cautions: cautions.length ? cautions : ['調度建議需由人員依現場狀況查驗。'],
     citations,
   }
 }

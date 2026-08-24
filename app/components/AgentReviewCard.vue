@@ -35,7 +35,7 @@ const reviewContextKey = computed(() => JSON.stringify({
   horizon: props.horizon,
   summary: {
     recommendedMoves: props.summary.recommendedMoves,
-    persistentAlerts: props.summary.persistentAlerts,
+    inventoryAlerts: props.summary.inventoryAlerts,
     emptyNow: props.summary.emptyNow,
     fullNow: props.summary.fullNow,
   },
@@ -73,7 +73,7 @@ async function requestReview() {
         horizonMinutes: Number(props.horizon),
         summary: {
           recommendedMoves: props.summary.recommendedMoves,
-          persistentAlerts: props.summary.persistentAlerts,
+          inventoryAlerts: props.summary.inventoryAlerts,
           emptyNow: props.summary.emptyNow,
           fullNow: props.summary.fullNow,
         },
@@ -91,16 +91,16 @@ async function requestReview() {
     try {
       payload = JSON.parse(responseText)
     } catch {
-      throw new Error(response.ok ? 'AWS AgentCore 回傳格式無法讀取。' : 'AWS AgentCore 暫時無法完成覆核。')
+      throw new Error(response.ok ? 'AWS AgentCore 回傳格式無法讀取。' : 'AWS AgentCore 暫時無法產生分析說明。')
     }
     if (sequence !== requestSequence) return
-    if (!response.ok || !validReview(payload)) throw new Error('AWS AgentCore 暫時無法完成覆核。')
+    if (!response.ok || !validReview(payload)) throw new Error('AWS AgentCore 暫時無法產生分析說明。')
     result.value = payload.data
   } catch (cause) {
     if (sequence !== requestSequence) return
     error.value = cause instanceof DOMException && cause.name === 'AbortError'
-      ? '覆核逾時，請稍後再試。'
-      : cause instanceof Error ? cause.message : '覆核暫時無法使用。'
+      ? '分析說明逾時，請稍後再試。'
+      : cause instanceof Error ? cause.message : '分析說明暫時無法使用。'
   } finally {
     window.clearTimeout(timeout)
     if (sequence === requestSequence) {
@@ -129,13 +129,13 @@ onBeforeUnmount(() => {
   <section v-if="enabled" class="mb-4 rounded-lg border border-line border-l-4 border-l-accent bg-panel-muted p-4" aria-labelledby="agent-review-title">
     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <p class="section-kicker text-base"><Icon icon="solar:shield-check-outline" /> AWS AgentCore 覆核</p>
-        <h2 id="agent-review-title" class="m-0 mt-1 text-lg font-bold text-ink">AI 調度覆核</h2>
-        <p class="m-0 mt-2 text-base leading-6 text-muted">只傳送畫面上的摘要事實；Agent 不重算風險，也不會自動派車。</p>
+        <p class="section-kicker text-base"><Icon icon="solar:chat-round-dots-outline" /> AWS AgentCore 說明</p>
+        <h2 id="agent-review-title" class="m-0 mt-1 text-lg font-bold text-ink">AI 風險分析說明</h2>
+        <p class="m-0 mt-2 text-base leading-6 text-muted">只解釋畫面上的摘要事實；Agent 不重算風險、不確認案件，也不會自動派車。</p>
       </div>
       <button type="button" class="inline-flex min-h-11 w-full shrink-0 items-center justify-center gap-2 rounded-md border border-accent bg-accent px-3 text-base font-bold text-on-accent transition-colors hover:bg-accent-strong sm:w-auto" :disabled="pending" @click="requestReview">
         <Icon :icon="pending ? 'svg-spinners:3-dots-fade' : 'solar:chat-round-check-outline'" />
-        {{ pending ? '覆核中' : (result ? '重新覆核' : '開始覆核') }}
+        {{ pending ? '產生中' : (result ? '重新產生' : '產生說明') }}
       </button>
     </div>
 

@@ -102,7 +102,17 @@ export interface Alert {
   severity: Exclude<RiskLevel, 'normal'>
   startedAt: string
   durationMinutes: number
+  /** Model risk for the condition, kept separate from operational priority. */
   riskScore: number
+  /** Explainable 0-100 ordering score; service anomalies deliberately use 0. */
+  priorityScore: number
+  scoreParts: {
+    forecast: number
+    current: number
+    gap: number
+    quality: number
+  }
+  dispatchEligible: boolean
   status: AlertStatus
   reasons: string[]
 }
@@ -127,7 +137,7 @@ export interface DashboardSummary {
   fullNow: number
   unavailableNow: number
   highRiskNext60m: number
-  persistentAlerts: number
+  inventoryAlerts: number
   recommendedMoves: number
 }
 

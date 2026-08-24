@@ -6,6 +6,12 @@ import {
   alertThresholdFor,
   riskLevelFor,
 } from './risk-policy.mjs'
+import {
+  DEFAULT_LIVE_OPERATION_POLICY,
+  alertDataQuality,
+  safetyStockFor,
+  scoreAlertPriority,
+} from '../shared/operational-policy.mjs'
 
 const APP_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const SOURCE_FILE = resolve(APP_DIR, 'data', 'dashboard.json')
@@ -200,6 +206,25 @@ function normalizeAlert(raw, stations, asOf) {
   const severity = text(source.severity)
   const duration = Math.max(1, Math.round(number(source.durationMinutes, condition.endsWith('_now') ? 30 : 60)))
   const message = text(source.message)
+  const currentFailure = condition === 'empty_now' || condition === 'full_now'
+  const inventory = condition === 'empty_now'
+    ? station?.availableBikes ?? 0
+    : condition === 'full_now'
+      ? station?.availableDocks ?? 0
+      : condition === 'empty_forecast'
+        ? forecast?.predictedBikes ?? 0
+        : forecast?.predictedDocks ?? 0
+  const gap = station && condition !== 'unavailable'
+    ? Math.max(0, Math.ceil(safetyStockFor(station) - inventory))
+    : 0
+  const priority = station && forecast && condition !== 'unavailable'
+    ? scoreAlertPriority({
+        riskScore: score,
+        currentFailure,
+        gap,
+        quality: alertDataQuality(station, forecast),
+      })
+    : { priorityScore: 0, scoreParts: { forecast: 0, current: 0, gap: 0, quality: 0 } }
 
   return {
     id: text(source.id, 'alert_' + stationId),
@@ -213,9 +238,11 @@ function normalizeAlert(raw, stations, asOf) {
     startedAt: text(source.startedAt, asOf),
     durationMinutes: duration,
     riskScore: score,
+    ...priority,
+    dispatchEligible: condition !== 'unavailable' && gap >= DEFAULT_LIVE_OPERATION_POLICY.minimumTransferBikes,
     status: 'open',
     reasons: message ? [message] : [condition === 'unavailable'
-      ? '此站呈現疑似服務異常，需人工確認。'
+      ? '此站呈現疑似服務異常，不納入搬運路線。'
       : '此站在回放時點呈現持續庫存風險。'],
   }
 }
@@ -346,7 +373,7 @@ function makeDashboard(source, asOf, scenario, availableTimes, districts) {
       const forecast = station.forecast.horizons['60']
       return forecast.level === 'high' || forecast.level === 'critical'
     }).length,
-    persistentAlerts: alerts.length,
+    inventoryAlerts: alerts.filter((alert) => alert.condition !== 'unavailable').length,
     recommendedMoves: dispatches.length,
   }
 

@@ -40,7 +40,7 @@ try {
           asOf: new Date().toISOString(),
           district: '新北市',
           horizonMinutes: 60,
-          summary: { recommendedMoves: 0, persistentAlerts: 0, emptyNow: 0, fullNow: 0 },
+          summary: { recommendedMoves: 0, inventoryAlerts: 0, emptyNow: 0, fullNow: 0 },
           facts: [],
         }),
       })
