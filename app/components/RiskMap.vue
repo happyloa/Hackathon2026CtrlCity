@@ -7,6 +7,7 @@ const props = defineProps<{
   horizon: HorizonKey
   selectedId?: string
   dataMode?: DataMode
+  district?: string
   profileCoverage?: PredictionCoverage | null
   profileError?: string
 }>()
@@ -47,8 +48,13 @@ const headerCount = computed(() => stationQuery.value
 const headerLabel = computed(() => stationQuery.value
   ? '個搜尋結果'
   : showAllStations.value
-    ? '個全市站點'
+    ? `個${props.district || '全市'}站點`
     : '個待處理站點')
+const scopeName = computed(() => props.district || '新北市')
+const stationScopeActionLabel = computed(() => showAllStations.value
+  ? '只看待處理站'
+  : `查看全部 ${allMappedStations.value.length} 站`)
+const mapAriaLabel = computed(() => `${scopeName.value}${isLive.value ? '即時基線風險站點地圖' : '歷史預測風險站點地圖'}`)
 const baselineNotice = computed(() => {
   if (!isLive.value) return ''
   if (hasBaselineLoadError.value) return '歷史基線暫時無法載入，現在僅顯示官方即時庫存；按「立即更新」即可重新比對。'
@@ -57,8 +63,8 @@ const baselineNotice = computed(() => {
 })
 const mapStatusText = computed(() => {
   if (stationQuery.value) return `搜尋結果共 ${mappedStations.value.length} 站；點選站點查看即時庫存與判讀。`
-  if (showAllStations.value) return `顯示全市 ${allMappedStations.value.length} 站；顏色標示需要優先處理的狀態。`
-  return `預設只顯示 ${actionableCount.value} 個待處理站點；可切換查看全市或搜尋站名。`
+  if (showAllStations.value) return `顯示${scopeName.value} ${allMappedStations.value.length} 站；顏色標示需要優先處理的狀態。`
+  return `預設只顯示 ${actionableCount.value} 個待處理站點；可切換查看${scopeName.value}全部站點或搜尋站名。`
 })
 
 let leaflet: LeafletModule | null = null
@@ -202,12 +208,20 @@ function renderMarkers() {
   }
 }
 
-function fitNewTaipeiBounds() {
+function fitCurrentScope() {
   if (!leaflet || !leafletMap || !allMappedStations.value.length) return
   const points = allMappedStations.value
     .filter(station => station.latitude !== null && station.longitude !== null)
     .map(station => [station.latitude as number, station.longitude as number] as [number, number])
-  if (points.length) leafletMap.fitBounds(leaflet.latLngBounds(points), { padding: [26, 26], maxZoom: 13 })
+  if (!points.length) return
+
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  leafletMap.fitBounds(leaflet.latLngBounds(points), {
+    animate: !reduceMotion,
+    duration: reduceMotion ? 0 : .35,
+    maxZoom: props.district ? 14 : 13,
+    padding: [28, 28],
+  })
 }
 
 function toggleStationScope() {
@@ -216,11 +230,12 @@ function toggleStationScope() {
 
 function chooseSearchResult(stationId: string) {
   emit('select', stationId)
+  stationQuery.value = ''
 }
 
 function focusSelectedStation() {
   if (!leafletMap || !props.selectedId) return
-  const selected = mappedStations.value.find(station => station.id === props.selectedId)
+  const selected = allMappedStations.value.find(station => station.id === props.selectedId)
   if (!selected || selected.latitude === null || selected.longitude === null) return
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
   leafletMap.panTo([selected.latitude, selected.longitude], { animate: !reduceMotion, duration: reduceMotion ? 0 : .35 })
@@ -237,7 +252,7 @@ async function initialiseMap() {
     minZoom: 9,
     maxZoom: 19,
   })
-  leaflet.control.attribution({ position: 'bottomleft', prefix: false }).addTo(leafletMap)
+  leaflet.control.attribution({ position: 'bottomright', prefix: false }).addTo(leafletMap)
   leaflet.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors',
@@ -245,7 +260,7 @@ async function initialiseMap() {
   canvasRenderer = leaflet.canvas({ padding: .5 })
   markerLayer = leaflet.layerGroup().addTo(leafletMap)
   renderMarkers()
-  fitNewTaipeiBounds()
+  fitCurrentScope()
 
   resizeObserver = new ResizeObserver(() => leafletMap?.invalidateSize({ pan: false }))
   resizeObserver.observe(mapElement.value)
@@ -260,8 +275,14 @@ const stationSignature = computed(() => `${hasBaselineLoadError.value}|${mappedS
 
 watch(stationSignature, () => renderMarkers())
 watch(() => props.selectedId, () => {
+  if (props.selectedId) stationQuery.value = ''
   renderMarkers()
   focusSelectedStation()
+})
+watch(() => props.district, async () => {
+  stationQuery.value = ''
+  await nextTick()
+  fitCurrentScope()
 })
 watch([() => props.dataMode, () => props.horizon], () => renderMarkers())
 
@@ -295,8 +316,8 @@ onBeforeUnmount(() => {
         <button v-if="stationQuery" class="grid h-8 w-8 shrink-0 place-items-center rounded text-muted transition-colors hover:bg-accent-strong hover:text-on-accent" type="button" aria-label="清除站點搜尋" @click="stationQuery = ''"><Icon class="text-xl" icon="solar:close-circle-outline" /></button>
       </div>
       <div class="map-actions flex items-center gap-2">
-        <button type="button" class="inline-flex min-h-11 items-center gap-1.5 rounded-md border border-line-strong bg-panel px-2.5 py-1.5 text-base font-bold text-accent-strong transition-colors hover:border-accent-strong hover:bg-panel-muted" :aria-pressed="showAllStations" @click="toggleStationScope"><Icon class="text-lg" :icon="showAllStations ? 'solar:filter-outline' : 'solar:map-point-outline'" /> {{ showAllStations ? '只看待處理站' : `查看全市 ${allMappedStations.length} 站` }}</button>
-        <button type="button" class="map-reset inline-flex min-h-11 items-center gap-1.5 rounded-md border border-accent-strong bg-accent-strong px-2.5 py-1.5 text-base font-bold text-on-accent transition-colors hover:border-accent hover:bg-accent" aria-label="重設為新北市全域" title="重設為新北市全域" @click="fitNewTaipeiBounds"><Icon class="text-lg" icon="solar:map-arrow-left-outline" /> <span class="map-reset-label">新北全域</span></button>
+        <button type="button" class="inline-flex min-h-11 items-center gap-1.5 rounded-md border border-line-strong bg-panel px-2.5 py-1.5 text-base font-bold text-accent-strong transition-colors hover:border-accent-strong hover:bg-panel-muted" :aria-pressed="showAllStations" @click="toggleStationScope"><Icon class="text-lg" :icon="showAllStations ? 'solar:filter-outline' : 'solar:map-point-outline'" /> {{ stationScopeActionLabel }}</button>
+        <button type="button" class="map-reset inline-flex min-h-11 items-center gap-1.5 rounded-md border border-accent-strong bg-accent-strong px-2.5 py-1.5 text-base font-bold text-on-accent transition-colors hover:border-accent hover:bg-accent" :aria-label="`重新對焦${district || '新北市全域'}`" :title="`重新對焦${district || '新北市全域'}`" @click="fitCurrentScope"><Icon class="text-lg" icon="solar:map-arrow-left-outline" /> <span class="map-reset-label">重新對焦</span></button>
       </div>
     </div>
 
@@ -309,7 +330,7 @@ onBeforeUnmount(() => {
       <p v-else-if="mappedStations.length > searchResults.length" class="col-span-full m-1 text-center text-base text-muted">另有 {{ mappedStations.length - searchResults.length }} 站，請輸入更完整的站名或行政區。</p>
     </div>
 
-    <div class="geographic-map map-height relative z-0 isolate mx-3.5 min-h-112 overflow-hidden rounded-lg border border-line bg-map" role="region" :aria-label="isLive ? '新北市即時基線風險站點地圖' : '新北市歷史預測風險站點地圖'">
+    <div class="geographic-map map-height relative z-0 isolate mx-3.5 min-h-112 overflow-hidden rounded-lg border border-line bg-map" role="region" :aria-label="mapAriaLabel">
       <div ref="mapElement" class="map-canvas map-height min-h-112 w-full" />
       <p v-if="!mappedStations.length" class="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 rounded-lg border border-line-strong bg-panel p-3 text-base font-bold text-ink">目前沒有可定位的站點資料。</p>
     </div>

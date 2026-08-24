@@ -231,6 +231,7 @@ function selectStation(stationId: string) {
           :horizon="horizon"
           :selected-id="selectedStationId"
           :data-mode="sourceMode"
+          :district="selectedDistrict"
           :profile-coverage="sourceMode === 'live' ? liveProfileCoverage : null"
           :profile-error="sourceMode === 'live' ? liveProfileError : ''"
           @select="selectStation"
