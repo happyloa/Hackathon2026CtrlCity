@@ -66,7 +66,7 @@ npm run aws:publish -- --stack ctrlcity-hackathon --region <REGION>
 npm run aws:smoke -- --stack ctrlcity-hackathon --region <REGION>
 ```
 
-`aws:publish` 會先讀取 stack output，再以相同來源路徑自動建置前端；只有 `AgentReviewEnabled=true` 時才把覆核入口編入 AWS 版本。
+`aws:publish` 會先讀取 stack output，再以相同來源路徑自動建置前端；只有 `AgentReviewEnabled=true` 時才把 AI 分析說明入口編入 AWS 版本。
 
 既有 Harness：
 
@@ -80,7 +80,7 @@ Stack 管理 Harness（會產生 AgentCore／Bedrock 用量）：
 npm run aws:deploy -- --stack ctrlcity-hackathon --region <REGION> --create-harness --model-id <MODEL_ID>
 ```
 
-Smoke test 預設不呼叫 Agent。只有同時加入 `--include-agent --confirm-agent-cost` 才會送出一筆付費覆核。
+Smoke test 預設不呼叫 Agent。只有同時加入 `--include-agent --confirm-agent-cost` 才會送出一筆付費分析請求。
 
 ## 成本與清理
 

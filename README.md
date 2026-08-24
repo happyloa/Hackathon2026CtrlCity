@@ -1,15 +1,18 @@
 # CtrlCity｜新北市 YouBike 調度工作台
 
-以新北市官方即時站況對照主辦方六個月歷史資料，產生 60 分鐘空／滿站風險、待確認告警與可行搬運建議。公開 Demo：<https://hackathon2026ctrlcity.pages.dev>
+以新北市官方即時站況對照主辦方六個月歷史資料，產生 60 分鐘空／滿站風險、可解釋優先分數與多站搬運路線。公開 Demo：<https://hackathon2026ctrlcity.pages.dev>
 
 ## Demo 主線
 
-- 即時調度：每 5 分鐘檢查官方資料，也可手動更新；來源失敗時不以歷史資料冒充即時資料。
+- 即時分析：每 5 分鐘檢查官方資料，也可手動更新；來源失敗時不以歷史資料冒充即時資料。
 - 風險判讀：目前空／滿站直接依官方庫存偵測；匹配到同站歷史基線時，再計算 60 分鐘風險。
-- 任務支援：列出搬運來源、目的、建議車數、距離與安全庫存試算，所有指派都需人工覆核。
+- 風險分流：依行政區與缺車／缺位／服務異常篩選；服務異常不納入搬運規劃。
+- 路線規劃：先依風險排序，再以缺口覆蓋率、安全庫存與距離配對；相近條件下優先滿站直送缺車站，最後以 12 台容量整合鄰近需求。
 - 地圖與站點：預設只顯示待處理站，可搜尋全市站點、查看歷史基線與附近替代還車站。
-- 歷史演練：重現固定時點的風險、告警與反事實調度試算，作為展示與驗證證據。
-- AWS 覆核：正式帳號啟用後，AgentCore 只解釋畫面既有事實，不重算模型或自動派車。
+- 歷史基線：歷史資料只用於預測與離線驗證，不在首頁提供回放操作。
+- AWS Agent：正式帳號啟用後，AgentCore 只解釋畫面既有事實，不重算模型或自動派車。
+
+平台只提供分析與預測，不確認案件、不建立工單、不送出派車命令。
 
 ## 本機執行
 
@@ -29,7 +32,7 @@ npm run typecheck
 npm run build
 ```
 
-`npm run build:cloudflare` 會輸出 `app/dist/`，供 Cloudflare Pages 的 Git Integration 部署。前端與歷史回放皆為靜態產物；只有 `/api/v1/live-stations` 經過唯讀代理，因此不會把大型資料或 Nuxt server bundle 送進 Pages Functions。
+`npm run build:cloudflare` 會輸出 `app/dist/`，供 Cloudflare Pages 的 Git Integration 部署。前端與精簡歷史基線皆為靜態產物；只有 `/api/v1/live-stations` 經過唯讀代理，因此不會把大型資料或 Nuxt server bundle 送進 Pages Functions。
 
 ## AWS 正式環境
 

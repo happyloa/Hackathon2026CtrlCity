@@ -3,7 +3,7 @@
 ## 已備妥
 
 - 私有 S3＋CloudFront 靜態網站。
-- HTTP API／Lambda：健康檢查、官方即時資料代理、AgentCore 覆核端點。
+- HTTP API／Lambda：健康檢查、官方即時資料代理、AgentCore 分析說明端點。
 - 選配 AgentCore Harness；預設關閉 Memory，限制 2 次迭代、300 tokens、20 秒。
 - 選配獨立知識文件 S3；只上傳 `app/aws/knowledge/*.md`，不含原始 CSV。
 - preflight、部署、發布、知識上傳與 smoke test 指令。
@@ -30,7 +30,7 @@ npm run aws:publish -- --stack ctrlcity-hackathon --region <REGION>
 npm run aws:smoke -- --stack ctrlcity-hackathon --region <REGION>
 ```
 
-`aws:publish` 會依 stack output 自動建置，再上傳前端；Agent 未啟用時不會顯示覆核入口。
+`aws:publish` 會依 stack output 自動建置，再上傳前端；Agent 未啟用時不會顯示分析說明入口。
 
 既有 Harness 加上 `--harness-arn <ARN>`。若要由 stack 建立最小 Harness，明確加上 `--create-harness --model-id <MODEL_ID>`；這會開始產生 AgentCore／Bedrock 用量。
 
