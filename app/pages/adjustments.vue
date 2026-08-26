@@ -144,20 +144,6 @@ function windowLabel(item: OperationalAdjustment) {
 
 <template>
   <div class="mx-auto w-full max-w-screen-2xl space-y-4 px-4 py-4 sm:px-6 lg:px-8 lg:py-6">
-    <section class="rounded-xl border border-warning bg-warning-surface p-4 sm:p-5">
-      <div class="flex items-start gap-3">
-        <Icon class="mt-0.5 shrink-0 text-2xl text-warning" icon="solar:info-circle-outline" />
-        <div class="min-w-0 text-base leading-6">
-          <strong class="block">這裡的設定只存在這台瀏覽器</strong>
-          <p class="mt-1 mb-0 text-muted">
-            本站是靜態網站、沒有後端資料庫。要讓模型真正忽略這些站點時段，必須按
-            <strong class="text-ink">匯出</strong>，用檔案覆蓋
-            <code class="rounded bg-panel px-1">app/data/operational-adjustments.json</code>
-            後重跑統計。只在這頁新增而沒有匯出，模型不會知道。
-          </p>
-        </div>
-      </div>
-    </section>
 
     <section class="rounded-xl border border-line bg-panel p-4 sm:p-5">
       <h2 class="m-0 text-xl font-bold">{{ editingId ? '編輯排除窗' : '新增排除窗' }}</h2>
@@ -166,30 +152,19 @@ function windowLabel(item: OperationalAdjustment) {
       </p>
 
       <div class="mt-4 grid gap-3 lg:grid-cols-2">
-        <ModalPicker
-          v-model="selectedStationId"
-          label="站點"
-          :options="stationOptions"
-          empty-label="站點資料載入中"
-        />
+        <ModalPicker v-model="selectedStationId" label="站點" :options="stationOptions" empty-label="站點資料載入中" />
         <label class="grid min-w-0 gap-1.5 text-base font-bold text-muted">
           <span>原因（選填）</span>
-          <input
-            v-model="draft.reason"
+          <input v-model="draft.reason"
             class="min-h-11 w-full rounded-md border border-line-strong bg-panel px-2.5 py-2 text-base font-normal text-ink outline-none focus:border-accent-strong"
-            type="text"
-            placeholder="例如：站體遷移、道路施工"
-          >
+            type="text" placeholder="例如：站體遷移、道路施工">
         </label>
 
         <label class="grid min-w-0 gap-1.5 text-base font-bold text-muted">
           <span>起始時間</span>
-          <input
-            v-model="draft.startAt"
+          <input v-model="draft.startAt"
             class="min-h-11 w-full rounded-md border bg-panel px-2.5 py-2 text-base font-normal text-ink outline-none focus:border-accent-strong"
-            :class="issues.startAt ? 'border-danger' : 'border-line-strong'"
-            type="datetime-local"
-          >
+            :class="issues.startAt ? 'border-danger' : 'border-line-strong'" type="datetime-local">
           <span v-if="issues.startAt" class="text-base font-normal text-danger">{{ issues.startAt }}</span>
         </label>
 
@@ -199,38 +174,30 @@ function windowLabel(item: OperationalAdjustment) {
             <input v-model="openEndedChecked" type="checkbox" class="size-4">
             <span class="font-normal text-ink">未定，持續關閉</span>
           </label>
-          <input
-            v-if="!openEndedChecked"
-            v-model="draft.endAt"
+          <input v-if="!openEndedChecked" v-model="draft.endAt"
             class="min-h-11 w-full rounded-md border bg-panel px-2.5 py-2 text-base font-normal text-ink outline-none focus:border-accent-strong"
-            :class="issues.endAt ? 'border-danger' : 'border-line-strong'"
-            type="datetime-local"
-          >
+            :class="issues.endAt ? 'border-danger' : 'border-line-strong'" type="datetime-local">
           <span v-if="issues.endAt" class="text-base font-normal text-danger">{{ issues.endAt }}</span>
         </div>
       </div>
 
       <p v-if="issues.stationId" class="mt-2 text-base text-danger">{{ issues.stationId }}</p>
 
-      <p v-if="pendingConflicts.length" class="mt-3 rounded-md border border-warning bg-warning-surface px-3 py-2 text-base">
+      <p v-if="pendingConflicts.length"
+        class="mt-3 rounded-md border border-warning bg-warning-surface px-3 py-2 text-base">
         這個站點已有 {{ pendingConflicts.length }} 筆時間重疊的排除窗，重疊不影響計算結果（同一時段只會被排除一次），但可能代表重複輸入。
       </p>
 
       <div class="mt-4 flex flex-wrap gap-2">
         <button
           class="inline-flex min-h-11 items-center gap-2 rounded-lg border border-accent bg-accent px-4 text-base font-bold text-on-accent transition-colors hover:opacity-90"
-          type="button"
-          @click="submit"
-        >
+          type="button" @click="submit">
           <Icon class="text-xl" :icon="editingId ? 'solar:check-circle-outline' : 'solar:add-circle-outline'" />
           {{ editingId ? '儲存變更' : '新增' }}
         </button>
-        <button
-          v-if="editingId"
+        <button v-if="editingId"
           class="inline-flex min-h-11 items-center gap-2 rounded-lg border border-line bg-surface px-4 text-base font-bold text-ink transition-colors hover:border-accent-strong"
-          type="button"
-          @click="resetForm"
-        >
+          type="button" @click="resetForm">
           取消編輯
         </button>
       </div>
@@ -247,41 +214,30 @@ function windowLabel(item: OperationalAdjustment) {
         <div class="flex flex-wrap gap-2">
           <button
             class="inline-flex min-h-11 items-center gap-2 rounded-lg border border-line bg-surface px-3 text-base font-bold text-ink transition-colors hover:border-accent-strong"
-            type="button"
-            title="從 app/data/operational-adjustments.json 重新載入，覆蓋此瀏覽器的本機清單"
-            @click="reload"
-          >
+            type="button" title="從 app/data/operational-adjustments.json 重新載入，覆蓋此瀏覽器的本機清單" @click="reload">
             <Icon class="text-xl text-accent" icon="solar:refresh-outline" /> 重新載入內建清單
           </button>
           <button
             class="inline-flex min-h-11 items-center gap-2 rounded-lg border border-line bg-surface px-3 text-base font-bold text-ink transition-colors hover:border-accent-strong"
-            type="button"
-            @click="download"
-          >
+            type="button" @click="download">
             <Icon class="text-xl text-accent" icon="solar:download-outline" /> 匯出 JSON
           </button>
           <button
             class="inline-flex min-h-11 items-center gap-2 rounded-lg border border-line bg-surface px-3 text-base font-bold text-ink transition-colors hover:border-accent-strong"
-            type="button"
-            @click="showImport = !showImport"
-          >
+            type="button" @click="showImport = !showImport">
             <Icon class="text-xl text-accent" icon="solar:upload-outline" /> 匯入
           </button>
         </div>
       </div>
 
       <div v-if="showImport" class="mt-4 grid gap-2">
-        <textarea
-          v-model="importText"
+        <textarea v-model="importText"
           class="min-h-32 w-full rounded-md border border-line-strong bg-surface p-3 font-mono text-sm text-ink outline-none focus:border-accent-strong"
-          placeholder="貼上 operational-adjustments.json 的內容"
-        />
+          placeholder="貼上 operational-adjustments.json 的內容" />
         <div>
           <button
             class="inline-flex min-h-11 items-center gap-2 rounded-lg border border-accent bg-accent px-4 text-base font-bold text-on-accent"
-            type="button"
-            @click="runImport"
-          >
+            type="button" @click="runImport">
             覆蓋目前清單
           </button>
         </div>
@@ -290,39 +246,27 @@ function windowLabel(item: OperationalAdjustment) {
       <p v-if="notice" class="mt-3 rounded-md border border-line bg-surface px-3 py-2 text-base">{{ notice }}</p>
 
       <div v-if="adjustments.length" class="mt-4 grid gap-2">
-        <article
-          v-for="item in adjustments"
-          :key="item.id"
-          class="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-line bg-surface p-3"
-        >
+        <article v-for="item in adjustments" :key="item.id"
+          class="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-line bg-surface p-3">
           <div class="min-w-0">
             <strong class="block truncate text-base">{{ item.district }} {{ item.stationName }}</strong>
             <span class="mt-0.5 block text-base text-muted">{{ windowLabel(item) }}</span>
             <span v-if="item.reason" class="mt-0.5 block text-base text-muted">{{ item.reason }}</span>
           </div>
           <div class="flex shrink-0 flex-wrap gap-2">
-            <span
-              v-if="item.endAt === null"
-              class="inline-flex min-h-9 items-center rounded-md border border-warning bg-warning-surface px-2 text-base font-bold text-warning"
-            >持續關閉</span>
-            <button
-              v-if="item.endAt === null"
+            <span v-if="item.endAt === null"
+              class="inline-flex min-h-9 items-center rounded-md border border-warning bg-warning-surface px-2 text-base font-bold text-warning">持續關閉</span>
+            <button v-if="item.endAt === null"
               class="inline-flex min-h-9 items-center gap-1 rounded-md border border-line bg-panel px-2 text-base font-bold text-ink hover:border-accent-strong"
-              type="button"
-              @click="endOpenWindow(item)"
-            >結束於現在</button>
+              type="button" @click="endOpenWindow(item)">結束於現在</button>
             <button
               class="inline-flex min-h-9 items-center gap-1 rounded-md border border-line bg-panel px-2 text-base font-bold text-ink hover:border-accent-strong"
-              type="button"
-              @click="edit(item)"
-            >
+              type="button" @click="edit(item)">
               <Icon class="text-lg" icon="solar:pen-outline" /> 編輯
             </button>
             <button
               class="inline-flex min-h-9 items-center gap-1 rounded-md border border-line bg-panel px-2 text-base font-bold text-danger hover:border-danger"
-              type="button"
-              @click="remove(item.id)"
-            >
+              type="button" @click="remove(item.id)">
               <Icon class="text-lg" icon="solar:trash-bin-trash-outline" /> 刪除
             </button>
           </div>
