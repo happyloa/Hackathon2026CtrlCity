@@ -56,11 +56,64 @@
 
 **額外功能**（不在九步計畫內，使用者臨時需求）：「營運ROI」頁面（依星期/時段/行政區/站點檢視歷史缺車率滿柱率，含地圖與逐日明細）、「營運調整」頁面（排除窗管理）、首頁熱門度圖表的 dev-mode 修復（`npm run data:live-static`）。
 
-### 下一步：Step 5、6、7
+### Step 5 進行中：XGBoost 訓練
 
-- Step 5：訓 XGBoost，僅用 `features.parquet` 的 `split='train'`（1–4月）
-- Step 6：用 `split='validation'`（5月）掃描各視窗閾值
-- Step 7：`split='test'`（6月）評估，與上表「全站+排除38站」的 **34.8% / 28.4% / 45.0%** 對照——這是新的 PoC 成敗判準
+`ml/src/train.py` 已完成，每個視野（30/60/120分）各訓一個 `XGBClassifier` 二元分類器，預測 `target_{h}_issue`（缺車或滿柱，對齊規則 baseline 的 combined 指標）。設定：`tree_method=hist`、`enable_categorical=True`（`station_id`/`slot`/`weekday` 直接當類別特徵）、`scale_pos_weight` 依訓練集正樣本率（約4.1%）校正、`early_stopping_rounds=50` 看 validation（5月）AUCPR。
+
+踩過的坑：
+- `station_id` 在 train/validation 各自 `astype("category")` 時類別集合不同步，validation 出現 train 沒見過的站直接讓 XGBoost 報錯。修法：跨全部資料先抓固定的 `station_id`/`slot`/`weekday` 類別清單，train/validation/test 全部套用同一份 `pd.CategoricalDtype`。
+- 第一輪 `n_estimators=2000`，60分與120分視野都在樹數上限前還在漲，代表被硬性截斷而非真正 early stop；加大到4000重跑。
+
+產出：`ml/output/model_{30,60,120}.json`、`feature_importance_{h}.json`、`val_proba_{h}.npy`/`val_target_{h}.npy`（供 Step 6 掃閾值用）。
+
+### 新發現：規則 baseline 的表現嚴重依行政區而異
+
+把 `evaluate-forecast.mjs` 的 6 月測試集混淆矩陣依站點所屬行政區拆分重算（新增 `evaluateTimelinesByGroup`，輸出到 `forecast-evaluation.json` 的 `test.byDistrict`，29 區 × 3 視野，檔案 45KB／限50KB），發現全站 34.8% F1 是被平均掉的假象——**站多、基礎缺車率低的市區明顯拖累分數，郊區反而很準**：
+
+| 分類 | 例子 | Precision | F1 | 特徵（60分鐘視野） |
+|---|---|---:|---:|---|
+| 高分 | 平溪區、石碇區 | 97% / 96% | 97% / 97% | 站少（4-5站）、缺車事件比例高達21%/7.4% |
+| 中等 | 萬里區、三芝區 | 55-70% | 55-66% | 站少、事件比例中等 |
+| 低分 | 板橋區、三重區、新莊區 | 21-31% | 27-39% | 站多（100+站）、缺車事件比例只有2-6% |
+| 歸零 | 烏來區、石門區 | 0% | 0% | 樣本太少或 6 月無事件 |
+
+根本原因：baseline 用**全站統一的單一閾值**（60分鐘=0.4），但各區基礎缺車率（`posRate`）差異極大。平溪這種觀光型站點缺車率高達21%，模型抓「歷史上常常沒車」就對，precision自然高；板橋這種市區站多、周轉快、缺車率只有3-6%，同一個門檻會把大量正常波動誤判成警報，precision被稀釋。**這代表 baseline 在市區（高流量、低基礎缺車率）誤報特別多，正是最需要 ML 模型改善的地方；郊區規則已經夠用，模型的邊際效益較低。**
+
+前端已接上：「營運ROI」頁面新增 F1 Dashboard 區塊，規則基線卡片會跟著行政區選單切換到該區數字（`app/pages/roi.vue`，`baselineF1` 依 `selectedDistrict` 查 `test.byDistrict`），四張卡片加了滑鼠 hover 說明 Precision/Recall/F1/樣本數的白話定義（`MetricCard.vue` 新增 `tooltip` prop）；模型 F1（30/60/120分、跟著所選時段換算）目前是「尚未產生」佔位狀態，等 Step 7 產出 per-scope 資料再接上。
+
+### 已完成：Step 6、7 —— XGBoost vs 規則 baseline 最終對照
+
+Step 6（`ml/src/threshold.py`）用驗證集（5月）機率掃描各視野最佳 F1 閾值，邏輯對齊 `evaluate-forecast.mjs` 的 `selectThreshold`（最大化F1，同分依序比precision/recall/threshold）。Step 7（`ml/src/evaluate.py`）用選定閾值在 6月測試集（從未被訓練或選閾值用過）評估。
+
+| 視野 | 指標 | 規則 Baseline | XGBoost | 差異 |
+|---|---|---:|---:|---:|
+| 30分 | F1 | 45.3% | 47.3% | +2.0pp |
+| | Precision | 40.3% | 41.1% | +0.8pp |
+| | Recall | 51.7% | 55.6% | +3.9pp |
+| **60分（主力）** | **F1** | **34.8%** | **38.0%** | **+3.2pp** |
+| | Precision | 28.4% | 30.8% | +2.4pp |
+| | Recall | 45.0% | 49.7% | +4.7pp |
+| 120分 | F1 | 26.3% | 31.7% | +5.4pp |
+| | Precision | 22.2% | 24.9% | +2.7pp |
+| | Recall | 32.4% | 43.4% | +11.0pp |
+
+**對照成功判準「60分鐘 F1 > 34.8% 且 Precision 明顯高於 28.4%」**：F1 過了（38.0%），但 Precision 只提升2.4個百分點，改善主要來自 Recall 大幅提高（+4.7pp）而非誤報明顯減少，不算完全達成「Precision 明顯高於」的判準精神。視野越長改善越明顯（120分 F1 +5.4pp、Recall +11.0pp），可能是長視野下規則 baseline 的歷史統計失真更嚴重，模型能學到的東西更多。
+
+產出：`ml/output/selected_thresholds.json`（各視野選定閾值）、`ml/output/test_evaluation.json`（測試集混淆矩陣）。已同步一份精簡版到 `app/data/model-evaluation.json`，並接進「營運ROI」頁面的模型 F1 區塊（`app/pages/roi.vue`）——目前只有全站彙總數字，還沒有依行政區/站點拆分，所以不會跟著頁面選單變動（跟規則基線卡片不同，那個已有 `test.byDistrict`）。
+
+### 下一步：4 個可選方向（尚未決定，待討論）
+
+Precision 改善幅度不大是目前最大的疑問，以下是討論過的候選方向，尚未選定：
+
+1. **加鄰站空間特徵**（PoC 九步計畫原訂 Step 8）：也許上下游鄰站的即時狀態能補上額外訊號，提升 precision。
+2. **先接受現有結果，直接往下做**：F1 有改善即可視為「驗證過 ML 有優勢」，先把其他 PoC 項目（前端整合、demo）做完。
+3. **把 XGBoost 結果也拆成 per-district**：驗證先前的推論（baseline 在市區誤報特別多，ML 應該在市區進步最多）是否成立，跟 `evaluate-forecast.mjs` 的 `test.byDistrict` 做法一致地重算模型版本。
+4. **調參或加特徵再評估一次**：目前只用了當前庫存+四組滯後+動量，還沒加入 `station-time-profile` 的訓練期統計特徵（歷史同站同時段空/滿率），這是最可能大幅提升 precision 的方向，但也是「加鄰站空間特徵」之外的另一種特徵擴充，兩者可以一起做或分開驗證效果。
+
+### 可討論的方式:
+如果總車柱數=m,可借車數=n,可還車數k=m-n, n為可設定的參數
+- 先定義目前所有站點時常缺車(n<=2)或是滿車(k<=2),先計算各站點每星期幾的每個時段,看是否有規律(是否需要考慮假日).找出不管缺車或是滿車時常低於平均值的站別,針對這些站別來優化,看看是否能提升整體F1值,也就是現有的baseline預測適合人數少或是站數少的行政區,但是多的站別則使用模型來協助
+
 
 ### AWS 部署時機
 
