@@ -127,11 +127,22 @@ def main() -> None:
     # a single malformed value instead of letting us count and skip it, the
     # way the Node pipeline's parseCount()/parseFiniteNumber() do.
     union_sql = " UNION ALL ".join(
-        f"SELECT *, '{name}' AS source_file, '{encoding}' AS source_encoding "
+        f"SELECT * EXCLUDE (城市, 行政區, 場站名稱), "
+        f"COALESCE(城市, '') AS 城市, COALESCE(行政區, '') AS 行政區, COALESCE(場站名稱, '') AS 場站名稱, "
+        f"'{name}' AS source_file, '{encoding}' AS source_encoding "
         f"FROM read_csv('{path.as_posix()}', encoding='utf-8', all_varchar=true)"
         for path, name, encoding in normalized
     )
     duckdb.sql(f"CREATE OR REPLACE TABLE raw AS {union_sql}")
+    # A blank field reads as SQL NULL, not '', and csv-parse's JS equivalent
+    # gives '' for an empty column — coalescing here keeps the self-join below
+    # from silently dropping rows on NULL != NULL, and matches the identity
+    # key the Node pipeline would compute for the same row.
+    null_identity = duckdb.sql(
+        "SELECT count(*) FROM raw WHERE 城市 = '' OR 行政區 = '' OR 場站名稱 = ''"
+    ).fetchone()[0]
+    if null_identity:
+        print(f"  {null_identity:,} row(s) had a blank city/district/name field (coalesced to '').")
     raw_count = duckdb.sql("SELECT count(*) FROM raw").fetchone()[0]
     print(f"\nLoaded {raw_count:,} raw rows across {len(normalized)} files.")
 

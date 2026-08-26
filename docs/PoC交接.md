@@ -16,6 +16,58 @@
 
 ---
 
+## 〇、進度更新（2026-08-26，CtrlCity 專案內 session）
+
+> **本節數字取代第一節與第五節裡已過時的內容。** 細節見 git log（`Hugh_v0.0` 分支）。第一、五節原文保留不動，僅供對照歷史決策過程。
+
+### 已完成：Step 1、2、2.5、3、4
+
+**Step 4（全站 baseline）修正了兩次：**
+
+| 版本 | 60分鐘 F1 | Precision | Recall | 說明 |
+|---|---:|---:|---:|---|
+| 217 站抽樣（第一節原始數字） | 39.2% | 35.0% | 44.5% | `hash mod 8` 抽樣，不具代表性 |
+| 全站 1,578 站（未排除壞站） | 46.4% | 42.1% | 51.7% | 抽樣偏低已修正，但含長期故障站 |
+| **全站 + 排除 38 站長期故障站（定案）** | **34.8%** | **28.4%** | **45.0%** | **唯一該拿來當 PoC 對照的基準** |
+
+第二版比第三版高，是因為長期故障站（可借車數卡在 0 數週到數月）對這套規則基線是送分題——historical profile 學到「這格永遠是空的」，模型永遠猜對，貢獻零成本真陽性。**第五節「F1 > 39.2%」的成功判準已過時，改為「60分鐘 F1 > 34.8% 且 Precision 明顯高於 28.4%」。**
+
+**新增：38 站長期故障站偵測與排除**
+
+第七節提到的「數值連續 N 筆凍結」heuristic 已實作（`app/scripts/detect-frozen-stations.mjs`，N=48 格=24小時視為高信心）。掃出 38 站，其中 7 站與雙 0 名單重疊，31 站是全新發現（有位可還、只是沒車，卡了數週到近三個月）。**已用官網逐一核實，確認為真實暫停營運**，非資料雜訊。
+
+排除窗登記在 `app/data/operational-adjustments.json`（可由「營運調整」頁面編輯／匯出／匯入），已接進三條管線：`station-time-profile.mjs`（ROI 統計）、`evaluate-forecast.mjs`（baseline 評估）、`build-artifacts.mjs`（正式 dashboard.json）。三者的 `ALERT_THRESHOLDS`（`risk-policy.mjs`）已同步更新為新驗證集閾值：30分=0.45、**60分=0.40（原 0.45）**、120分=0.40。
+
+**編碼陷阱補充**（第六節之外新發現）：
+- `新北AWS黑克松競賽0301-14.csv` 是 UTF-8 無 BOM 且無前導引號，其餘 8 個競賽檔才是 CP950；用「有 BOM 或開頭引號」判斷編碼會誤判，須對 header 做嚴格 UTF-8 解碼。
+- **DuckDB 1.5.5 不能直接讀 Big5 檔**：CRLF 會被誤判成 `\r`，須先轉成 UTF-8 再讀。
+- SQL 自我 JOIN 時，城市／行政區／站名若是 `NULL`（非空字串，13,324,945 列中有 1,514 列）會被 `NULL=NULL` 悄悄排除，須 `COALESCE` 成空字串——Node.js 版本因 `csv-parse` 給空字串而非 `NULL`，從沒踩過這個坑。
+
+**ML PoC 環境已建置並完成 Step 1/2/2.5/3**
+
+`ml/` 目錄已建立（venv Python 3.12；duckdb/pyarrow/pandas/xgboost/scikit-learn 已裝；Python 3.14 的 wheel 覆蓋不全，需指定 3.12）。
+
+| 產出 | 內容 | 交叉驗證 |
+|---|---|---|
+| `ml/data/clean.parquet` | 13,324,945 列、1,578 站、`is_operational` 欄（雙0＋38站排除窗） | 行數與 Node 版本 raw 行數完全對上 |
+| `ml/data/features.parquet` | 30 欄：身分/時間、當前庫存、四組滯後特徵（30/60/120分/1天前）、三視窗×三種 target（empty/full/issue） | test split 60分鐘正樣本比率 3.75%，與 Node 版本 base rate 3.8% 幾乎一致 |
+
+兩者皆用 DuckDB SQL 向量化處理（`LAG`/`LEAD` window function），初版曾誤用 Python 逐列迴圈處理 1332 萬列，已重寫修正。管線與腳本：`ml/src/clean.py`、`ml/src/features.py`。
+
+**額外功能**（不在九步計畫內，使用者臨時需求）：「營運ROI」頁面（依星期/時段/行政區/站點檢視歷史缺車率滿柱率，含地圖與逐日明細）、「營運調整」頁面（排除窗管理）、首頁熱門度圖表的 dev-mode 修復（`npm run data:live-static`）。
+
+### 下一步：Step 5、6、7
+
+- Step 5：訓 XGBoost，僅用 `features.parquet` 的 `split='train'`（1–4月）
+- Step 6：用 `split='validation'`（5月）掃描各視窗閾值
+- Step 7：`split='test'`（6月）評估，與上表「全站+排除38站」的 **34.8% / 28.4% / 45.0%** 對照——這是新的 PoC 成敗判準
+
+### AWS 部署時機
+
+等本機 `npm run dev` 全部確認無誤才開始導入；技術方向是在既有 Lambda 模式（健康檢查、即時代理、AgentCore 說明端點）下加一個窄端點，把排除窗 JSON 寫進 S3，不建 DynamoDB。詳見 `docs/03_實作與驗證/AWS正式環境交接.md`。
+
+---
+
 ## 一、本專案現況的定位（重要）
 
 CtrlCity 已完成度很高且已上線。經比對，**先前規劃的多數建議你們已經實作了**：直接預測存量、停運剔除、嚴格時間切分、60 分鐘主視野、P/R/F1、貪婪配對含容量限制、反事實模擬雛形。
