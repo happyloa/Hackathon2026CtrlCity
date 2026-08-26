@@ -23,10 +23,14 @@ test('shared event-risk policy is frozen to the chronological validation selecti
 })
 
 test('risk levels use the shared threshold while current inventory failures remain critical', () => {
-  assert.equal(riskLevelFor(.449, '60'), 'medium')
-  assert.equal(riskLevelFor(.45, '60'), 'high')
-  assert.equal(riskLevelFor(.65, '60'), 'critical')
-  assert.equal(riskLevelFor(.4, '120'), 'high')
+  // Derived from the live threshold rather than hardcoded scores: ALERT_THRESHOLDS
+  // is a frozen snapshot of the validation-selected value and legitimately moves
+  // whenever forecast-evaluation.json is regenerated (see risk-policy.mjs).
+  const threshold60 = ALERT_THRESHOLDS['60']
+  assert.equal(riskLevelFor(threshold60 - .001, '60'), 'medium')
+  assert.equal(riskLevelFor(threshold60, '60'), 'high')
+  assert.equal(riskLevelFor(Math.min(1, threshold60 + .2), '60'), 'critical')
+  assert.equal(riskLevelFor(ALERT_THRESHOLDS['120'], '120'), 'high')
   assert.equal(alertSeverityFor(.2, '60'), 'normal')
   assert.equal(alertSeverityFor(.2, '60', { currentFailure: true }), 'critical')
 })

@@ -1,0 +1,8 @@
+# CtrlCity ML PoC. Install into ml/.venv built with Python 3.12 —
+# 3.14 wheel coverage for pyarrow/xgboost is still incomplete and falls back
+# to building from source.
+duckdb>=1.1
+pyarrow>=18.0
+pandas>=2.2
+xgboost>=2.1
+scikit-learn>=1.5

@@ -5,7 +5,7 @@ export const RISK_POLICY_VERSION = 'event-risk-policy-v1'
 // generation and static export so the visible alert state matches evaluation.
 export const ALERT_THRESHOLDS = Object.freeze({
   '30': 0.45,
-  '60': 0.45,
+  '60': 0.4,
   '120': 0.4,
 })
 

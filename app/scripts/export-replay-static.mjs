@@ -408,6 +408,22 @@ function normalizeLiveProfileStation(raw) {
   })
 
   while (slots.length < 48) slots.push(null)
+  const popularity = list(source.popularity).slice(0, 7).map((rawDay) => {
+    const hours = list(rawDay).slice(0, 24).map((rawHour) => {
+      const value = list(rawHour)
+      if (value.length !== 3) return null
+      const sampleDays = Math.max(0, Math.round(number(value[0])))
+      if (!sampleDays) return null
+      return [
+        sampleDays,
+        Math.max(0, round(number(value[1]), 1)),
+        Math.max(0, round(number(value[2]), 1)),
+      ]
+    })
+    while (hours.length < 24) hours.push(null)
+    return hours
+  })
+  while (popularity.length < 7) popularity.push(Array.from({ length: 24 }, () => null))
   const id = text(source.id)
   const matchKey = text(source.matchKey)
   return id && matchKey
@@ -419,6 +435,7 @@ function normalizeLiveProfileStation(raw) {
         latitude: Number.isFinite(latitude) ? latitude : null,
         longitude: Number.isFinite(longitude) ? longitude : null,
         slots,
+        popularity,
       }
     : null
 }
@@ -463,14 +480,27 @@ async function exportLiveProfiles(source, outputDir) {
     }), 'utf8')
   }
 
+  const popularityPaths = {}
+  for (let weekday = 0; weekday < 7; weekday += 1) {
+    const name = `popularity-v1-${weekday}.json`
+    popularityPaths[String(weekday)] = '/data/live-profile/' + name
+    await writeFile(resolve(directory, name), JSON.stringify({
+      weekday,
+      profiles: stations.map((station) => station.popularity[weekday]),
+    }), 'utf8')
+  }
+
   const manifest = {
     schemaVersion: '2.0',
     modelVersion: modelVersion(rawProfiles.modelVersion),
     timezone: text(rawProfiles.timezone, 'Asia/Taipei'),
     riskPolicy: normalizeLiveRiskPolicy(rawProfiles.riskPolicy),
     prediction: predictionMetadata(rawProfiles.prediction, stations),
+    stationIds: stations.map((station) => station.id),
     matchKeys: stations.map((station) => station.matchKey),
     slots: paths,
+    popularity: popularityPaths,
+    popularityValueFormat: ['sampleDays', 'meanAvailableBikes', 'meanAvailableDocks'],
   }
   await writeFile(resolve(directory, 'manifest.json'), JSON.stringify(manifest), 'utf8')
 
