@@ -424,7 +424,7 @@ onBeforeUnmount(() => {
         class="flex min-h-13 items-center justify-between gap-2 rounded-md border border-line bg-panel px-2.5 py-2 text-left text-base text-ink transition-colors hover:border-accent-strong hover:bg-surface"
         type="button" @click="chooseSearchResult(station.id)">
         <span class="grid min-w-0 gap-0.5"><strong class="truncate">{{ displayStationName(station.name)
-            }}</strong><small class="text-base text-muted">{{ station.district || '新北市' }}</small></span>
+        }}</strong><small class="text-base text-muted">{{ station.district || '新北市' }}</small></span>
         <b class="shrink-0 whitespace-nowrap font-mono text-base text-accent-strong">{{ station.availableBikes }} 車／{{
           station.availableDocks }} 位</b>
       </button>
@@ -467,17 +467,17 @@ onBeforeUnmount(() => {
               :style="{ backgroundColor: STABLE_MARKER_COLORS.balanced }" />黃褐｜穩定均衡</span>
           <span class="inline-flex min-w-0 items-center gap-1.5 leading-snug"><i
               class="h-2.5 w-2.5 shrink-0 rounded-full border border-line-strong"
-              :style="{ backgroundColor: STABLE_MARKER_COLORS['bike-heavy'] }" />紫｜可借 ≥ 2/3</span>
+              :style="{ backgroundColor: STABLE_MARKER_COLORS['bike-heavy'] }" />可借車位 ≥ 2/3</span>
           <span class="inline-flex min-w-0 items-center gap-1.5 leading-snug"><i
               class="h-2.5 w-2.5 shrink-0 rounded-full border border-line-strong"
-              :style="{ backgroundColor: STABLE_MARKER_COLORS['dock-heavy'] }" />藍綠｜可還 ≥ 2/3</span>
+              :style="{ backgroundColor: STABLE_MARKER_COLORS['dock-heavy'] }" />可還車位 ≥ 2/3</span>
         </template>
         <span class="inline-flex min-w-0 items-center gap-1.5 leading-snug"><i
             class="h-2.5 w-2.5 shrink-0 rounded-full border border-line-strong"
-            :style="{ backgroundColor: MARKER_COLORS['empty-risk'] }" />紅｜缺車風險</span>
+            :style="{ backgroundColor: MARKER_COLORS['empty-risk'] }" />紅｜缺車,可借車位0</span>
         <span class="inline-flex min-w-0 items-center gap-1.5 leading-snug"><i
             class="h-2.5 w-2.5 shrink-0 rounded-full border border-line-strong"
-            :style="{ backgroundColor: MARKER_COLORS['full-risk'] }" />藍｜缺位風險</span>
+            :style="{ backgroundColor: MARKER_COLORS['full-risk'] }" />藍｜缺位,可還車位0</span>
         <span class="inline-flex min-w-0 items-center gap-1.5 leading-snug"><i
             class="h-2.5 w-2.5 shrink-0 rounded-full border border-line-strong"
             :style="{ backgroundColor: MARKER_COLORS['service-review'] }" />灰｜服務異常</span>
