@@ -259,7 +259,7 @@ function parseSnapshot(row, aliases, stationCache, counters) {
   const identityKey = `${city}|${district}|${canonicalName}`
   let station = stationCache.get(identityKey)
   if (!station) {
-    station = { id: stableId(identityKey), cohort: isInEvaluationCohort(identityKey) }
+    station = { id: stableId(identityKey), cohort: isInEvaluationCohort(identityKey), district }
     stationCache.set(identityKey, station)
   }
   if (!station.cohort) return null
@@ -467,6 +467,52 @@ function evaluateTimelines(timelines, profiles, thresholdsByHorizon = null) {
   return horizons
 }
 
+/**
+ * Same confusion-matrix logic as evaluateTimelines, but grouped by an
+ * arbitrary key (district) instead of pooled across every station. Used only
+ * for the already-selected test-split thresholds, so it only needs the
+ * combined empty/full confusion matrix, not the threshold sweep or the
+ * separate empty/full/probability breakdowns.
+ */
+function evaluateTimelinesByGroup(timelines, profiles, thresholdsByHorizon, groupKeyFor) {
+  const groups = new Map()
+  for (const [stationId, timeline] of timelines.entries()) {
+    const groupKey = groupKeyFor(stationId)
+    if (groupKey == null) continue
+    let group = groups.get(groupKey)
+    if (!group) {
+      group = { stationIds: new Set(), byHorizon: new Map(HORIZONS.map((horizon) => [horizon, createConfusion()])) }
+      groups.set(groupKey, group)
+    }
+    group.stationIds.add(stationId)
+
+    for (const snapshot of timeline.values()) {
+      for (const horizon of HORIZONS) {
+        const target = timeline.get(snapshot.bucketEpoch + horizon * 60 * 1000)
+        if (!target) continue
+        if (snapshot.currentState === 'unavailable') continue
+        if (target.currentState === 'unavailable') continue
+        const previous = timeline.get(snapshot.bucketEpoch - HALF_HOUR_MS)
+        const risk = forecastRisk(snapshot, previous, horizon, profiles)
+        const actual = target.currentState === 'empty' || target.currentState === 'full'
+        updateConfusion(group.byHorizon.get(horizon), risk.inventoryRisk >= thresholdsByHorizon[horizon], actual)
+      }
+    }
+  }
+  return groups
+}
+
+function serializeGroups(groups) {
+  const result = {}
+  for (const [groupKey, group] of groups) {
+    result[groupKey] = {
+      stationCount: group.stationIds.size,
+      horizons: Object.fromEntries(HORIZONS.map((horizon) => [horizon, finalizeConfusion(group.byHorizon.get(horizon))])),
+    }
+  }
+  return result
+}
+
 function selectThreshold(accumulator) {
   const candidates = [...accumulator.candidates.entries()].map(([threshold, confusion]) => ({
     threshold,
@@ -638,6 +684,18 @@ async function main() {
   const validationApplied = evaluateTimelines(timelines.validation, profiles, thresholds)
   const testApplied = evaluateTimelines(timelines.test, profiles, thresholds)
 
+  const districtByStationId = new Map()
+  for (const station of stationCache.values()) {
+    if (station.cohort) districtByStationId.set(station.id, station.district)
+  }
+  const testByDistrictGroups = evaluateTimelinesByGroup(
+    timelines.test,
+    profiles,
+    thresholds,
+    (stationId) => districtByStationId.get(stationId) ?? null,
+  )
+  const testByDistrict = serializeGroups(testByDistrictGroups)
+
   const evaluation = {
     schemaVersion: '1.0',
     generatedAt: new Date().toISOString(),
@@ -702,6 +760,7 @@ async function main() {
     test: {
       split: '2026-06',
       horizons: Object.fromEntries(HORIZONS.map((horizon) => [horizon, serializeApplied(testApplied.get(horizon))])),
+      byDistrict: testByDistrict,
     },
     limitations: [
       IS_FULL_COHORT

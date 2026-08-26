@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "1.0",
+  "model": {
+    "type": "xgboost",
+    "objective": "predict station_empty_or_full inventory risk at a given horizon",
+    "trainSplit": "2026-01-01 to 2026-04-30",
+    "thresholdSplit": "2026-05-01 to 2026-05-31",
+    "testSplit": "2026-06-01 to 2026-06-30"
+  },
+  "test": {
+    "split": "2026-06",
+    "horizons": {
+      "30": { "threshold": 0.87, "tp": 45618, "fp": 65263, "fn": 36374, "tn": 2035983, "predictionCount": 2183238, "precision": 0.411, "recall": 0.556, "f1": 0.473 },
+      "60": { "threshold": 0.83, "tp": 40654, "fp": 91459, "fn": 41218, "tn": 2007324, "predictionCount": 2180655, "precision": 0.308, "recall": 0.497, "f1": 0.38 },
+      "120": { "threshold": 0.8, "tp": 35440, "fp": 106659, "fn": 46245, "tn": 1987145, "predictionCount": 2175489, "precision": 0.249, "recall": 0.434, "f1": 0.317 }
+    }
+  },
+  "limitations": [
+    "全站彙總數字，尚未依行政區或站點拆分（規則 baseline 已有 test.byDistrict，模型版本待後續補上）。",
+    "站點/星期/時段選單目前不會改變這組數字；顯示為固定目標值，等 per-scope 評估產出後才會跟著篩選換算。"
+  ]
+}
