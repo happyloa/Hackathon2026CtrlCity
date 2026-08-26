@@ -15,19 +15,30 @@ import {
   updateScenarioProfileStats,
 } from './scenario-profile-cutoff.mjs'
 import {
+  createCentralStationPopularityAccumulator,
+  createStationPopularityAccumulator,
+  stationPopularityProfile,
+  updateCentralStationPopularity,
+  updateStationPopularity,
+} from './station-popularity.mjs'
+import {
   ALERT_THRESHOLDS,
   HORIZON_MINUTES,
   RISK_POLICY_VERSION,
   alertSeverityFor,
   alertThresholdFor,
 } from './risk-policy.mjs'
+import { buildExclusionIndex, parseAdjustmentsFile } from '../shared/operational-adjustments.mjs'
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url))
 const APP_DIR = resolve(SCRIPT_DIR, '..')
 const REPO_DIR = resolve(APP_DIR, '..')
-const SOURCE_DIR = resolve(REPO_DIR, 'docs', '資料集')
+const SOURCE_DIR = process.env.CTRL_CITY_DATASET_DIR
+  ? resolve(process.env.CTRL_CITY_DATASET_DIR)
+  : resolve(REPO_DIR, 'docs', '資料集')
 const OUTPUT_FILE = resolve(APP_DIR, 'data', 'dashboard.json')
 const ALIAS_FILE = resolve(SCRIPT_DIR, 'station-aliases.json')
+const ADJUSTMENTS_FILE = resolve(APP_DIR, 'data', 'operational-adjustments.json')
 
 const HALF_HOUR_MS = 30 * 60 * 1000
 const HISTORY_POINTS = 12
@@ -266,11 +277,18 @@ function haversineKm(a, b) {
 async function detectEncoding(filePath) {
   const handle = await open(filePath, 'r')
   try {
-    const bytes = Buffer.alloc(4)
+    const bytes = Buffer.alloc(4096)
     const { bytesRead } = await handle.read(bytes, 0, bytes.length, 0)
     const hasUtf8Bom = bytesRead >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf
-    const startsWithQuote = bytesRead >= 1 && bytes[0] === 0x22
-    return hasUtf8Bom || startsWithQuote ? 'utf8' : 'cp950'
+    if (hasUtf8Bom) return 'utf8'
+    try {
+      const lineFeed = bytes.subarray(0, bytesRead).indexOf(0x0a)
+      const sampleEnd = lineFeed >= 0 ? lineFeed + 1 : bytesRead
+      new TextDecoder('utf-8', { fatal: true }).decode(bytes.subarray(0, sampleEnd))
+      return 'utf8'
+    } catch {
+      return 'cp950'
+    }
   } finally {
     await handle.close()
   }
@@ -807,7 +825,7 @@ function compactProfile(profile) {
   ]
 }
 
-function makeLiveProfiles(stationIndex, profileStats) {
+function makeLiveProfiles(stationIndex, profileStats, popularityAccumulator) {
   const stations = [...stationIndex.values()]
     .map((station) => ({
       id: station.id,
@@ -818,6 +836,7 @@ function makeLiveProfiles(stationIndex, profileStats) {
       latitude: station.latitude,
       longitude: station.longitude,
       slots: Array.from({ length: 48 }, (_, slot) => compactProfile(profileStats.get(profileKey(station.id, slot)))),
+      popularity: stationPopularityProfile(popularityAccumulator, station.id),
     }))
     .sort((left, right) => left.id.localeCompare(right.id))
 
@@ -854,6 +873,7 @@ function makeLiveProfiles(stationIndex, profileStats) {
     // full risk, inferred service-review rate]. Risk rates use per mille
     // integers to keep the artifact small and static-CDN friendly.
     profileValueFormat: ['sampleCount', 'meanBikes', 'meanDocks', 'emptyRiskPermille', 'fullRiskPermille', 'serviceReviewPermille'],
+    popularityValueFormat: ['sampleDays', 'meanAvailableBikes', 'meanAvailableDocks'],
     stations,
   }
 }
@@ -905,6 +925,16 @@ function buildScenario(scenario, captured, profileStats) {
   return { summary, stations, alerts, dispatches, briefingFacts, stationHistories }
 }
 
+async function loadAdjustmentExclusions() {
+  try {
+    const raw = JSON.parse(await readFile(ADJUSTMENTS_FILE, 'utf8'))
+    return buildExclusionIndex(parseAdjustmentsFile(raw))
+  } catch (error) {
+    if (error.code === 'ENOENT') return buildExclusionIndex([])
+    throw new Error(`Could not read ${ADJUSTMENTS_FILE}: ${error.message}`)
+  }
+}
+
 async function main() {
   const aliases = await loadAliases()
   const sourceFiles = await listSourceFiles()
@@ -912,9 +942,15 @@ async function main() {
     throw new Error(`No CSV files were found at ${SOURCE_DIR}`)
   }
 
+  const exclusions = await loadAdjustmentExclusions()
+  if (!exclusions.isEmpty) {
+    console.log(`Applying operator adjustment windows across ${exclusions.stationCount} station(s).`)
+  }
+
   const stationIndex = new Map()
   const districts = new Set()
   const profileStats = new Map()
+  const popularityMoments = createStationPopularityAccumulator()
   const bucketStats = new Map()
   const quality = {
     rawRows: 0,
@@ -935,6 +971,10 @@ async function main() {
       quality.rawRows += 1
       const snapshot = toSnapshot(row, { ...source, fileName }, aliases, stationIndex, quality, districts)
       if (!snapshot) return
+      if (!exclusions.isEmpty && exclusions.excludes(snapshot.id, snapshot.epoch)) {
+        quality.excludedByAdjustment = (quality.excludedByAdjustment ?? 0) + 1
+        return
+      }
       quality.validRows += 1
       validRowsInFile += 1
 
@@ -951,6 +991,7 @@ async function main() {
       if (snapshot.capacityGap !== 0) bucket.capacityGap += 1
 
       updateProfile(profileStats, snapshot)
+      updateStationPopularity(popularityMoments, snapshot)
     })
     quality.encodings[result.encoding] = (quality.encodings[result.encoding] ?? 0) + 1
     quality.files.push({ fileName, encoding: result.encoding, rows: result.rows, validRows: validRowsInFile })
@@ -958,6 +999,7 @@ async function main() {
   }
 
   const scenarios = chooseScenarios(bucketStats)
+  const popularityAccumulator = createCentralStationPopularityAccumulator(popularityMoments)
   const scenarioCaptures = new Map(
     scenarios.map((scenario) => [
       scenario.epoch,
@@ -989,8 +1031,6 @@ async function main() {
       if (!timestamp) return
       const captureTargets = windowTargets.get(timestamp.bucketEpoch) ?? []
       const contributesToProfile = scenarios.some((scenario) => timestamp.bucketEpoch < scenario.epoch)
-      if (!captureTargets.length && !contributesToProfile) return
-
       const snapshot = toSnapshot(
         row,
         { ...source, fileName },
@@ -1000,6 +1040,10 @@ async function main() {
         replayDistricts,
       )
       if (!snapshot) return
+      if (!exclusions.isEmpty && exclusions.excludes(snapshot.id, snapshot.epoch)) return
+
+      updateCentralStationPopularity(popularityAccumulator, snapshot)
+      if (!captureTargets.length && !contributesToProfile) return
 
       updateScenarioProfileStats(scenarioProfileStats, scenarios, snapshot)
 
@@ -1033,7 +1077,7 @@ async function main() {
     return operations.has('deliver_bikes') && operations.has('remove_bikes')
   }) || scenarios.at(-1)
   const defaultArtifact = scenarioArtifacts[defaultScenario.at]
-  const liveProfiles = makeLiveProfiles(stationIndex, profileStats)
+  const liveProfiles = makeLiveProfiles(stationIndex, profileStats, popularityAccumulator)
   const availableTimes = [...bucketStats.values()]
     .sort((left, right) => left.epoch - right.epoch)
     .map((bucket) => bucket.at)

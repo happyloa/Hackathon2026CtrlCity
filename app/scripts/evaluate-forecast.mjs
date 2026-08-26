@@ -7,11 +7,16 @@ import { fileURLToPath } from 'node:url'
 import { parse } from 'csv-parse'
 import iconv from 'iconv-lite'
 
+import { buildExclusionIndex, parseAdjustmentsFile } from '../shared/operational-adjustments.mjs'
+
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url))
 const APP_DIR = resolve(SCRIPT_DIR, '..')
 const REPO_DIR = resolve(APP_DIR, '..')
-const SOURCE_DIR = resolve(REPO_DIR, 'docs', '資料集')
+const SOURCE_DIR = process.env.CTRL_CITY_DATASET_DIR
+  ? resolve(process.env.CTRL_CITY_DATASET_DIR)
+  : resolve(REPO_DIR, 'docs', '資料集')
 const ALIAS_FILE = resolve(SCRIPT_DIR, 'station-aliases.json')
+const ADJUSTMENTS_FILE = resolve(APP_DIR, 'data', 'operational-adjustments.json')
 const OUTPUT_DIR = resolve(APP_DIR, 'data')
 const OUTPUT_FILE = resolve(OUTPUT_DIR, 'forecast-evaluation.json')
 const MARKDOWN_FILE = resolve(REPO_DIR, 'docs', '03_實作與驗證', '歷史風險基線評估.md')
@@ -23,8 +28,17 @@ const MODEL_VERSION = 'historical-live-inventory-baseline-v2'
 const SUFFICIENT_BASELINE_MIN_SAMPLES = 6
 const HIGH_CONFIDENCE_MIN_SAMPLES = 12
 const THRESHOLD_CANDIDATES = [0.02, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9]
-const COHORT_MODULUS = 8
+// Sampling exists only to cap local memory. Set CTRL_CITY_COHORT_MODULUS=1 for a
+// full-station run; any other positive integer keeps the deterministic 1/N sample.
+const COHORT_MODULUS = (() => {
+  const raw = Number(process.env.CTRL_CITY_COHORT_MODULUS ?? 8)
+  if (!Number.isInteger(raw) || raw < 1) {
+    throw new Error(`CTRL_CITY_COHORT_MODULUS must be a positive integer; received ${process.env.CTRL_CITY_COHORT_MODULUS}`)
+  }
+  return raw
+})()
 const COHORT_REMAINDER = 0
+const IS_FULL_COHORT = COHORT_MODULUS === 1
 
 const SPLITS = Object.freeze({
   train: {
@@ -82,6 +96,7 @@ function stableId(identityKey) {
 }
 
 function isInEvaluationCohort(identityKey) {
+  if (IS_FULL_COHORT) return true
   const hash = createHash('sha256').update(identityKey).digest('hex')
   return Number.parseInt(hash.slice(0, 8), 16) % COHORT_MODULUS === COHORT_REMAINDER
 }
@@ -154,11 +169,21 @@ function profileKey(stationId, slot) {
 async function detectEncoding(filePath) {
   const handle = await open(filePath, 'r')
   try {
-    const bytes = Buffer.alloc(4)
+    const bytes = Buffer.alloc(4096)
     const { bytesRead } = await handle.read(bytes, 0, bytes.length, 0)
     const hasUtf8Bom = bytesRead >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf
-    const startsWithQuote = bytesRead >= 1 && bytes[0] === 0x22
-    return hasUtf8Bom || startsWithQuote ? 'utf8' : 'cp950'
+    if (hasUtf8Bom) return 'utf8'
+    // A leading quote or BOM is not a reliable signal: some competition exports are
+    // UTF-8 with neither. Strict-decode the header line instead — CP950 byte pairs
+    // are almost never valid UTF-8, so a clean decode means the file really is UTF-8.
+    try {
+      const lineFeed = bytes.subarray(0, bytesRead).indexOf(0x0a)
+      const sampleEnd = lineFeed >= 0 ? lineFeed + 1 : bytesRead
+      new TextDecoder('utf-8', { fatal: true }).decode(bytes.subarray(0, sampleEnd))
+      return 'utf8'
+    } catch {
+      return 'cp950'
+    }
   } finally {
     await handle.close()
   }
@@ -175,6 +200,15 @@ async function listSourceFiles() {
 async function loadAliases() {
   const aliases = JSON.parse(await readFile(ALIAS_FILE, 'utf8'))
   return new Map(Object.entries(aliases).map(([raw, canonical]) => [normalizeText(raw), normalizeText(canonical)]))
+}
+
+async function readAdjustments() {
+  try {
+    return parseAdjustmentsFile(JSON.parse(await readFile(ADJUSTMENTS_FILE, 'utf8')))
+  } catch (error) {
+    if (error.code === 'ENOENT') return []
+    throw new Error(`Could not read ${ADJUSTMENTS_FILE}: ${error.message}`)
+  }
 }
 
 async function streamRows(filePath, onRow) {
@@ -494,7 +528,9 @@ function markdownFor(evaluation) {
 - 靜態基線只含樣本數、平均庫存與風險率，不含原始 CSV 或單筆快照。少於 ${SUFFICIENT_BASELINE_MIN_SAMPLES} 筆會標示樣本有限；${HIGH_CONFIDENCE_MIN_SAMPLES} 筆以上只代表資料較多，不代表機率已校準。
 - 時間切分：${SPLITS.train.period} 訓練、${SPLITS.validation.period} 選閾值、${SPLITS.test.period} 最後測試。
 - 目標是判斷 30／60／120 分鐘後是否空車或滿位。可借、可還皆為 0 的服務異常快照會排除，不當成庫存事件。
-- 以站點鍵的 SHA-256 固定抽樣 \`hash mod ${COHORT_MODULUS} = ${COHORT_REMAINDER}\`，共 ${evaluation.cohort.stationCount.toLocaleString()} 站；重跑可得到相同樣本。
+- ${IS_FULL_COHORT
+    ? `**全站評估**，共 ${evaluation.cohort.stationCount.toLocaleString()} 站，未做任何抽樣。`
+    : `以站點鍵的 SHA-256 固定抽樣 \`hash mod ${COHORT_MODULUS} = ${COHORT_REMAINDER}\`，共 ${evaluation.cohort.stationCount.toLocaleString()} 站；重跑可得到相同樣本。`}
 
 ## 驗證集：閾值選擇
 
@@ -516,7 +552,9 @@ ${Object.entries(test).map(([horizon, result]) => metricRow(`${horizon} 分鐘`,
 
 - 這是可解釋的啟發式基線，不是校準後的機率模型。Brier score 與 log loss 留在 JSON 供後續比較。
 - 時間切分可避免資料洩漏；正式上線後仍需滾動重訓與時間外測試。
-- 固定抽樣是為了降低本機記憶體用量。上線前應重跑全站，並分行政區、尖離峰及空／滿類型檢查誤差。
+- ${IS_FULL_COHORT
+    ? '本次已涵蓋全站，後續仍應分行政區、尖離峰及空／滿類型檢查誤差。'
+    : '固定抽樣是為了降低本機記憶體用量。上線前應重跑全站，並分行政區、尖離峰及空／滿類型檢查誤差。'}
 - 首次開頁沒有前一時槽的頁面內變化量，會採較保守的判讀；仍需另測 cold start。
 - 目前未納入天氣、活動、捷運班次、道路、調度紀錄或服務異常成因。
 `
@@ -534,6 +572,11 @@ async function main() {
   if (!sourceFiles.length) throw new Error(`No CSV files were found at ${SOURCE_DIR}`)
 
   const aliases = await loadAliases()
+  const adjustments = await readAdjustments()
+  const exclusions = buildExclusionIndex(adjustments)
+  if (!exclusions.isEmpty) {
+    console.log(`Applying ${adjustments.length} operator adjustment window(s) across ${exclusions.stationCount} station(s).`)
+  }
   const stationCache = new Map()
   const profiles = new Map()
   const timelines = { validation: new Map(), test: new Map() }
@@ -543,6 +586,7 @@ async function main() {
     validCohortRows: 0,
     invalidTimestampRows: 0,
     invalidNumericRows: 0,
+    excludedByAdjustment: 0,
     trainRows: 0,
     validationRows: 0,
     testRows: 0,
@@ -556,6 +600,10 @@ async function main() {
       counters.rawRows += 1
       const snapshot = parseSnapshot(row, aliases, stationCache, counters)
       if (!snapshot) return
+      if (!exclusions.isEmpty && exclusions.excludes(snapshot.id, snapshot.bucketEpoch)) {
+        counters.excludedByAdjustment += 1
+        return
+      }
       counters.validCohortRows += 1
       fileRows += 1
       const split = splitFor(snapshot.bucketEpoch)
@@ -614,9 +662,12 @@ async function main() {
     },
     timeSplit: Object.fromEntries(Object.entries(SPLITS).map(([name, split]) => [name, split.period])),
     cohort: {
-      selection: `sha256(normalized city|district|station name) mod ${COHORT_MODULUS} = ${COHORT_REMAINDER}`,
+      selection: IS_FULL_COHORT
+        ? 'all stations (no sampling)'
+        : `sha256(normalized city|district|station name) mod ${COHORT_MODULUS} = ${COHORT_REMAINDER}`,
       stationCount: cohortStationIds.size,
-      sampledFraction: `1/${COHORT_MODULUS}`,
+      sampledFraction: IS_FULL_COHORT ? '1/1 (full cohort)' : `1/${COHORT_MODULUS}`,
+      fullCohort: IS_FULL_COHORT,
     },
     data: {
       sourceFiles: counters.sourceFiles,
@@ -628,6 +679,8 @@ async function main() {
       trainingProfiles: profiles.size,
       invalidTimestampRows: counters.invalidTimestampRows,
       invalidNumericRows: counters.invalidNumericRows,
+      excludedByAdjustment: counters.excludedByAdjustment,
+      adjustmentsApplied: adjustments.length,
       encodings: counters.encodings,
     },
     thresholdSelection: {
@@ -651,7 +704,9 @@ async function main() {
       horizons: Object.fromEntries(HORIZONS.map((horizon) => [horizon, serializeApplied(testApplied.get(horizon))])),
     },
     limitations: [
-      '固定站點抽樣用於控制本機記憶體，並非全站點離線評估。',
+      IS_FULL_COHORT
+        ? '本次為全站點離線評估，未做站點抽樣。'
+        : '固定站點抽樣用於控制本機記憶體，並非全站點離線評估。',
       '同時無車與無可還位的疑似服務異常快照不納入空車／滿位二元事件指標。',
       '未使用天氣、活動、交通、調度或即時事件資料；結果是啟發式基線而非可校準機率模型。',
       '每次重跑會更新 generatedAt，但資料切分、特徵、閾值候選與抽樣規則固定。',

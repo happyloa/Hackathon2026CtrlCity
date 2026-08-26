@@ -192,6 +192,8 @@ onBeforeUnmount(() => {
       <div class="grid gap-0.5 rounded-md border border-line bg-panel-muted p-2"><span class="text-base font-bold text-muted">總車柱</span><strong class="font-mono text-xl text-ink">{{ station.totalDocks }}</strong></div>
     </div>
 
+    <StationPopularityChart :station="station" />
+
     <section v-if="baselineComparison" class="mb-3 mt-4 rounded-md border border-line border-l-4 border-l-accent-strong bg-panel-muted p-3" aria-label="即時庫存與歷史基線比較">
       <div class="flex flex-col items-start gap-0.5 text-base font-extrabold text-ink sm:flex-row sm:items-center sm:justify-between sm:gap-2">
         <span class="inline-flex items-center gap-1.5"><Icon class="text-lg text-accent-strong" icon="solar:scale-outline" /> {{ horizon }} 分鐘預估</span>

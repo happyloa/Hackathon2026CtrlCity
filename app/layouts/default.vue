@@ -7,6 +7,8 @@ const navigation = [
   { to: "/", label: "營運總覽", icon: "solar:radar-2-outline" },
   { to: "/stations", label: "站點總覽", icon: "solar:map-point-wave-outline" },
   { to: "/dispatch", label: "調度規劃", icon: "solar:routing-2-outline" },
+  { to: "/roi", label: "營運ROI", icon: "solar:chart-square-outline" },
+  { to: "/adjustments", label: "營運調整", icon: "solar:calendar-mark-outline" },
 ];
 
 const activeLabel = computed(

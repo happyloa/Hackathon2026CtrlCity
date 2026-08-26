@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import test from 'node:test'
 
 import { exportReplayStatic } from '../scripts/export-replay-static.mjs'
+import { ALERT_THRESHOLDS } from '../scripts/risk-policy.mjs'
 
 test('static export preserves dual-direction dispatches and shards live profiles', async () => {
   const outputDir = await mkdtemp(join(tmpdir(), 'ctrlcity-static-export-'))
@@ -18,9 +19,12 @@ test('static export preserves dual-direction dispatches and shards live profiles
     assert.equal(manifest.modelVersion, 'historical-live-inventory-baseline-v2')
     assert.equal(manifest.timezone, 'Asia/Taipei')
     assert.equal(Object.keys(manifest.slots).length, 48)
-    assert.equal(manifest.riskPolicy.alertThresholds['60'], .45)
+    assert.equal(manifest.riskPolicy.alertThresholds['60'], ALERT_THRESHOLDS['60'])
     assert.ok(Array.isArray(manifest.matchKeys))
     assert.equal(manifest.matchKeys.length, result.liveProfiles.stations)
+    assert.equal(manifest.stationIds.length, result.liveProfiles.stations)
+    assert.equal(Object.keys(manifest.popularity).length, 7)
+    assert.deepEqual(manifest.popularityValueFormat, ['sampleDays', 'meanAvailableBikes', 'meanAvailableDocks'])
     assert.equal('stations' in manifest, false)
     assert.equal(manifest.prediction?.schemaVersion, '1.0')
     assert.equal(manifest.prediction?.primaryHorizonMinutes, 60)
@@ -39,8 +43,18 @@ test('static export preserves dual-direction dispatches and shards live profiles
     assert.equal(slot.slot, 18)
     assert.ok(Array.isArray(slot.profiles))
     assert.equal(slot.profiles.length, manifest.matchKeys.length)
-    assert.ok(slot.profiles.every(profile => Array.isArray(profile) && profile.length === 6))
+    // A station with zero train-period observations for this slot (e.g. fully
+    // excluded by an operator adjustment window spanning the whole dataset)
+    // legitimately falls back to null; see normalizeLiveProfileStation.
+    assert.ok(slot.profiles.every(profile => profile === null || (Array.isArray(profile) && profile.length === 6)))
+    assert.ok(slot.profiles.some(profile => Array.isArray(profile)), 'at least one station must have a real profile for this slot')
     assert.ok((await stat(join(outputDir, 'data', 'live-profile', 'slot-v2-18.json'))).size < 1_024 * 1_024)
+
+    const popularity = JSON.parse(await readFile(join(outputDir, 'data', 'live-profile', 'popularity-v1-1.json'), 'utf8'))
+    assert.equal(popularity.weekday, 1)
+    assert.equal(popularity.profiles.length, manifest.matchKeys.length)
+    assert.ok(popularity.profiles.some(day => Array.isArray(day) && day.length === 24 && day.some(Boolean)))
+    assert.ok((await stat(join(outputDir, 'data', 'live-profile', 'popularity-v1-1.json'))).size < 1_024 * 1_024)
 
     const replayManifest = JSON.parse(await readFile(join(outputDir, 'data', 'replay', 'manifest.json'), 'utf8'))
     assert.equal(Object.keys(replayManifest.labels).length, 3)

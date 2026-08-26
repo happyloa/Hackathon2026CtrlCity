@@ -147,6 +147,11 @@ function validateLiveProfiles(liveProfiles, requiresPredictionContract) {
   assert(liveProfiles.timezone === 'Asia/Taipei', 'liveProfiles timezone must be Asia/Taipei')
   assert(Array.isArray(liveProfiles.stations) && liveProfiles.stations.length > 1000, 'liveProfiles stations are incomplete')
   assert(liveProfiles.riskPolicy?.version, 'liveProfiles risk policy is missing')
+  assert(
+    Array.isArray(liveProfiles.popularityValueFormat)
+      && liveProfiles.popularityValueFormat.join('|') === 'sampleDays|meanAvailableBikes|meanAvailableDocks',
+    'liveProfiles popularity value format is invalid',
+  )
   for (const horizon of ['30', '60', '120']) {
     assertRisk(liveProfiles.riskPolicy.alertThresholds?.[horizon], `liveProfiles ${horizon}-minute alert threshold`)
   }
@@ -162,6 +167,16 @@ function validateLiveProfiles(liveProfiles, requiresPredictionContract) {
       assert(Array.isArray(profile) && profile.length === 6, `liveProfiles ${station.id} has invalid compact profile`)
       assert(profile.every((value) => Number.isInteger(value) && value >= 0), `liveProfiles ${station.id} has non-integer profile values`)
       assert(profile.slice(3).every((value) => value <= 1000), `liveProfiles ${station.id} has invalid permille risk`)
+    }
+    assert(Array.isArray(station.popularity) && station.popularity.length === 7, `liveProfiles ${station.id} must have 7 popularity weekdays`)
+    for (const day of station.popularity) {
+      assert(Array.isArray(day) && day.length === 24, `liveProfiles ${station.id} popularity day must have 24 hours`)
+      for (const profile of day) {
+        if (profile === null) continue
+        assert(Array.isArray(profile) && profile.length === 3, `liveProfiles ${station.id} has invalid popularity profile`)
+        assert(Number.isInteger(profile[0]) && profile[0] > 0, `liveProfiles ${station.id} popularity sample days are invalid`)
+        assert(profile.slice(1).every((value) => isFiniteNumber(value) && value >= 0), `liveProfiles ${station.id} popularity means are invalid`)
+      }
     }
   }
   if (requiresPredictionContract) {
