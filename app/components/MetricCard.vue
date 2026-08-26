@@ -7,6 +7,7 @@ const props = withDefaults(defineProps<{
   caption: string
   icon: string
   tone?: 'neutral' | 'warning' | 'critical' | 'positive'
+  tooltip?: string
 }>(), {
   tone: 'neutral',
 })
@@ -29,7 +30,19 @@ const iconClasses = {
   <article class="flex min-w-0 items-start gap-3 rounded-xl border p-4 shadow-sm" :class="toneClasses[props.tone]">
     <span class="grid size-11 shrink-0 place-items-center rounded-lg text-xl" :class="iconClasses[props.tone]"><Icon :icon="props.icon" /></span>
     <div class="min-w-0">
-      <p class="m-0 text-base font-semibold text-muted">{{ props.label }}</p>
+      <div class="flex items-center gap-1">
+        <p class="m-0 text-base font-semibold text-muted">{{ props.label }}</p>
+        <span v-if="props.tooltip" class="group/tip relative inline-flex">
+          <button
+            type="button"
+            class="grid size-5 shrink-0 place-items-center rounded-full text-muted hover:text-ink"
+            :aria-label="`${props.label} 說明`"
+          ><Icon icon="solar:question-circle-linear" /></button>
+          <span
+            class="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 w-56 -translate-x-1/2 rounded-lg border border-line-strong bg-surface p-2.5 text-sm font-normal leading-5 text-ink opacity-0 shadow-lg transition-opacity group-hover/tip:opacity-100 group-focus-within/tip:opacity-100"
+          >{{ props.tooltip }}</span>
+        </span>
+      </div>
       <strong class="mt-1 block break-words text-2xl font-bold leading-tight text-ink">{{ props.value }}</strong>
       <small class="mt-1 block text-base leading-6 text-muted">{{ props.caption }}</small>
     </div>

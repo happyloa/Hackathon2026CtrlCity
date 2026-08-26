@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0",
-  "generatedAt": "2026-08-25T17:17:59.338Z",
+  "generatedAt": "2026-08-26T07:05:56.117Z",
   "model": {
     "version": "historical-live-inventory-baseline-v2",
     "objective": "預測未來時點是否空車或滿位",
@@ -560,6 +560,1197 @@
           "excludedUnavailableCurrent": 33585,
           "excludedUnavailableTarget": 4229,
           "averageHistoricalProfileObservations": 117.291
+        }
+      }
+    },
+    "byDistrict": {
+      "林口區": {
+        "stationCount": 94,
+        "horizons": {
+          "30": {
+            "tp": 1175,
+            "fp": 2125,
+            "fn": 1460,
+            "tn": 130506,
+            "predictionCount": 135266,
+            "precision": 0.356,
+            "recall": 0.446,
+            "f1": 0.396,
+            "specificity": 0.984,
+            "alertRate": 0.024
+          },
+          "60": {
+            "tp": 895,
+            "fp": 3200,
+            "fn": 1739,
+            "tn": 129338,
+            "predictionCount": 135172,
+            "precision": 0.219,
+            "recall": 0.34,
+            "f1": 0.266,
+            "specificity": 0.976,
+            "alertRate": 0.03
+          },
+          "120": {
+            "tp": 548,
+            "fp": 3322,
+            "fn": 2085,
+            "tn": 129029,
+            "predictionCount": 134984,
+            "precision": 0.142,
+            "recall": 0.208,
+            "f1": 0.169,
+            "specificity": 0.975,
+            "alertRate": 0.029
+          }
+        }
+      },
+      "三重區": {
+        "stationCount": 135,
+        "horizons": {
+          "30": {
+            "tp": 3291,
+            "fp": 5574,
+            "fn": 3395,
+            "tn": 180084,
+            "predictionCount": 192344,
+            "precision": 0.371,
+            "recall": 0.492,
+            "f1": 0.423,
+            "specificity": 0.97,
+            "alertRate": 0.046
+          },
+          "60": {
+            "tp": 2823,
+            "fp": 8154,
+            "fn": 3861,
+            "tn": 177371,
+            "predictionCount": 192209,
+            "precision": 0.257,
+            "recall": 0.422,
+            "f1": 0.32,
+            "specificity": 0.956,
+            "alertRate": 0.057
+          },
+          "120": {
+            "tp": 2046,
+            "fp": 8366,
+            "fn": 4637,
+            "tn": 176890,
+            "predictionCount": 191939,
+            "precision": 0.197,
+            "recall": 0.306,
+            "f1": 0.239,
+            "specificity": 0.955,
+            "alertRate": 0.054
+          }
+        }
+      },
+      "新莊區": {
+        "stationCount": 137,
+        "horizons": {
+          "30": {
+            "tp": 3913,
+            "fp": 6589,
+            "fn": 4111,
+            "tn": 182224,
+            "predictionCount": 196837,
+            "precision": 0.373,
+            "recall": 0.488,
+            "f1": 0.422,
+            "specificity": 0.965,
+            "alertRate": 0.053
+          },
+          "60": {
+            "tp": 3391,
+            "fp": 9850,
+            "fn": 4623,
+            "tn": 178835,
+            "predictionCount": 196699,
+            "precision": 0.256,
+            "recall": 0.423,
+            "f1": 0.319,
+            "specificity": 0.948,
+            "alertRate": 0.067
+          },
+          "120": {
+            "tp": 2293,
+            "fp": 10209,
+            "fn": 5711,
+            "tn": 178210,
+            "predictionCount": 196423,
+            "precision": 0.183,
+            "recall": 0.286,
+            "f1": 0.224,
+            "specificity": 0.946,
+            "alertRate": 0.064
+          }
+        }
+      },
+      "土城區": {
+        "stationCount": 100,
+        "horizons": {
+          "30": {
+            "tp": 3447,
+            "fp": 4786,
+            "fn": 3240,
+            "tn": 127054,
+            "predictionCount": 138527,
+            "precision": 0.419,
+            "recall": 0.515,
+            "f1": 0.462,
+            "specificity": 0.964,
+            "alertRate": 0.059
+          },
+          "60": {
+            "tp": 2924,
+            "fp": 7181,
+            "fn": 3760,
+            "tn": 124562,
+            "predictionCount": 138427,
+            "precision": 0.289,
+            "recall": 0.437,
+            "f1": 0.348,
+            "specificity": 0.945,
+            "alertRate": 0.073
+          },
+          "120": {
+            "tp": 2088,
+            "fp": 7550,
+            "fn": 4593,
+            "tn": 123996,
+            "predictionCount": 138227,
+            "precision": 0.217,
+            "recall": 0.313,
+            "f1": 0.256,
+            "specificity": 0.943,
+            "alertRate": 0.07
+          }
+        }
+      },
+      "新店區": {
+        "stationCount": 125,
+        "horizons": {
+          "30": {
+            "tp": 3893,
+            "fp": 5513,
+            "fn": 3216,
+            "tn": 165303,
+            "predictionCount": 177925,
+            "precision": 0.414,
+            "recall": 0.548,
+            "f1": 0.471,
+            "specificity": 0.968,
+            "alertRate": 0.053
+          },
+          "60": {
+            "tp": 3382,
+            "fp": 8262,
+            "fn": 3718,
+            "tn": 162409,
+            "predictionCount": 177771,
+            "precision": 0.29,
+            "recall": 0.476,
+            "f1": 0.361,
+            "specificity": 0.952,
+            "alertRate": 0.065
+          },
+          "120": {
+            "tp": 2361,
+            "fp": 8840,
+            "fn": 4734,
+            "tn": 161528,
+            "predictionCount": 177463,
+            "precision": 0.211,
+            "recall": 0.333,
+            "f1": 0.258,
+            "specificity": 0.948,
+            "alertRate": 0.063
+          }
+        }
+      },
+      "汐止區": {
+        "stationCount": 79,
+        "horizons": {
+          "30": {
+            "tp": 1372,
+            "fp": 1847,
+            "fn": 1386,
+            "tn": 105636,
+            "predictionCount": 110241,
+            "precision": 0.426,
+            "recall": 0.497,
+            "f1": 0.459,
+            "specificity": 0.983,
+            "alertRate": 0.029
+          },
+          "60": {
+            "tp": 1108,
+            "fp": 2891,
+            "fn": 1649,
+            "tn": 104486,
+            "predictionCount": 110134,
+            "precision": 0.277,
+            "recall": 0.402,
+            "f1": 0.328,
+            "specificity": 0.973,
+            "alertRate": 0.036
+          },
+          "120": {
+            "tp": 740,
+            "fp": 3116,
+            "fn": 2013,
+            "tn": 104051,
+            "predictionCount": 109920,
+            "precision": 0.192,
+            "recall": 0.269,
+            "f1": 0.224,
+            "specificity": 0.971,
+            "alertRate": 0.035
+          }
+        }
+      },
+      "板橋區": {
+        "stationCount": 221,
+        "horizons": {
+          "30": {
+            "tp": 11188,
+            "fp": 16610,
+            "fn": 8405,
+            "tn": 278452,
+            "predictionCount": 314655,
+            "precision": 0.402,
+            "recall": 0.571,
+            "f1": 0.472,
+            "specificity": 0.944,
+            "alertRate": 0.088
+          },
+          "60": {
+            "tp": 10616,
+            "fp": 23737,
+            "fn": 8954,
+            "tn": 271126,
+            "predictionCount": 314433,
+            "precision": 0.309,
+            "recall": 0.542,
+            "f1": 0.394,
+            "specificity": 0.919,
+            "alertRate": 0.109
+          },
+          "120": {
+            "tp": 8475,
+            "fp": 24457,
+            "fn": 11070,
+            "tn": 269987,
+            "predictionCount": 313989,
+            "precision": 0.257,
+            "recall": 0.434,
+            "f1": 0.323,
+            "specificity": 0.917,
+            "alertRate": 0.105
+          }
+        }
+      },
+      "永和區": {
+        "stationCount": 55,
+        "horizons": {
+          "30": {
+            "tp": 2108,
+            "fp": 3857,
+            "fn": 2333,
+            "tn": 67208,
+            "predictionCount": 75506,
+            "precision": 0.353,
+            "recall": 0.475,
+            "f1": 0.405,
+            "specificity": 0.946,
+            "alertRate": 0.079
+          },
+          "60": {
+            "tp": 1957,
+            "fp": 5671,
+            "fn": 2478,
+            "tn": 65346,
+            "predictionCount": 75452,
+            "precision": 0.257,
+            "recall": 0.441,
+            "f1": 0.324,
+            "specificity": 0.92,
+            "alertRate": 0.101
+          },
+          "120": {
+            "tp": 1499,
+            "fp": 5781,
+            "fn": 2929,
+            "tn": 65135,
+            "predictionCount": 75344,
+            "precision": 0.206,
+            "recall": 0.339,
+            "f1": 0.256,
+            "specificity": 0.918,
+            "alertRate": 0.097
+          }
+        }
+      },
+      "中和區": {
+        "stationCount": 115,
+        "horizons": {
+          "30": {
+            "tp": 2351,
+            "fp": 4462,
+            "fn": 3243,
+            "tn": 155065,
+            "predictionCount": 165121,
+            "precision": 0.345,
+            "recall": 0.42,
+            "f1": 0.379,
+            "specificity": 0.972,
+            "alertRate": 0.041
+          },
+          "60": {
+            "tp": 2036,
+            "fp": 6432,
+            "fn": 3555,
+            "tn": 152983,
+            "predictionCount": 165006,
+            "precision": 0.24,
+            "recall": 0.364,
+            "f1": 0.29,
+            "specificity": 0.96,
+            "alertRate": 0.051
+          },
+          "120": {
+            "tp": 1517,
+            "fp": 6539,
+            "fn": 4067,
+            "tn": 152653,
+            "predictionCount": 164776,
+            "precision": 0.188,
+            "recall": 0.272,
+            "f1": 0.222,
+            "specificity": 0.959,
+            "alertRate": 0.049
+          }
+        }
+      },
+      "淡水區": {
+        "stationCount": 87,
+        "horizons": {
+          "30": {
+            "tp": 2576,
+            "fp": 2861,
+            "fn": 2402,
+            "tn": 117186,
+            "predictionCount": 125025,
+            "precision": 0.474,
+            "recall": 0.517,
+            "f1": 0.495,
+            "specificity": 0.976,
+            "alertRate": 0.043
+          },
+          "60": {
+            "tp": 1975,
+            "fp": 4441,
+            "fn": 2987,
+            "tn": 115511,
+            "predictionCount": 124914,
+            "precision": 0.308,
+            "recall": 0.398,
+            "f1": 0.347,
+            "specificity": 0.963,
+            "alertRate": 0.051
+          },
+          "120": {
+            "tp": 1303,
+            "fp": 4952,
+            "fn": 3624,
+            "tn": 114813,
+            "predictionCount": 124692,
+            "precision": 0.208,
+            "recall": 0.264,
+            "f1": 0.233,
+            "specificity": 0.959,
+            "alertRate": 0.05
+          }
+        }
+      },
+      "蘆洲區": {
+        "stationCount": 56,
+        "horizons": {
+          "30": {
+            "tp": 1157,
+            "fp": 2339,
+            "fn": 1698,
+            "tn": 73929,
+            "predictionCount": 79123,
+            "precision": 0.331,
+            "recall": 0.405,
+            "f1": 0.364,
+            "specificity": 0.969,
+            "alertRate": 0.044
+          },
+          "60": {
+            "tp": 1056,
+            "fp": 3573,
+            "fn": 1798,
+            "tn": 72640,
+            "predictionCount": 79067,
+            "precision": 0.228,
+            "recall": 0.37,
+            "f1": 0.282,
+            "specificity": 0.953,
+            "alertRate": 0.059
+          },
+          "120": {
+            "tp": 738,
+            "fp": 3672,
+            "fn": 2114,
+            "tn": 72431,
+            "predictionCount": 78955,
+            "precision": 0.167,
+            "recall": 0.259,
+            "f1": 0.203,
+            "specificity": 0.952,
+            "alertRate": 0.056
+          }
+        }
+      },
+      "鶯歌區": {
+        "stationCount": 59,
+        "horizons": {
+          "30": {
+            "tp": 531,
+            "fp": 802,
+            "fn": 567,
+            "tn": 73453,
+            "predictionCount": 75353,
+            "precision": 0.398,
+            "recall": 0.484,
+            "f1": 0.437,
+            "specificity": 0.989,
+            "alertRate": 0.018
+          },
+          "60": {
+            "tp": 375,
+            "fp": 1210,
+            "fn": 723,
+            "tn": 72986,
+            "predictionCount": 75294,
+            "precision": 0.237,
+            "recall": 0.342,
+            "f1": 0.28,
+            "specificity": 0.984,
+            "alertRate": 0.021
+          },
+          "120": {
+            "tp": 196,
+            "fp": 1296,
+            "fn": 902,
+            "tn": 72782,
+            "predictionCount": 75176,
+            "precision": 0.131,
+            "recall": 0.179,
+            "f1": 0.151,
+            "specificity": 0.983,
+            "alertRate": 0.02
+          }
+        }
+      },
+      "樹林區": {
+        "stationCount": 76,
+        "horizons": {
+          "30": {
+            "tp": 1807,
+            "fp": 2190,
+            "fn": 1557,
+            "tn": 103810,
+            "predictionCount": 109364,
+            "precision": 0.452,
+            "recall": 0.537,
+            "f1": 0.491,
+            "specificity": 0.979,
+            "alertRate": 0.037
+          },
+          "60": {
+            "tp": 1455,
+            "fp": 3370,
+            "fn": 1907,
+            "tn": 102556,
+            "predictionCount": 109288,
+            "precision": 0.302,
+            "recall": 0.433,
+            "f1": 0.355,
+            "specificity": 0.968,
+            "alertRate": 0.044
+          },
+          "120": {
+            "tp": 1028,
+            "fp": 3564,
+            "fn": 2333,
+            "tn": 102211,
+            "predictionCount": 109136,
+            "precision": 0.224,
+            "recall": 0.306,
+            "f1": 0.259,
+            "specificity": 0.966,
+            "alertRate": 0.042
+          }
+        }
+      },
+      "三峽區": {
+        "stationCount": 75,
+        "horizons": {
+          "30": {
+            "tp": 539,
+            "fp": 1179,
+            "fn": 965,
+            "tn": 97058,
+            "predictionCount": 99741,
+            "precision": 0.314,
+            "recall": 0.358,
+            "f1": 0.335,
+            "specificity": 0.988,
+            "alertRate": 0.017
+          },
+          "60": {
+            "tp": 415,
+            "fp": 1846,
+            "fn": 1089,
+            "tn": 96316,
+            "predictionCount": 99666,
+            "precision": 0.184,
+            "recall": 0.276,
+            "f1": 0.22,
+            "specificity": 0.981,
+            "alertRate": 0.023
+          },
+          "120": {
+            "tp": 272,
+            "fp": 1886,
+            "fn": 1232,
+            "tn": 96126,
+            "predictionCount": 99516,
+            "precision": 0.126,
+            "recall": 0.181,
+            "f1": 0.149,
+            "specificity": 0.981,
+            "alertRate": 0.022
+          }
+        }
+      },
+      "萬里區": {
+        "stationCount": 7,
+        "horizons": {
+          "30": {
+            "tp": 69,
+            "fp": 21,
+            "fn": 25,
+            "tn": 6962,
+            "predictionCount": 7077,
+            "precision": 0.767,
+            "recall": 0.734,
+            "f1": 0.75,
+            "specificity": 0.997,
+            "alertRate": 0.013
+          },
+          "60": {
+            "tp": 59,
+            "fp": 25,
+            "fn": 35,
+            "tn": 6835,
+            "predictionCount": 6954,
+            "precision": 0.702,
+            "recall": 0.628,
+            "f1": 0.663,
+            "specificity": 0.996,
+            "alertRate": 0.012
+          },
+          "120": {
+            "tp": 39,
+            "fp": 37,
+            "fn": 55,
+            "tn": 6577,
+            "predictionCount": 6708,
+            "precision": 0.513,
+            "recall": 0.415,
+            "f1": 0.459,
+            "specificity": 0.994,
+            "alertRate": 0.011
+          }
+        }
+      },
+      "深坑區": {
+        "stationCount": 6,
+        "horizons": {
+          "30": {
+            "tp": 143,
+            "fp": 66,
+            "fn": 66,
+            "tn": 8359,
+            "predictionCount": 8634,
+            "precision": 0.684,
+            "recall": 0.684,
+            "f1": 0.684,
+            "specificity": 0.992,
+            "alertRate": 0.024
+          },
+          "60": {
+            "tp": 107,
+            "fp": 125,
+            "fn": 102,
+            "tn": 8294,
+            "predictionCount": 8628,
+            "precision": 0.461,
+            "recall": 0.512,
+            "f1": 0.485,
+            "specificity": 0.985,
+            "alertRate": 0.027
+          },
+          "120": {
+            "tp": 75,
+            "fp": 161,
+            "fn": 133,
+            "tn": 8247,
+            "predictionCount": 8616,
+            "precision": 0.318,
+            "recall": 0.361,
+            "f1": 0.338,
+            "specificity": 0.981,
+            "alertRate": 0.027
+          }
+        }
+      },
+      "泰山區": {
+        "stationCount": 26,
+        "horizons": {
+          "30": {
+            "tp": 615,
+            "fp": 747,
+            "fn": 532,
+            "tn": 35520,
+            "predictionCount": 37414,
+            "precision": 0.452,
+            "recall": 0.536,
+            "f1": 0.49,
+            "specificity": 0.979,
+            "alertRate": 0.036
+          },
+          "60": {
+            "tp": 480,
+            "fp": 1172,
+            "fn": 666,
+            "tn": 35070,
+            "predictionCount": 37388,
+            "precision": 0.291,
+            "recall": 0.419,
+            "f1": 0.343,
+            "specificity": 0.968,
+            "alertRate": 0.044
+          },
+          "120": {
+            "tp": 327,
+            "fp": 1269,
+            "fn": 819,
+            "tn": 34921,
+            "predictionCount": 37336,
+            "precision": 0.205,
+            "recall": 0.285,
+            "f1": 0.239,
+            "specificity": 0.965,
+            "alertRate": 0.043
+          }
+        }
+      },
+      "瑞芳區": {
+        "stationCount": 9,
+        "horizons": {
+          "30": {
+            "tp": 125,
+            "fp": 90,
+            "fn": 87,
+            "tn": 9653,
+            "predictionCount": 9955,
+            "precision": 0.581,
+            "recall": 0.59,
+            "f1": 0.585,
+            "specificity": 0.991,
+            "alertRate": 0.022
+          },
+          "60": {
+            "tp": 96,
+            "fp": 148,
+            "fn": 116,
+            "tn": 9470,
+            "predictionCount": 9830,
+            "precision": 0.393,
+            "recall": 0.453,
+            "f1": 0.421,
+            "specificity": 0.985,
+            "alertRate": 0.025
+          },
+          "120": {
+            "tp": 61,
+            "fp": 180,
+            "fn": 151,
+            "tn": 9188,
+            "predictionCount": 9580,
+            "precision": 0.253,
+            "recall": 0.288,
+            "f1": 0.269,
+            "specificity": 0.981,
+            "alertRate": 0.025
+          }
+        }
+      },
+      "五股區": {
+        "stationCount": 32,
+        "horizons": {
+          "30": {
+            "tp": 375,
+            "fp": 422,
+            "fn": 335,
+            "tn": 42325,
+            "predictionCount": 43457,
+            "precision": 0.471,
+            "recall": 0.528,
+            "f1": 0.498,
+            "specificity": 0.99,
+            "alertRate": 0.018
+          },
+          "60": {
+            "tp": 275,
+            "fp": 658,
+            "fn": 434,
+            "tn": 42059,
+            "predictionCount": 43426,
+            "precision": 0.295,
+            "recall": 0.388,
+            "f1": 0.335,
+            "specificity": 0.985,
+            "alertRate": 0.021
+          },
+          "120": {
+            "tp": 185,
+            "fp": 708,
+            "fn": 524,
+            "tn": 41947,
+            "predictionCount": 43364,
+            "precision": 0.207,
+            "recall": 0.261,
+            "f1": 0.231,
+            "specificity": 0.983,
+            "alertRate": 0.021
+          }
+        }
+      },
+      "八里區": {
+        "stationCount": 31,
+        "horizons": {
+          "30": {
+            "tp": 374,
+            "fp": 414,
+            "fn": 410,
+            "tn": 42092,
+            "predictionCount": 43290,
+            "precision": 0.475,
+            "recall": 0.477,
+            "f1": 0.476,
+            "specificity": 0.99,
+            "alertRate": 0.018
+          },
+          "60": {
+            "tp": 263,
+            "fp": 648,
+            "fn": 521,
+            "tn": 41818,
+            "predictionCount": 43250,
+            "precision": 0.289,
+            "recall": 0.335,
+            "f1": 0.31,
+            "specificity": 0.985,
+            "alertRate": 0.021
+          },
+          "120": {
+            "tp": 142,
+            "fp": 768,
+            "fn": 640,
+            "tn": 41620,
+            "predictionCount": 43170,
+            "precision": 0.156,
+            "recall": 0.182,
+            "f1": 0.168,
+            "specificity": 0.982,
+            "alertRate": 0.021
+          }
+        }
+      },
+      "石碇區": {
+        "stationCount": 4,
+        "horizons": {
+          "30": {
+            "tp": 169,
+            "fp": 3,
+            "fn": 3,
+            "tn": 2133,
+            "predictionCount": 2308,
+            "precision": 0.983,
+            "recall": 0.983,
+            "f1": 0.983,
+            "specificity": 0.999,
+            "alertRate": 0.075
+          },
+          "60": {
+            "tp": 159,
+            "fp": 6,
+            "fn": 5,
+            "tn": 2047,
+            "predictionCount": 2217,
+            "precision": 0.964,
+            "recall": 0.97,
+            "f1": 0.967,
+            "specificity": 0.997,
+            "alertRate": 0.074
+          },
+          "120": {
+            "tp": 142,
+            "fp": 9,
+            "fn": 6,
+            "tn": 1878,
+            "predictionCount": 2035,
+            "precision": 0.94,
+            "recall": 0.959,
+            "f1": 0.95,
+            "specificity": 0.995,
+            "alertRate": 0.074
+          }
+        }
+      },
+      "三芝區": {
+        "stationCount": 9,
+        "horizons": {
+          "30": {
+            "tp": 314,
+            "fp": 121,
+            "fn": 121,
+            "tn": 10897,
+            "predictionCount": 11453,
+            "precision": 0.722,
+            "recall": 0.722,
+            "f1": 0.722,
+            "specificity": 0.989,
+            "alertRate": 0.038
+          },
+          "60": {
+            "tp": 241,
+            "fp": 197,
+            "fn": 191,
+            "tn": 10757,
+            "predictionCount": 11386,
+            "precision": 0.55,
+            "recall": 0.558,
+            "f1": 0.554,
+            "specificity": 0.982,
+            "alertRate": 0.038
+          },
+          "120": {
+            "tp": 150,
+            "fp": 293,
+            "fn": 277,
+            "tn": 10532,
+            "predictionCount": 11252,
+            "precision": 0.339,
+            "recall": 0.351,
+            "f1": 0.345,
+            "specificity": 0.973,
+            "alertRate": 0.039
+          }
+        }
+      },
+      "烏來區": {
+        "stationCount": 2,
+        "horizons": {
+          "30": {
+            "tp": 0,
+            "fp": 0,
+            "fn": 0,
+            "tn": 1380,
+            "predictionCount": 1380,
+            "precision": 0,
+            "recall": 0,
+            "f1": 0,
+            "specificity": 1,
+            "alertRate": 0
+          },
+          "60": {
+            "tp": 0,
+            "fp": 0,
+            "fn": 0,
+            "tn": 1320,
+            "predictionCount": 1320,
+            "precision": 0,
+            "recall": 0,
+            "f1": 0,
+            "specificity": 1,
+            "alertRate": 0
+          },
+          "120": {
+            "tp": 0,
+            "fp": 0,
+            "fn": 0,
+            "tn": 1200,
+            "predictionCount": 1200,
+            "precision": 0,
+            "recall": 0,
+            "f1": 0,
+            "specificity": 1,
+            "alertRate": 0
+          }
+        }
+      },
+      "金山區": {
+        "stationCount": 6,
+        "horizons": {
+          "30": {
+            "tp": 52,
+            "fp": 33,
+            "fn": 34,
+            "tn": 7766,
+            "predictionCount": 7885,
+            "precision": 0.612,
+            "recall": 0.605,
+            "f1": 0.608,
+            "specificity": 0.996,
+            "alertRate": 0.011
+          },
+          "60": {
+            "tp": 38,
+            "fp": 46,
+            "fn": 48,
+            "tn": 7718,
+            "predictionCount": 7850,
+            "precision": 0.452,
+            "recall": 0.442,
+            "f1": 0.447,
+            "specificity": 0.994,
+            "alertRate": 0.011
+          },
+          "120": {
+            "tp": 25,
+            "fp": 57,
+            "fn": 61,
+            "tn": 7637,
+            "predictionCount": 7780,
+            "precision": 0.305,
+            "recall": 0.291,
+            "f1": 0.298,
+            "specificity": 0.993,
+            "alertRate": 0.011
+          }
+        }
+      },
+      "石門區": {
+        "stationCount": 5,
+        "horizons": {
+          "30": {
+            "tp": 0,
+            "fp": 1,
+            "fn": 1,
+            "tn": 3448,
+            "predictionCount": 3450,
+            "precision": 0,
+            "recall": 0,
+            "f1": 0,
+            "specificity": 1,
+            "alertRate": 0
+          },
+          "60": {
+            "tp": 0,
+            "fp": 0,
+            "fn": 1,
+            "tn": 3299,
+            "predictionCount": 3300,
+            "precision": 0,
+            "recall": 0,
+            "f1": 0,
+            "specificity": 1,
+            "alertRate": 0
+          },
+          "120": {
+            "tp": 0,
+            "fp": 0,
+            "fn": 1,
+            "tn": 2999,
+            "predictionCount": 3000,
+            "precision": 0,
+            "recall": 0,
+            "f1": 0,
+            "specificity": 1,
+            "alertRate": 0
+          }
+        }
+      },
+      "坪林區": {
+        "stationCount": 4,
+        "horizons": {
+          "30": {
+            "tp": 45,
+            "fp": 17,
+            "fn": 18,
+            "tn": 2680,
+            "predictionCount": 2760,
+            "precision": 0.726,
+            "recall": 0.714,
+            "f1": 0.72,
+            "specificity": 0.994,
+            "alertRate": 0.022
+          },
+          "60": {
+            "tp": 29,
+            "fp": 32,
+            "fn": 34,
+            "tn": 2545,
+            "predictionCount": 2640,
+            "precision": 0.475,
+            "recall": 0.46,
+            "f1": 0.468,
+            "specificity": 0.988,
+            "alertRate": 0.023
+          },
+          "120": {
+            "tp": 14,
+            "fp": 43,
+            "fn": 47,
+            "tn": 2296,
+            "predictionCount": 2400,
+            "precision": 0.246,
+            "recall": 0.23,
+            "f1": 0.237,
+            "specificity": 0.982,
+            "alertRate": 0.024
+          }
+        }
+      },
+      "平溪區": {
+        "stationCount": 5,
+        "horizons": {
+          "30": {
+            "tp": 712,
+            "fp": 11,
+            "fn": 11,
+            "tn": 2716,
+            "predictionCount": 3450,
+            "precision": 0.985,
+            "recall": 0.985,
+            "f1": 0.985,
+            "specificity": 0.996,
+            "alertRate": 0.21
+          },
+          "60": {
+            "tp": 677,
+            "fp": 21,
+            "fn": 16,
+            "tn": 2586,
+            "predictionCount": 3300,
+            "precision": 0.97,
+            "recall": 0.977,
+            "f1": 0.973,
+            "specificity": 0.992,
+            "alertRate": 0.212
+          },
+          "120": {
+            "tp": 610,
+            "fp": 27,
+            "fn": 23,
+            "tn": 2340,
+            "predictionCount": 3000,
+            "precision": 0.958,
+            "recall": 0.964,
+            "f1": 0.961,
+            "specificity": 0.989,
+            "alertRate": 0.212
+          }
+        }
+      },
+      "貢寮區": {
+        "stationCount": 3,
+        "horizons": {
+          "30": {
+            "tp": 10,
+            "fp": 8,
+            "fn": 8,
+            "tn": 4291,
+            "predictionCount": 4317,
+            "precision": 0.556,
+            "recall": 0.556,
+            "f1": 0.556,
+            "specificity": 0.998,
+            "alertRate": 0.004
+          },
+          "60": {
+            "tp": 5,
+            "fp": 13,
+            "fn": 13,
+            "tn": 4283,
+            "predictionCount": 4314,
+            "precision": 0.278,
+            "recall": 0.278,
+            "f1": 0.278,
+            "specificity": 0.997,
+            "alertRate": 0.004
+          },
+          "120": {
+            "tp": 1,
+            "fp": 17,
+            "fn": 17,
+            "tn": 4273,
+            "predictionCount": 4308,
+            "precision": 0.056,
+            "recall": 0.056,
+            "f1": 0.056,
+            "specificity": 0.996,
+            "alertRate": 0.004
+          }
+        }
+      },
+      "雙溪區": {
+        "stationCount": 2,
+        "horizons": {
+          "30": {
+            "tp": 3,
+            "fp": 10,
+            "fn": 9,
+            "tn": 1358,
+            "predictionCount": 1380,
+            "precision": 0.231,
+            "recall": 0.25,
+            "f1": 0.24,
+            "specificity": 0.993,
+            "alertRate": 0.009
+          },
+          "60": {
+            "tp": 4,
+            "fp": 14,
+            "fn": 8,
+            "tn": 1294,
+            "predictionCount": 1320,
+            "precision": 0.222,
+            "recall": 0.333,
+            "f1": 0.267,
+            "specificity": 0.989,
+            "alertRate": 0.014
+          },
+          "120": {
+            "tp": 2,
+            "fp": 19,
+            "fn": 10,
+            "tn": 1169,
+            "predictionCount": 1200,
+            "precision": 0.095,
+            "recall": 0.167,
+            "f1": 0.121,
+            "specificity": 0.984,
+            "alertRate": 0.018
+          }
         }
       }
     }
