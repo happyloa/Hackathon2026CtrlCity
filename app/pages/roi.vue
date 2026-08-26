@@ -104,17 +104,24 @@ const baselineF1 = computed(() => {
 
 /**
  * Model F1 comes from the Step 7 XGBoost held-out test evaluation
- * (ml/src/evaluate.py -> app/data/model-evaluation.json). Unlike the rule
- * baseline, this has not been broken down by district/station yet (see
- * model-evaluation.json's `limitations`), so all three horizons show the
- * same all-cohort number regardless of the pickers above until a per-scope
- * evaluation pipeline exists.
+ * (ml/src/evaluate.py -> app/data/model-evaluation.json), now also broken
+ * down by district the same way as the rule baseline. Small districts (a
+ * handful of stations) swing wildly on either side -- some improve a lot,
+ * a few (e.g. 石碇區) collapse -- so the per-district model number is far
+ * noisier than the baseline's simple historical average there; it only
+ * becomes a fair comparison once a district has enough stations.
  */
-type ModelF1Metrics = { f1: number, precision: number, recall: number }
+type ModelF1Metrics = { tp: number, fp: number, fn: number, tn: number, precision: number, recall: number, f1: number }
+const modelByDistrictLookup = modelEvaluation.test?.byDistrict as
+  Record<string, { stationCount: number, horizons: Record<string, ModelF1Metrics> }> | undefined
+
 const modelF1Horizons = [30, 60, 120] as const
 const modelF1Rows = computed(() => modelF1Horizons.map((horizon) => {
-  const metrics = (modelEvaluation.test?.horizons as Record<string, ModelF1Metrics> | undefined)?.[String(horizon)]
-  return { horizon, metrics: metrics ?? null }
+  const byDistrict = selectedDistrict.value
+    ? modelByDistrictLookup?.[selectedDistrict.value]?.horizons?.[String(horizon)]
+    : null
+  const metrics = byDistrict ?? (modelEvaluation.test?.horizons as Record<string, ModelF1Metrics> | undefined)?.[String(horizon)]
+  return { horizon, metrics: metrics ?? null, scoped: Boolean(byDistrict) }
 }))
 
 const dayPeak = computed(() => {
@@ -242,7 +249,9 @@ watch([selectedDistrict, selectedWeekday, selectedSlot, selectedStationId], () =
       </div>
 
       <div class="mt-5">
-        <h3 class="m-0 text-base font-bold text-muted">XGBoost 模型 F1 · 全站（尚未依行政區/站點拆分）· 6月測試集</h3>
+        <h3 class="m-0 text-base font-bold text-muted">
+          XGBoost 模型 F1{{ selectedDistrict ? `（${selectedDistrict}）` : '（全站）' }} · 6月測試集
+        </h3>
         <div class="mt-2 space-y-2">
           <div
             v-for="row in modelF1Rows"
@@ -257,7 +266,12 @@ watch([selectedDistrict, selectedWeekday, selectedSlot, selectedStationId], () =
           </div>
         </div>
         <p class="mt-2 mb-0 text-base text-muted">
-          目前跟規則基線不同，模型分數還沒有依行政區/站點拆分，所以不會跟著上方選單變動；之後若補上分區評估會一併換算。
+          <template v-if="selectedDistrict && (activeScope?.stationCount ?? 0) < 20">
+            這個行政區只有 {{ activeScope?.stationCount ?? 0 }} 站，樣本少、分數容易大起大落，不適合直接拿來判斷模型好壞。
+          </template>
+          <template v-else>
+            站數愈多的行政區，模型對規則基線的改善愈穩定；站數很少的行政區可能因樣本不足而波動劇烈，甚至比基線差。
+          </template>
         </p>
       </div>
     </section>
