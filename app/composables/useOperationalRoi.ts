@@ -37,8 +37,9 @@ interface RoiArtifact {
   scopes: Record<string, RoiScope>
   stations?: [string, string, string, number, number, number][]
   stationShards?: Record<string, string>
-  stationDetailPath?: string
+  stationDetailPaths?: string[]
   stationDetailFormat?: {
+    stationsPerShard: number
     recordsPerStation: number
     bytesPerRecord: number
     originDate: string
@@ -197,27 +198,31 @@ export function useOperationalRoi() {
 
   /**
    * Every individual reading behind one station × weekday × slot aggregate.
-   * All 1,568 stations' readings live in one binary file (station-details.bin),
-   * packed at a fixed per-station stride — a station's array index doubles as
-   * its byte offset, so only that station's ~17 KB slice is fetched via an
-   * HTTP Range request rather than downloading the whole ~27 MB file. A range
-   * fetch that fails, or a server that ignores Range and returns the whole
-   * file, both still resolve correctly below.
+   * All stations' readings live in a small, fixed number of binary shard
+   * files (station-details-N.bin — split so no single asset exceeds
+   * Cloudflare Pages' 25 MiB per-file cap), packed at a fixed per-station
+   * stride within its shard. Only the selected station's ~17 KB slice is
+   * fetched via an HTTP Range request rather than downloading a whole shard.
+   * A range fetch that fails, or a server that ignores Range and returns the
+   * whole shard, both still resolve correctly below.
    */
   async function loadStationDetail(stationId: string): Promise<void> {
     if (!stationId || details.value[stationId] || !import.meta.client) return
-    const base = artifact.stationDetailPath
+    const paths = artifact.stationDetailPaths
     const format = artifact.stationDetailFormat
     const index = STATION_INDEX_BY_ID.get(stationId)
-    if (!base || !format || index === undefined) return
+    if (!paths?.length || !format || index === undefined) return
+    const shardIndex = Math.floor(index / format.stationsPerShard)
+    const path = paths[shardIndex]
+    if (!path) return
 
     detailLoading.value = true
     detailMissing.value = false
     try {
       const stride = format.recordsPerStation * format.bytesPerRecord
-      const start = index * stride
+      const start = (index % format.stationsPerShard) * stride
       const end = start + stride - 1
-      const response = await fetch(base, { headers: { Range: `bytes=${start}-${end}` }, cache: 'no-store' })
+      const response = await fetch(path, { headers: { Range: `bytes=${start}-${end}` }, cache: 'no-store' })
       if (!response.ok && response.status !== 206) throw new Error(`detail fetch failed: ${response.status}`)
       const buffer = await response.arrayBuffer()
       const byteOffset = response.status === 206 ? 0 : start

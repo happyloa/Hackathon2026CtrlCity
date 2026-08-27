@@ -9,10 +9,11 @@
 // N 筆凍結，N 待 EDA 決定") — this script is that EDA pass. It only reports
 // candidates; nothing is excluded automatically.
 //
-// Reads the single station-details.bin file written by station-time-profile.mjs
-// (public/data/roi/station-details.bin), which packs every station's readings
-// in chronological order at a fixed per-station stride, so no CSV re-scan is
-// needed. Run `npm run data:profile` first if that file is missing.
+// Reads the station-details-N.bin shard files written by station-time-profile.mjs
+// (public/data/roi/), which pack every station's readings in chronological
+// order at a fixed per-station stride (split across shards so no single file
+// exceeds Cloudflare Pages' 25 MiB asset cap), so no CSV re-scan is needed.
+// Run `npm run data:profile` first if those files are missing.
 
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
@@ -22,7 +23,7 @@ const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url))
 const APP_DIR = resolve(SCRIPT_DIR, '..')
 const REPO_DIR = resolve(APP_DIR, '..')
 const ROI_FILE = resolve(APP_DIR, 'data', 'operational-roi.json')
-const DETAIL_FILE = resolve(APP_DIR, 'public', 'data', 'roi', 'station-details.bin')
+const SHARD_DIR = resolve(APP_DIR, 'public', 'data', 'roi')
 const OUTPUT_DIR = resolve(REPO_DIR, 'ml', 'output')
 const MISSING_RECORD = 0xffff
 
@@ -82,19 +83,22 @@ function findRuns(view, recordsPerStation, metric) {
 async function main() {
   const roi = JSON.parse(await readFile(ROI_FILE, 'utf8'))
   const format = roi.stationDetailFormat
-  if (!format) throw new Error(`${ROI_FILE} has no stationDetailFormat. Run npm run data:profile first.`)
+  const paths = roi.stationDetailPaths
+  if (!format || !paths?.length) throw new Error(`${ROI_FILE} has no stationDetailFormat/stationDetailPaths. Run npm run data:profile first.`)
 
-  const buffer = await readFile(DETAIL_FILE).catch(() => {
-    throw new Error(`${DETAIL_FILE} not found. Run npm run data:profile first.`)
-  })
+  const buffers = await Promise.all(paths.map((path) => readFile(resolve(SHARD_DIR, path.replace('/data/roi/', ''))).catch(() => {
+    throw new Error(`${resolve(SHARD_DIR, path.replace('/data/roi/', ''))} not found. Run npm run data:profile first.`)
+  })))
   const stride = format.recordsPerStation * format.bytesPerRecord
   const originEpoch = Date.parse(`${format.originDate}T00:00:00Z`)
 
-  // roi.stations is positionally aligned with station-details.bin's stride,
-  // exactly as station-time-profile.mjs wrote it.
+  // roi.stations is positionally aligned with the shard files' stride,
+  // exactly as station-time-profile.mjs wrote them.
   const findings = []
   roi.stations.forEach(([stationId, district, name, totalDocks], stationIndex) => {
-    const start = stationIndex * stride
+    const shardIndex = Math.floor(stationIndex / format.stationsPerShard)
+    const buffer = buffers[shardIndex]
+    const start = (stationIndex % format.stationsPerShard) * stride
     const view = new DataView(buffer.buffer, buffer.byteOffset + start, stride)
 
     for (const metric of ['bikes', 'docks']) {
