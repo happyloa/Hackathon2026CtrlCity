@@ -37,7 +37,15 @@ interface RoiArtifact {
   scopes: Record<string, RoiScope>
   stations?: [string, string, string, number, number, number][]
   stationShards?: Record<string, string>
-  stationDetailPath?: string
+  stationDetailPaths?: string[]
+  stationDetailFormat?: {
+    stationsPerShard: number
+    recordsPerStation: number
+    bytesPerRecord: number
+    originDate: string
+    days: number
+    slotsPerDay: number
+  }
   adjustmentsApplied?: number
   rowsExcludedByAdjustment?: number
 }
@@ -73,13 +81,16 @@ function toCell(values: number[] | null): RoiCell | null {
 
 type ShardCell = [number, number, number, number, number] | null
 
+const MISSING_RECORD = 0xffff
+
 interface StationDetail {
-  stationId: string
   originDate: string
   days: number
   slotsPerDay: number
-  grid: number[]
+  view: DataView
 }
+
+const STATION_INDEX_BY_ID = new Map(STATIONS.map((station, index) => [station.id, index]))
 
 export interface DetailRecord {
   date: string
@@ -187,20 +198,40 @@ export function useOperationalRoi() {
 
   /**
    * Every individual reading behind one station × weekday × slot aggregate.
-   * The detail files are regenerated rather than committed, so a missing file
-   * is an expected state, not an error.
+   * All stations' readings live in a small, fixed number of binary shard
+   * files (station-details-N.bin — split so no single asset exceeds
+   * Cloudflare Pages' 25 MiB per-file cap), packed at a fixed per-station
+   * stride within its shard. Only the selected station's ~17 KB slice is
+   * fetched via an HTTP Range request rather than downloading a whole shard.
+   * A range fetch that fails, or a server that ignores Range and returns the
+   * whole shard, both still resolve correctly below.
    */
   async function loadStationDetail(stationId: string): Promise<void> {
     if (!stationId || details.value[stationId] || !import.meta.client) return
-    const base = artifact.stationDetailPath
-    if (!base) return
+    const paths = artifact.stationDetailPaths
+    const format = artifact.stationDetailFormat
+    const index = STATION_INDEX_BY_ID.get(stationId)
+    if (!paths?.length || !format || index === undefined) return
+    const shardIndex = Math.floor(index / format.stationsPerShard)
+    const path = paths[shardIndex]
+    if (!path) return
 
     detailLoading.value = true
     detailMissing.value = false
     try {
-      const payload = await $fetch<StationDetail>(`${base}/${stationId}.json`, { cache: 'no-store' })
-      if (!Array.isArray(payload?.grid)) throw new Error('detail payload is not an array')
-      details.value = { ...details.value, [stationId]: payload }
+      const stride = format.recordsPerStation * format.bytesPerRecord
+      const start = (index % format.stationsPerShard) * stride
+      const end = start + stride - 1
+      const response = await fetch(path, { headers: { Range: `bytes=${start}-${end}` }, cache: 'no-store' })
+      if (!response.ok && response.status !== 206) throw new Error(`detail fetch failed: ${response.status}`)
+      const buffer = await response.arrayBuffer()
+      const byteOffset = response.status === 206 ? 0 : start
+      if (buffer.byteLength < byteOffset + stride) throw new Error('detail payload shorter than expected')
+      const view = new DataView(buffer, byteOffset, stride)
+      details.value = {
+        ...details.value,
+        [stationId]: { originDate: format.originDate, days: format.days, slotsPerDay: format.slotsPerDay, view },
+      }
     } catch {
       detailMissing.value = true
     } finally {
@@ -217,8 +248,11 @@ export function useOperationalRoi() {
     for (let dayOrdinal = 0; dayOrdinal < detail.days; dayOrdinal += 1) {
       const date = new Date(origin + dayOrdinal * 86_400_000)
       if (date.getUTCDay() !== weekday) continue
-      const packed = detail.grid[dayOrdinal * detail.slotsPerDay + slot]
-      if (packed === undefined || packed < 0) continue
+      const recordIndex = dayOrdinal * detail.slotsPerDay + slot
+      const byteOffset = recordIndex * 2
+      if (byteOffset + 2 > detail.view.byteLength) continue
+      const packed = detail.view.getUint16(byteOffset, true)
+      if (packed === MISSING_RECORD) continue
       const pad = (value: number) => String(value).padStart(2, '0')
       records.push({
         date: `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`,

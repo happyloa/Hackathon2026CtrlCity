@@ -9,12 +9,13 @@
 // N 筆凍結，N 待 EDA 決定") — this script is that EDA pass. It only reports
 // candidates; nothing is excluded automatically.
 //
-// Reads the per-station detail files written by station-time-profile.mjs
-// (public/data/roi/stations/*.json), which are already in chronological order,
-// so no CSV re-scan is needed. Run `npm run data:profile` first if those files
-// are missing.
+// Reads the station-details-N.bin shard files written by station-time-profile.mjs
+// (public/data/roi/), which pack every station's readings in chronological
+// order at a fixed per-station stride (split across shards so no single file
+// exceeds Cloudflare Pages' 25 MiB asset cap), so no CSV re-scan is needed.
+// Run `npm run data:profile` first if those files are missing.
 
-import { mkdir, readFile, readdir, rename, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -22,8 +23,9 @@ const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url))
 const APP_DIR = resolve(SCRIPT_DIR, '..')
 const REPO_DIR = resolve(APP_DIR, '..')
 const ROI_FILE = resolve(APP_DIR, 'data', 'operational-roi.json')
-const DETAIL_DIR = resolve(APP_DIR, 'public', 'data', 'roi', 'stations')
+const SHARD_DIR = resolve(APP_DIR, 'public', 'data', 'roi')
 const OUTPUT_DIR = resolve(REPO_DIR, 'ml', 'output')
+const MISSING_RECORD = 0xffff
 
 // A run shorter than this is ordinary demand noise, not worth reporting.
 const MIN_RUN_SLOTS = Number(process.env.CTRL_CITY_FROZEN_MIN_SLOTS ?? 6) // 3 hours
@@ -41,10 +43,11 @@ function dateFromOrdinal(originEpoch, dayOrdinal) {
 }
 
 /**
- * Walks one station's grid in chronological order and returns runs where
- * `metric` (bikes or docks) stays at 0 while the other stays positive.
+ * Walks one station's slice of the buffer in chronological order and returns
+ * runs where `metric` (bikes or docks) stays at 0 while the other stays
+ * positive.
  */
-function findRuns(detail, metric) {
+function findRuns(view, recordsPerStation, metric) {
   const runs = []
   let runStart = null
   let runLength = 0
@@ -57,10 +60,10 @@ function findRuns(detail, metric) {
     runLength = 0
   }
 
-  for (let index = 0; index < detail.grid.length; index += 1) {
-    const packed = detail.grid[index]
+  for (let index = 0; index < recordsPerStation; index += 1) {
+    const packed = view.getUint16(index * 2, true)
     let matches = false
-    if (packed >= 0) {
+    if (packed !== MISSING_RECORD) {
       const bikes = Math.floor(packed / 256)
       const docks = packed % 256
       matches = metric === 'bikes' ? (bikes === 0 && docks > 0) : (docks === 0 && bikes > 0)
@@ -73,37 +76,42 @@ function findRuns(detail, metric) {
       flush(index - 1)
     }
   }
-  flush(detail.grid.length - 1)
+  flush(recordsPerStation - 1)
   return runs
 }
 
 async function main() {
   const roi = JSON.parse(await readFile(ROI_FILE, 'utf8'))
-  const stationById = new Map(roi.stations.map(([id, district, name, totalDocks]) => [id, { id, district, name, totalDocks }]))
+  const format = roi.stationDetailFormat
+  const paths = roi.stationDetailPaths
+  if (!format || !paths?.length) throw new Error(`${ROI_FILE} has no stationDetailFormat/stationDetailPaths. Run npm run data:profile first.`)
 
-  const available = new Set((await readdir(DETAIL_DIR).catch(() => [])).map((name) => name.replace('.json', '')))
-  if (!available.size) {
-    throw new Error(`No detail files in ${DETAIL_DIR}. Run npm run data:profile first.`)
-  }
+  const buffers = await Promise.all(paths.map((path) => readFile(resolve(SHARD_DIR, path.replace('/data/roi/', ''))).catch(() => {
+    throw new Error(`${resolve(SHARD_DIR, path.replace('/data/roi/', ''))} not found. Run npm run data:profile first.`)
+  })))
+  const stride = format.recordsPerStation * format.bytesPerRecord
+  const originEpoch = Date.parse(`${format.originDate}T00:00:00Z`)
 
+  // roi.stations is positionally aligned with the shard files' stride,
+  // exactly as station-time-profile.mjs wrote them.
   const findings = []
-  for (const stationId of available) {
-    const station = stationById.get(stationId)
-    if (!station) continue
-    const detail = JSON.parse(await readFile(resolve(DETAIL_DIR, `${stationId}.json`), 'utf8'))
-    const originEpoch = Date.parse(`${detail.originDate}T00:00:00Z`)
+  roi.stations.forEach(([stationId, district, name, totalDocks], stationIndex) => {
+    const shardIndex = Math.floor(stationIndex / format.stationsPerShard)
+    const buffer = buffers[shardIndex]
+    const start = (stationIndex % format.stationsPerShard) * stride
+    const view = new DataView(buffer.buffer, buffer.byteOffset + start, stride)
 
     for (const metric of ['bikes', 'docks']) {
-      for (const run of findRuns(detail, metric)) {
+      for (const run of findRuns(view, format.recordsPerStation, metric)) {
         const startDay = Math.floor(run.startIndex / 48)
         const startSlot = run.startIndex % 48
         const endDay = Math.floor(run.endIndex / 48)
         const endSlot = run.endIndex % 48
         findings.push({
           stationId,
-          district: station.district,
-          name: station.name,
-          totalDocks: station.totalDocks,
+          district,
+          name,
+          totalDocks,
           metric: metric === 'bikes' ? '可借車數' : '可還位數',
           lengthSlots: run.length,
           lengthHours: Math.round(run.length / 2 * 10) / 10,
@@ -115,7 +123,7 @@ async function main() {
         })
       }
     }
-  }
+  })
 
   findings.sort((left, right) => right.lengthSlots - left.lengthSlots)
 
@@ -138,7 +146,7 @@ async function main() {
   const stationsAffected = new Set(findings.map((finding) => finding.stationId))
   const stationsHighConfidence = new Set(highConfidence.map((finding) => finding.stationId))
 
-  console.log(`Scanned ${available.size.toLocaleString()} stations.`)
+  console.log(`Scanned ${roi.stations.length.toLocaleString()} stations.`)
   console.log(`Runs of >= ${MIN_RUN_SLOTS} slots (${MIN_RUN_SLOTS / 2}h): ${findings.length.toLocaleString()}, across ${stationsAffected.size.toLocaleString()} stations`)
   console.log(`  of which >= ${HIGH_CONFIDENCE_SLOTS} slots (${HIGH_CONFIDENCE_SLOTS / 2}h, high confidence): ${highConfidence.length.toLocaleString()}, across ${stationsHighConfidence.size.toLocaleString()} stations`)
   console.log(`Wrote ${csvPath}`)

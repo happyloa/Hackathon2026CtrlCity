@@ -17,7 +17,7 @@
 
 import { createReadStream } from 'node:fs'
 import { createHash } from 'node:crypto'
-import { mkdir, open, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
+import { mkdir, open, readFile, readdir, rename, writeFile } from 'node:fs/promises'
 import { dirname, extname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -37,8 +37,14 @@ const ADJUSTMENTS_FILE = resolve(APP_DIR, 'data', 'operational-adjustments.json'
 const OUTPUT_DIR = resolve(REPO_DIR, 'ml', 'output')
 const ROI_FILE = resolve(APP_DIR, 'data', 'operational-roi.json')
 const SHARD_DIR = resolve(APP_DIR, 'public', 'data', 'roi')
-const DETAIL_DIR = resolve(SHARD_DIR, 'stations')
 const ROI_PERIOD = 'all'
+const RECORDS_PER_STATION = 181 * 48 // PERIOD_DAYS x slotsPerDay, fixed stride so a station's byte offset is index * RECORDS_PER_STATION * 2
+const MISSING_RECORD = 0xffff
+// Cloudflare Pages rejects any single static asset over 25 MiB (the whole
+// deploy fails instantly, not a real build error). One binary covering all
+// 1,577 stations comes to ~27.4 MB, just over that cap, so it is split into
+// fixed-size station shards well under the limit with room to grow.
+const DETAIL_SHARD_COUNT = 2
 
 const PERIOD_ORIGIN = Date.UTC(2026, 0, 1)
 const PERIOD_DAYS = 181                      // 2026-01-01 .. 2026-06-30
@@ -355,34 +361,55 @@ async function writeStationShards(bucket, stationOrder) {
 }
 
 /**
- * One file per station holding every raw half-hour reading, so the UI can list
- * the individual dates behind an aggregate. Values are packed as
- * `bikes * 256 + docks` into a slot-major grid; -1 marks a missing or suspended
- * reading. That keeps a station's six months to roughly 40 KB.
+ * Every raw half-hour reading, for every station, packed into a small, fixed
+ * number of binary shard files — so the UI can list the individual dates
+ * behind an aggregate without shipping a per-station JSON file. A station's
+ * earlier one-file-per-station JSON encoding (~66 MB / 1,568 files across
+ * decimal-text arrays) was far too much to commit; this packs each reading
+ * into 2 bytes (`bikes * 256 + docks`, docks capped at 255 and bikes capped
+ * at 254 so the packed value never collides with the 0xFFFF
+ * "missing/suspended" sentinel) at a fixed stride per station. A single
+ * merged file would be ~27.4 MB, just over Cloudflare Pages' 25 MiB
+ * per-asset cap, so stations are split evenly across DETAIL_SHARD_COUNT
+ * files instead.
  *
- * These files are deliberately NOT committed — 1,500-odd of them is far more
- * than belongs in Git. `npm run data:profile` regenerates them from the CSVs,
- * and the UI degrades to "明細尚未產生" when they are absent.
+ * Station order matches `roi.stations` exactly, so `stationOrder`'s array
+ * index doubles as the shard + byte-offset key (see stationDetailFormat
+ * written into operational-roi.json). The client fetches only its selected
+ * station's ~17 KB slice via an HTTP Range request rather than downloading a
+ * whole shard.
  */
 async function writeStationDetail(stationOrder, detailByStation) {
-  await rm(DETAIL_DIR, { recursive: true, force: true })
-  await mkdir(DETAIL_DIR, { recursive: true })
+  const stationsPerShard = Math.ceil(stationOrder.length / DETAIL_SHARD_COUNT)
+  const paths = []
+  let stationsWithData = 0
 
-  let written = 0
-  for (const station of stationOrder) {
-    const grid = detailByStation.get(station.id)
-    if (!grid) continue
-    await writeFile(resolve(DETAIL_DIR, `${station.id}.json`), JSON.stringify({
-      stationId: station.id,
-      originDate: '2026-01-01',
-      days: PERIOD_DAYS,
-      slotsPerDay: 48,
-      encoding: 'bikes * 256 + docks, -1 when unobserved or suspended',
-      grid: Array.from(grid),
-    }), 'utf8')
-    written += 1
+  for (let shard = 0; shard < DETAIL_SHARD_COUNT; shard += 1) {
+    const shardStations = stationOrder.slice(shard * stationsPerShard, (shard + 1) * stationsPerShard)
+    if (!shardStations.length) continue
+    const buffer = Buffer.alloc(shardStations.length * RECORDS_PER_STATION * 2, 0xff)
+    shardStations.forEach((station, indexInShard) => {
+      const grid = detailByStation.get(station.id)
+      if (!grid) return
+      stationsWithData += 1
+      const base = indexInShard * RECORDS_PER_STATION * 2
+      for (let slotIndex = 0; slotIndex < RECORDS_PER_STATION; slotIndex += 1) {
+        const packed = grid[slotIndex]
+        const record = packed < 0
+          ? MISSING_RECORD
+          : Math.min(254, Math.floor(packed / 256)) * 256 + Math.min(255, packed % 256)
+        buffer.writeUInt16LE(record, base + slotIndex * 2)
+      }
+    })
+
+    const name = `station-details-${shard}.bin`
+    const path = resolve(SHARD_DIR, name)
+    await mkdir(dirname(path), { recursive: true })
+    await writeFile(path, buffer)
+    paths.push(`/data/roi/${name}`)
   }
-  return written
+
+  return { paths, stationsPerShard, stationsWithData }
 }
 
 async function writeAtomically(filePath, contents) {
@@ -607,15 +634,27 @@ async function main() {
   ])
   roi.stationFormat = ['id', 'district', 'name', 'totalDocks', 'latitude', 'longitude']
   roi.stationShards = await writeStationShards(cells.get(ROI_PERIOD), stationOrder)
-  roi.stationDetailPath = '/data/roi/stations'
-  const detailFiles = await writeStationDetail(stationOrder, detailByStation)
+  const detail = await writeStationDetail(stationOrder, detailByStation)
+  roi.stationDetailPaths = detail.paths
+  roi.stationDetailFormat = {
+    stationsPerShard: detail.stationsPerShard,
+    recordsPerStation: RECORDS_PER_STATION,
+    bytesPerRecord: 2,
+    originDate: '2026-01-01',
+    days: PERIOD_DAYS,
+    slotsPerDay: 48,
+    encoding: 'uint16 LE, bikes * 256 + docks (bikes capped at 254, docks capped at 255), 0xFFFF = unobserved or suspended',
+    note: 'stationOrder index i lives in stationDetailPaths[floor(i / stationsPerShard)], '
+      + 'at byte offset (i % stationsPerShard) * recordsPerStation * bytesPerRecord; fetch with an HTTP Range request',
+  }
 
   await writeAtomically(ROI_FILE, `${JSON.stringify(roi)}\n`)
   const withoutCoordinates = stations.size - stationOrder.length
   console.log(`\nWrote ${ROI_FILE} (${Object.keys(roi.scopes).length} scopes, ${stationOrder.length} mapped stations)`)
   if (withoutCoordinates) console.log(`  ${withoutCoordinates} station(s) had no usable coordinates and are not on the map`)
   console.log(`Wrote 7 weekday shards to ${SHARD_DIR}`)
-  console.log(`Wrote ${detailFiles.toLocaleString()} per-station detail files to ${DETAIL_DIR} (not committed)`)
+  console.log(`Wrote ${detail.paths.length} station-detail shard(s) to ${SHARD_DIR} `
+    + `(${detail.stationsWithData.toLocaleString()}/${stationOrder.length} stations have readings)`)
 
   const summaryPath = resolve(OUTPUT_DIR, 'station-time-profile-summary.json')
   await writeAtomically(summaryPath, `${JSON.stringify({
