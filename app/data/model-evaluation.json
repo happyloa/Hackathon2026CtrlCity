@@ -10,13 +10,480 @@
   "test": {
     "split": "2026-06",
     "horizons": {
-      "30": { "threshold": 0.87, "tp": 45618, "fp": 65263, "fn": 36374, "tn": 2035983, "predictionCount": 2183238, "precision": 0.411, "recall": 0.556, "f1": 0.473 },
-      "60": { "threshold": 0.83, "tp": 40654, "fp": 91459, "fn": 41218, "tn": 2007324, "predictionCount": 2180655, "precision": 0.308, "recall": 0.497, "f1": 0.38 },
-      "120": { "threshold": 0.8, "tp": 35440, "fp": 106659, "fn": 46245, "tn": 1987145, "predictionCount": 2175489, "precision": 0.249, "recall": 0.434, "f1": 0.317 }
+      "30": {
+        "threshold": 0.87,
+        "tp": 45618,
+        "fp": 65263,
+        "fn": 36374,
+        "tn": 2035983,
+        "predictionCount": 2183238,
+        "precision": 0.411,
+        "recall": 0.556,
+        "f1": 0.473
+      },
+      "60": {
+        "threshold": 0.83,
+        "tp": 40654,
+        "fp": 91459,
+        "fn": 41218,
+        "tn": 2007324,
+        "predictionCount": 2180655,
+        "precision": 0.308,
+        "recall": 0.497,
+        "f1": 0.38
+      },
+      "120": {
+        "threshold": 0.8,
+        "tp": 35440,
+        "fp": 106659,
+        "fn": 46245,
+        "tn": 1987145,
+        "predictionCount": 2175489,
+        "precision": 0.249,
+        "recall": 0.434,
+        "f1": 0.317
+      }
+    },
+    "byDistrict": {
+      "三峽區": {
+        "stationCount": 75,
+        "horizons": {
+          "60": {
+            "tp": 300,
+            "fp": 1125,
+            "fn": 1204,
+            "tn": 97037,
+            "predictionCount": 99666,
+            "precision": 0.211,
+            "recall": 0.199,
+            "f1": 0.205
+          }
+        }
+      },
+      "三芝區": {
+        "stationCount": 9,
+        "horizons": {
+          "60": {
+            "tp": 157,
+            "fp": 141,
+            "fn": 275,
+            "tn": 10813,
+            "predictionCount": 11386,
+            "precision": 0.527,
+            "recall": 0.363,
+            "f1": 0.43
+          }
+        }
+      },
+      "三重區": {
+        "stationCount": 135,
+        "horizons": {
+          "60": {
+            "tp": 3109,
+            "fp": 7261,
+            "fn": 3575,
+            "tn": 178264,
+            "predictionCount": 192209,
+            "precision": 0.3,
+            "recall": 0.465,
+            "f1": 0.365
+          }
+        }
+      },
+      "中和區": {
+        "stationCount": 115,
+        "horizons": {
+          "60": {
+            "tp": 2327,
+            "fp": 5377,
+            "fn": 3264,
+            "tn": 154038,
+            "predictionCount": 165006,
+            "precision": 0.302,
+            "recall": 0.416,
+            "f1": 0.35
+          }
+        }
+      },
+      "五股區": {
+        "stationCount": 32,
+        "horizons": {
+          "60": {
+            "tp": 252,
+            "fp": 465,
+            "fn": 457,
+            "tn": 42252,
+            "predictionCount": 43426,
+            "precision": 0.351,
+            "recall": 0.355,
+            "f1": 0.353
+          }
+        }
+      },
+      "八里區": {
+        "stationCount": 31,
+        "horizons": {
+          "60": {
+            "tp": 214,
+            "fp": 480,
+            "fn": 570,
+            "tn": 41986,
+            "predictionCount": 43250,
+            "precision": 0.308,
+            "recall": 0.273,
+            "f1": 0.29
+          }
+        }
+      },
+      "土城區": {
+        "stationCount": 100,
+        "horizons": {
+          "60": {
+            "tp": 3518,
+            "fp": 6982,
+            "fn": 3166,
+            "tn": 124761,
+            "predictionCount": 138427,
+            "precision": 0.335,
+            "recall": 0.526,
+            "f1": 0.409
+          }
+        }
+      },
+      "坪林區": {
+        "stationCount": 4,
+        "horizons": {
+          "60": {
+            "tp": 16,
+            "fp": 30,
+            "fn": 47,
+            "tn": 2547,
+            "predictionCount": 2640,
+            "precision": 0.348,
+            "recall": 0.254,
+            "f1": 0.294
+          }
+        }
+      },
+      "平溪區": {
+        "stationCount": 5,
+        "horizons": {
+          "60": {
+            "tp": 677,
+            "fp": 27,
+            "fn": 16,
+            "tn": 2580,
+            "predictionCount": 3300,
+            "precision": 0.962,
+            "recall": 0.977,
+            "f1": 0.969
+          }
+        }
+      },
+      "新店區": {
+        "stationCount": 125,
+        "horizons": {
+          "60": {
+            "tp": 3429,
+            "fp": 7493,
+            "fn": 3671,
+            "tn": 163178,
+            "predictionCount": 177771,
+            "precision": 0.314,
+            "recall": 0.483,
+            "f1": 0.381
+          }
+        }
+      },
+      "新莊區": {
+        "stationCount": 137,
+        "horizons": {
+          "60": {
+            "tp": 3607,
+            "fp": 8606,
+            "fn": 4407,
+            "tn": 180079,
+            "predictionCount": 196699,
+            "precision": 0.295,
+            "recall": 0.45,
+            "f1": 0.357
+          }
+        }
+      },
+      "板橋區": {
+        "stationCount": 221,
+        "horizons": {
+          "60": {
+            "tp": 11702,
+            "fp": 22444,
+            "fn": 7868,
+            "tn": 272419,
+            "predictionCount": 314433,
+            "precision": 0.343,
+            "recall": 0.598,
+            "f1": 0.436
+          }
+        }
+      },
+      "林口區": {
+        "stationCount": 94,
+        "horizons": {
+          "60": {
+            "tp": 882,
+            "fp": 2392,
+            "fn": 1752,
+            "tn": 130146,
+            "predictionCount": 135172,
+            "precision": 0.269,
+            "recall": 0.335,
+            "f1": 0.299
+          }
+        }
+      },
+      "樹林區": {
+        "stationCount": 76,
+        "horizons": {
+          "60": {
+            "tp": 1348,
+            "fp": 2562,
+            "fn": 2014,
+            "tn": 103364,
+            "predictionCount": 109288,
+            "precision": 0.345,
+            "recall": 0.401,
+            "f1": 0.371
+          }
+        }
+      },
+      "永和區": {
+        "stationCount": 55,
+        "horizons": {
+          "60": {
+            "tp": 2096,
+            "fp": 5127,
+            "fn": 2339,
+            "tn": 65890,
+            "predictionCount": 75452,
+            "precision": 0.29,
+            "recall": 0.473,
+            "f1": 0.36
+          }
+        }
+      },
+      "汐止區": {
+        "stationCount": 79,
+        "horizons": {
+          "60": {
+            "tp": 1145,
+            "fp": 2475,
+            "fn": 1612,
+            "tn": 104902,
+            "predictionCount": 110134,
+            "precision": 0.316,
+            "recall": 0.415,
+            "f1": 0.359
+          }
+        }
+      },
+      "泰山區": {
+        "stationCount": 26,
+        "horizons": {
+          "60": {
+            "tp": 473,
+            "fp": 944,
+            "fn": 673,
+            "tn": 35298,
+            "predictionCount": 37388,
+            "precision": 0.334,
+            "recall": 0.413,
+            "f1": 0.369
+          }
+        }
+      },
+      "淡水區": {
+        "stationCount": 87,
+        "horizons": {
+          "60": {
+            "tp": 1946,
+            "fp": 4140,
+            "fn": 3016,
+            "tn": 115812,
+            "predictionCount": 124914,
+            "precision": 0.32,
+            "recall": 0.392,
+            "f1": 0.352
+          }
+        }
+      },
+      "深坑區": {
+        "stationCount": 6,
+        "horizons": {
+          "60": {
+            "tp": 95,
+            "fp": 102,
+            "fn": 114,
+            "tn": 8317,
+            "predictionCount": 8628,
+            "precision": 0.482,
+            "recall": 0.455,
+            "f1": 0.468
+          }
+        }
+      },
+      "烏來區": {
+        "stationCount": 2,
+        "horizons": {
+          "60": {
+            "tp": 0,
+            "fp": 1,
+            "fn": 0,
+            "tn": 1319,
+            "predictionCount": 1320,
+            "precision": 0,
+            "recall": 0,
+            "f1": 0
+          }
+        }
+      },
+      "瑞芳區": {
+        "stationCount": 9,
+        "horizons": {
+          "60": {
+            "tp": 86,
+            "fp": 115,
+            "fn": 126,
+            "tn": 9503,
+            "predictionCount": 9830,
+            "precision": 0.428,
+            "recall": 0.406,
+            "f1": 0.416
+          }
+        }
+      },
+      "石碇區": {
+        "stationCount": 4,
+        "horizons": {
+          "60": {
+            "tp": 10,
+            "fp": 21,
+            "fn": 154,
+            "tn": 2032,
+            "predictionCount": 2217,
+            "precision": 0.323,
+            "recall": 0.061,
+            "f1": 0.103
+          }
+        }
+      },
+      "石門區": {
+        "stationCount": 5,
+        "horizons": {
+          "60": {
+            "tp": 0,
+            "fp": 0,
+            "fn": 1,
+            "tn": 3299,
+            "predictionCount": 3300,
+            "precision": 0,
+            "recall": 0,
+            "f1": 0
+          }
+        }
+      },
+      "萬里區": {
+        "stationCount": 7,
+        "horizons": {
+          "60": {
+            "tp": 49,
+            "fp": 34,
+            "fn": 45,
+            "tn": 6826,
+            "predictionCount": 6954,
+            "precision": 0.59,
+            "recall": 0.521,
+            "f1": 0.554
+          }
+        }
+      },
+      "蘆洲區": {
+        "stationCount": 56,
+        "horizons": {
+          "60": {
+            "tp": 1145,
+            "fp": 2848,
+            "fn": 1709,
+            "tn": 73365,
+            "predictionCount": 79067,
+            "precision": 0.287,
+            "recall": 0.401,
+            "f1": 0.334
+          }
+        }
+      },
+      "貢寮區": {
+        "stationCount": 3,
+        "horizons": {
+          "60": {
+            "tp": 0,
+            "fp": 3,
+            "fn": 18,
+            "tn": 4293,
+            "predictionCount": 4314,
+            "precision": 0,
+            "recall": 0,
+            "f1": 0
+          }
+        }
+      },
+      "金山區": {
+        "stationCount": 6,
+        "horizons": {
+          "60": {
+            "tp": 31,
+            "fp": 52,
+            "fn": 55,
+            "tn": 7712,
+            "predictionCount": 7850,
+            "precision": 0.373,
+            "recall": 0.36,
+            "f1": 0.367
+          }
+        }
+      },
+      "雙溪區": {
+        "stationCount": 2,
+        "horizons": {
+          "60": {
+            "tp": 4,
+            "fp": 37,
+            "fn": 8,
+            "tn": 1271,
+            "predictionCount": 1320,
+            "precision": 0.098,
+            "recall": 0.333,
+            "f1": 0.151
+          }
+        }
+      },
+      "鶯歌區": {
+        "stationCount": 59,
+        "horizons": {
+          "60": {
+            "tp": 328,
+            "fp": 772,
+            "fn": 770,
+            "tn": 73424,
+            "predictionCount": 75294,
+            "precision": 0.298,
+            "recall": 0.299,
+            "f1": 0.298
+          }
+        }
+      }
     }
   },
   "limitations": [
-    "全站彙總數字，尚未依行政區或站點拆分（規則 baseline 已有 test.byDistrict，模型版本待後續補上）。",
-    "站點/星期/時段選單目前不會改變這組數字；顯示為固定目標值，等 per-scope 評估產出後才會跟著篩選換算。"
+    "各行政區樣本數差異很大（2站到221站），小樣本區的分數波動劇烈，僅供參考。",
+    "站點/星期/時段選單目前只有行政區會換算這組數字；星期與時段仍不會篩選。"
   ]
 }

@@ -3,6 +3,7 @@ per horizon, mirroring evaluate-forecast.mjs's selectThreshold (max F1, tie
 broken by higher precision, then higher recall, then higher threshold)."""
 
 import json
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -34,20 +35,21 @@ def select_threshold(proba: np.ndarray, target: np.ndarray) -> dict:
 
 
 def main():
-    selected = {}
-    for horizon in HORIZONS:
+    horizons = [int(h) for h in sys.argv[1:]] or HORIZONS
+    thresholds_path = OUTPUT_DIR / "selected_thresholds.json"
+    selected = json.loads(thresholds_path.read_text(encoding="utf-8")) if thresholds_path.exists() else {}
+
+    for horizon in horizons:
         proba = np.load(OUTPUT_DIR / f"val_proba_{horizon}.npy")
         target = np.load(OUTPUT_DIR / f"val_target_{horizon}.npy").astype(bool)
         best = select_threshold(proba, target)
-        selected[horizon] = best
+        selected[str(horizon)] = best
         print(f"horizon={horizon}m threshold={best['threshold']} f1={best['f1']} "
               f"precision={best['precision']} recall={best['recall']} "
               f"(tp={best['tp']} fp={best['fp']} fn={best['fn']})")
 
-    (OUTPUT_DIR / "selected_thresholds.json").write_text(
-        json.dumps(selected, indent=2, ensure_ascii=False)
-    )
-    print(f"saved {OUTPUT_DIR / 'selected_thresholds.json'}")
+    thresholds_path.write_text(json.dumps(selected, indent=2, ensure_ascii=False), encoding="utf-8")
+    print(f"saved {thresholds_path}")
 
 
 if __name__ == "__main__":

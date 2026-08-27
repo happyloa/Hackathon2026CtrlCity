@@ -4,6 +4,7 @@ import { SLOT_OPTIONS, WEEKDAY_OPTIONS, useOperationalRoi } from '~/composables/
 import type { RoiMapPoint } from '~/components/RoiMap.client.vue'
 import forecastEvaluation from '~/data/forecast-evaluation.json'
 import modelEvaluation from '~/data/model-evaluation.json'
+import stationRiskEvaluation from '~/data/station-risk-evaluation.json'
 
 const route = useRoute()
 const router = useRouter()
@@ -77,44 +78,66 @@ const percent = (value: number) => `${(value * 100).toFixed(1)}%`
 
 /**
  * The rule-baseline F1 is the 6-month held-out test evaluation (60min), fixed
- * to the PoC success criterion. It only breaks down by district (not by
- * weekday/slot, and not by individual station -- a single station's monthly
- * sample is too small for a stable P/R/F1 read) -- picking a district swaps
- * in that district's own confusion matrix; clearing it falls back to the
- * all-station number.
+ * to the PoC success criterion. District aggregates can be misleading for an
+ * individual station -- e.g. 平溪區's district average is 97.3% F1 but 平溪國中
+ * itself is 0%, because the district number is dominated by other, far more
+ * predictable stations. stationRiskEvaluation now covers every station (not
+ * just the flagged high-risk cohort), so a station's own number always takes
+ * priority over its district's when both exist. A station with very few
+ * evaluated predictions (e.g. mostly excluded as a double-zero outage, like
+ * 平溪國中's daily 18:00-06:00 blackout) can land on 0/0 precision/recall --
+ * that means "nothing to predict", not "the model failed" -- so the UI must
+ * always show the sample count next to the score.
  */
 type BaselineHorizonMetrics = { tp: number, fp: number, fn: number, tn: number, precision: number, recall: number, f1: number }
 const byDistrictLookup = forecastEvaluation.test?.byDistrict as
   Record<string, { stationCount: number, horizons: Record<string, BaselineHorizonMetrics> }> | undefined
+const stationRiskLookup = stationRiskEvaluation.stations as
+  Record<string, { name: string, baseline: Record<string, BaselineHorizonMetrics>, model: Record<string, ModelF1MetricsType> | null }>
 
 const baselineF1 = computed(() => {
-  const byDistrict = selectedDistrict.value
+  const stationRisk = selectedStation.value ? stationRiskLookup[selectedStation.value.station.id] : null
+  const byDistrict = !stationRisk && selectedDistrict.value
     ? byDistrictLookup?.[selectedDistrict.value]?.horizons?.['60']
     : null
-  const horizon = byDistrict ?? forecastEvaluation.test?.horizons?.['60']?.inventoryIssue
+  const horizon = stationRisk?.baseline['60'] ?? byDistrict ?? forecastEvaluation.test?.horizons?.['60']?.inventoryIssue
   if (!horizon) return null
   return {
     precision: horizon.precision,
     recall: horizon.recall,
     f1: horizon.f1,
     samples: horizon.tp + horizon.fp + horizon.fn + horizon.tn,
-    scoped: Boolean(byDistrict),
+    actualEvents: horizon.tp + horizon.fn,
+    alertsIssued: horizon.tp + horizon.fp,
+    scope: stationRisk ? 'station' as const : byDistrict ? 'district' as const : null,
   }
 })
 
 /**
  * Model F1 comes from the Step 7 XGBoost held-out test evaluation
- * (ml/src/evaluate.py -> app/data/model-evaluation.json). Unlike the rule
- * baseline, this has not been broken down by district/station yet (see
- * model-evaluation.json's `limitations`), so all three horizons show the
- * same all-cohort number regardless of the pickers above until a per-scope
- * evaluation pipeline exists.
+ * (ml/src/evaluate.py -> app/data/model-evaluation.json), now also broken
+ * down by district the same way as the rule baseline. Small districts (a
+ * handful of stations) swing wildly on either side -- some improve a lot,
+ * a few (e.g. 石碇區) collapse -- so the per-district model number is far
+ * noisier than the baseline's simple historical average there; it only
+ * becomes a fair comparison once a district has enough stations. The flagged
+ * high-risk cohort's own per-station number (only 60min so far) takes
+ * priority over both, for the same reason as baselineF1 above.
  */
-type ModelF1Metrics = { f1: number, precision: number, recall: number }
+type ModelF1Metrics = { tp: number, fp: number, fn: number, tn: number, precision: number, recall: number, f1: number }
+type ModelF1MetricsType = ModelF1Metrics
+const modelByDistrictLookup = modelEvaluation.test?.byDistrict as
+  Record<string, { stationCount: number, horizons: Record<string, ModelF1Metrics> }> | undefined
+
 const modelF1Horizons = [30, 60, 120] as const
 const modelF1Rows = computed(() => modelF1Horizons.map((horizon) => {
-  const metrics = (modelEvaluation.test?.horizons as Record<string, ModelF1Metrics> | undefined)?.[String(horizon)]
-  return { horizon, metrics: metrics ?? null }
+  const stationRisk = selectedStation.value ? stationRiskLookup[selectedStation.value.station.id] : null
+  const stationMetrics = stationRisk?.model?.[String(horizon)] ?? null
+  const byDistrict = !stationMetrics && selectedDistrict.value
+    ? modelByDistrictLookup?.[selectedDistrict.value]?.horizons?.[String(horizon)]
+    : null
+  const metrics = stationMetrics ?? byDistrict ?? (modelEvaluation.test?.horizons as Record<string, ModelF1Metrics> | undefined)?.[String(horizon)]
+  return { horizon, metrics: metrics ?? null, scope: stationMetrics ? 'station' as const : byDistrict ? 'district' as const : null }
 }))
 
 const dayPeak = computed(() => {
@@ -206,8 +229,21 @@ watch([selectedDistrict, selectedWeekday, selectedSlot, selectedStationId], () =
 
       <div v-if="baselineF1" class="mt-4">
         <h3 class="m-0 text-base font-bold text-muted">
-          規則基線{{ baselineF1.scoped ? `（${selectedDistrict}）` : '（全站）' }} · 60分鐘 · 6月測試集
+          規則基線{{
+            baselineF1.scope === 'station' ? `（${selectedStation?.station.name}）`
+            : baselineF1.scope === 'district' ? `（${selectedDistrict}）`
+            : '（全站）'
+          }} · 60分鐘 · 6月測試集
         </h3>
+        <p v-if="baselineF1.scope === 'station'" class="mt-1 mb-0 text-base text-muted">
+          這是該站自己的數字（樣本 {{ baselineF1.samples.toLocaleString() }} 筆），不是行政區平均——同一區的其他站可能差很多。
+          <template v-if="baselineF1.actualEvents === 0">
+            這站在6月的評估時段內完全沒發生過缺車/滿柱事件（可能是雙0停運時段太多、或是本來就很少缺車），Precision/Recall 是 0/0 的邊界情況，不代表基線預測失準。
+          </template>
+          <template v-else-if="baselineF1.alertsIssued === 0">
+            基線在這站完全沒發出過警報，Precision 是 0/0 的邊界情況，不代表誤報。
+          </template>
+        </p>
         <div class="mt-2 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <MetricCard
             label="Precision"
@@ -242,7 +278,12 @@ watch([selectedDistrict, selectedWeekday, selectedSlot, selectedStationId], () =
       </div>
 
       <div class="mt-5">
-        <h3 class="m-0 text-base font-bold text-muted">XGBoost 模型 F1 · 全站（尚未依行政區/站點拆分）· 6月測試集</h3>
+        <h3 class="m-0 text-base font-bold text-muted">
+          XGBoost 模型 F1{{
+            modelF1Rows.some(r => r.scope === 'station') ? `（${selectedStation?.station.name}）`
+            : selectedDistrict ? `（${selectedDistrict}）` : '（全站）'
+          }} · 6月測試集
+        </h3>
         <div class="mt-2 space-y-2">
           <div
             v-for="row in modelF1Rows"
@@ -251,15 +292,27 @@ watch([selectedDistrict, selectedWeekday, selectedSlot, selectedStationId], () =
           >
             <span class="text-base font-bold">{{ row.horizon }} 分鐘</span>
             <span v-if="row.metrics" class="text-base">
-              F1 {{ percent(row.metrics.f1) }} · Precision {{ percent(row.metrics.precision) }} · Recall {{ percent(row.metrics.recall) }}
+              Precision {{ percent(row.metrics.precision) }} · Recall {{ percent(row.metrics.recall) }} · F1 {{ percent(row.metrics.f1) }}
+            </span>
+            <span v-else-if="row.scope === null && selectedStation" class="text-base text-muted">
+              尚未產生（這個視野的鄰站特徵模型還沒訓練，只有60分鐘有單站數字）
             </span>
             <span v-else class="text-base text-muted">尚未產生 · 等待 Step 5-7 XGBoost 訓練與評估完成</span>
           </div>
         </div>
         <p class="mt-2 mb-0 text-base text-muted">
-          目前跟規則基線不同，模型分數還沒有依行政區/站點拆分，所以不會跟著上方選單變動；之後若補上分區評估會一併換算。
+          <template v-if="modelF1Rows.some(r => r.scope === 'station')">
+            這是該站自己的數字，不是行政區平均。單站樣本量比行政區小很多，分數會比較不穩定，尤其該站幾乎沒發生過事件時，Precision/Recall 可能落在 0/0 這種邊界情況（不代表模型失準）。
+          </template>
+          <template v-else-if="selectedDistrict && (activeScope?.stationCount ?? 0) < 20">
+            這個行政區只有 {{ activeScope?.stationCount ?? 0 }} 站，樣本少、分數容易大起大落，不適合直接拿來判斷模型好壞。
+          </template>
+          <template v-else>
+            站數愈多的行政區，模型對規則基線的改善愈穩定；站數很少的行政區可能因樣本不足而波動劇烈，甚至比基線差。
+          </template>
         </p>
       </div>
+      <!-- N-beat -->
     </section>
     <section class="rounded-xl border border-line bg-panel p-4 sm:p-5">
       <div class="flex flex-wrap items-start justify-between gap-3">

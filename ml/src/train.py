@@ -22,7 +22,7 @@ OUTPUT_DIR.mkdir(exist_ok=True)
 
 HORIZONS = [30, 60, 120]
 
-NUMERIC_FEATURES = [
+STATIC_NUMERIC_FEATURES = [
     "total_docks",
     "available_bikes",
     "available_docks",
@@ -38,9 +38,50 @@ NUMERIC_FEATURES = [
     "lag_1d_docks",
     "momentum_bikes_30m",
     "momentum_docks_30m",
+    "neighbor_low_bikes_rate",
+    "neighbor_count",
 ]
 CATEGORICAL_FEATURES = ["station_id", "slot", "weekday"]
-FEATURE_COLUMNS = NUMERIC_FEATURES + CATEGORICAL_FEATURES
+
+# Tried and reverted: feeding the model the train-period station x slot
+# profile and the rule baseline's own composite risk score (forecastRisk())
+# as features. Those two features dominated gain so completely (more than
+# everything else combined) that the model converged in ~250 rounds instead
+# of ~3400 and landed at test F1=34.8% -- back down to plain rule-baseline
+# level, i.e. it learned to copy the baseline rather than correct it. Left
+# here (off by default) rather than deleted, since the columns still exist
+# in features.parquet and someone may want to retry with different
+# regularization instead of writing this from scratch again.
+INCLUDE_STACKING_FEATURES = False
+
+# Also tried and reverted: per-station discrete peak-window flags
+# (build_station_peaks.py) -- "is this target slot inside THIS station's own
+# historical peak empty/full window". Unlike the continuous profile score,
+# this one didn't collapse the model (best_iteration stayed in the thousands,
+# feature importance didn't dominate), but it didn't help either: test F1
+# went from 38.3% to 38.1% and precision from 32.1% to 30.8%. Conclusion:
+# station_id + slot with thousands of trees already learns "this station at
+# this time" patterns on its own -- a compressed digest of the same
+# information doesn't add anything station_id/slot couldn't already capture.
+# The neighbor feature works because it's genuinely external info (other
+# stations' current state); this one wasn't. Off by default; code kept for
+# reference rather than deleted.
+INCLUDE_PEAK_WINDOW_FEATURES = False
+
+
+def horizon_feature_columns(horizon: int) -> list[str]:
+    """Profile/baseline-risk/peak-window features are horizon-specific --
+    each model only sees the ones computed at ITS OWN target slot
+    (bucket_at + horizon), not another horizon's."""
+    columns = list(STATIC_NUMERIC_FEATURES)
+    if INCLUDE_STACKING_FEATURES:
+        columns += [
+            f"profile_empty_rate_{horizon}", f"profile_full_rate_{horizon}", f"profile_observations_{horizon}",
+            f"baseline_empty_risk_{horizon}", f"baseline_full_risk_{horizon}",
+        ]
+    if INCLUDE_PEAK_WINDOW_FEATURES:
+        columns += [f"in_own_peak_empty_{horizon}", f"in_own_peak_full_{horizon}"]
+    return columns + CATEGORICAL_FEATURES
 
 
 def load_categories(con: duckdb.DuckDBPyConnection) -> dict:
@@ -59,6 +100,7 @@ def load_categories(con: duckdb.DuckDBPyConnection) -> dict:
 
 def load_split(con: duckdb.DuckDBPyConnection, split: str, horizon: int, categories: dict):
     target_col = f"target_{horizon}_issue"
+    feature_columns = horizon_feature_columns(horizon)
     query = f"""
         SELECT
             station_id, slot, weekday,
@@ -67,6 +109,10 @@ def load_split(con: duckdb.DuckDBPyConnection, split: str, horizon: int, categor
             lag_120m_bikes, lag_120m_docks, lag_1d_bikes, lag_1d_docks,
             (available_bikes - lag_30m_bikes) AS momentum_bikes_30m,
             (available_docks - lag_30m_docks) AS momentum_docks_30m,
+            neighbor_low_bikes_rate, neighbor_count,
+            profile_empty_rate_{horizon}, profile_full_rate_{horizon}, profile_observations_{horizon},
+            baseline_empty_risk_{horizon}, baseline_full_risk_{horizon},
+            in_own_peak_empty_{horizon}, in_own_peak_full_{horizon},
             {target_col} AS target
         FROM read_parquet('{FEATURES_PATH.as_posix()}')
         WHERE split = '{split}' AND {target_col} IS NOT NULL
@@ -76,7 +122,7 @@ def load_split(con: duckdb.DuckDBPyConnection, split: str, horizon: int, categor
     df["slot"] = df["slot"].astype(categories["slot"])
     df["weekday"] = df["weekday"].astype(categories["weekday"])
     y = df.pop("target").astype(int)
-    return df[FEATURE_COLUMNS], y
+    return df[feature_columns], y
 
 
 def train_horizon(con: duckdb.DuckDBPyConnection, horizon: int, categories: dict) -> None:

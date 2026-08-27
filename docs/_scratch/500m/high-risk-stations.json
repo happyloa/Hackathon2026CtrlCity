@@ -1,0 +1,2943 @@
+{
+  "generatedAt": "2026-08-26T10:34:14.919Z",
+  "method": {
+    "source": "ml/output/station-time-profile-all.csv (lowBikesRate/lowDocksRate, threshold = max(2, ceil(totalDocks*0.1)))",
+    "minObservationsPerCell": 6,
+    "topN": 60,
+    "clusterRadiusMeters": 500,
+    "combinedRiskDefinition": "weighted-average(lowBikesRate) + weighted-average(lowDocksRate) across all sufficiently-sampled weekday x slot cells"
+  },
+  "stations": [
+    {
+      "stationId": "st_86653145416ac6",
+      "name": "平溪國中",
+      "city": "新北市",
+      "district": "平溪區",
+      "totalDocks": 55,
+      "bikeRisk": 0.768,
+      "dockRisk": 0,
+      "combinedRisk": 0.768,
+      "totalObservations": 4393,
+      "workdayBikePeak": {
+        "slot": 36,
+        "timeLabel": "18:00",
+        "bucket": "傍晚尖峰 17:00-20:00",
+        "rate": 0.938
+      },
+      "workdayDockPeak": null,
+      "weekendBikePeak": {
+        "slot": 36,
+        "timeLabel": "18:00",
+        "bucket": "傍晚尖峰 17:00-20:00",
+        "rate": 0.833
+      },
+      "weekendDockPeak": null,
+      "clusterId": "st_86653145416ac6",
+      "clusterSize": 1,
+      "latitude": 25.02348,
+      "longitude": 121.73422
+    },
+    {
+      "stationId": "st_cc1e95adbdadba",
+      "name": "寶橋路29巷",
+      "city": "新北市",
+      "district": "新店區",
+      "totalDocks": 10,
+      "bikeRisk": 0.434,
+      "dockRisk": 0.212,
+      "combinedRisk": 0.646,
+      "totalObservations": 8685,
+      "workdayBikePeak": {
+        "slot": 18,
+        "timeLabel": "09:00",
+        "bucket": "上午離峰 09:00-12:00",
+        "rate": 0.962
+      },
+      "workdayDockPeak": {
+        "slot": 36,
+        "timeLabel": "18:00",
+        "bucket": "傍晚尖峰 17:00-20:00",
+        "rate": 0.731
+      },
+      "weekendBikePeak": {
+        "slot": 46,
+        "timeLabel": "23:00",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 0.962
+      },
+      "weekendDockPeak": {
+        "slot": 30,
+        "timeLabel": "15:00",
+        "bucket": "下午 14:00-17:00",
+        "rate": 0.769
+      },
+      "clusterId": "st_cc1e95adbdadba",
+      "clusterSize": 11,
+      "latitude": 24.97492,
+      "longitude": 121.54389
+    },
+    {
+      "stationId": "st_4cac7851513aec",
+      "name": "新北捷運環狀線南機廠",
+      "city": "新北市",
+      "district": "新店區",
+      "totalDocks": 21,
+      "bikeRisk": 0.64,
+      "dockRisk": 0.003,
+      "combinedRisk": 0.643,
+      "totalObservations": 8685,
+      "workdayBikePeak": {
+        "slot": 16,
+        "timeLabel": "08:00",
+        "bucket": "通勤上午 06:00-09:00",
+        "rate": 0.962
+      },
+      "workdayDockPeak": {
+        "slot": 47,
+        "timeLabel": "23:30",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 0.04
+      },
+      "weekendBikePeak": {
+        "slot": 47,
+        "timeLabel": "23:30",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 0.846
+      },
+      "weekendDockPeak": {
+        "slot": 11,
+        "timeLabel": "05:30",
+        "bucket": "凌晨 00:00-06:00",
+        "rate": 0.038
+      },
+      "clusterId": "st_cc1e95adbdadba",
+      "clusterSize": 11,
+      "latitude": 24.98343,
+      "longitude": 121.52891
+    },
+    {
+      "stationId": "st_023bc09e7858a3",
+      "name": "捷運江子翠站(4號出口)",
+      "city": "新北市",
+      "district": "板橋區",
+      "totalDocks": 11,
+      "bikeRisk": 0.354,
+      "dockRisk": 0.269,
+      "combinedRisk": 0.623,
+      "totalObservations": 8685,
+      "workdayBikePeak": {
+        "slot": 1,
+        "timeLabel": "00:30",
+        "bucket": "凌晨 00:00-06:00",
+        "rate": 1
+      },
+      "workdayDockPeak": {
+        "slot": 16,
+        "timeLabel": "08:00",
+        "bucket": "通勤上午 06:00-09:00",
+        "rate": 0.923
+      },
+      "weekendBikePeak": {
+        "slot": 46,
+        "timeLabel": "23:00",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 1
+      },
+      "weekendDockPeak": {
+        "slot": 25,
+        "timeLabel": "12:30",
+        "bucket": "午間 12:00-14:00",
+        "rate": 0.769
+      },
+      "clusterId": "st_023bc09e7858a3",
+      "clusterSize": 6,
+      "latitude": 25.02946,
+      "longitude": 121.47307
+    },
+    {
+      "stationId": "st_cefa1b3fee735f",
+      "name": "金城裕民路口(中正國中)",
+      "city": "新北市",
+      "district": "土城區",
+      "totalDocks": 54,
+      "bikeRisk": 0.615,
+      "dockRisk": 0,
+      "combinedRisk": 0.615,
+      "totalObservations": 8685,
+      "workdayBikePeak": {
+        "slot": 37,
+        "timeLabel": "18:30",
+        "bucket": "傍晚尖峰 17:00-20:00",
+        "rate": 0.962
+      },
+      "workdayDockPeak": null,
+      "weekendBikePeak": {
+        "slot": 36,
+        "timeLabel": "18:00",
+        "bucket": "傍晚尖峰 17:00-20:00",
+        "rate": 0.808
+      },
+      "weekendDockPeak": null,
+      "clusterId": "st_cefa1b3fee735f",
+      "clusterSize": 1,
+      "latitude": 24.98288,
+      "longitude": 121.45619
+    },
+    {
+      "stationId": "st_e6c00776b34974",
+      "name": "審計人員訓練大樓",
+      "city": "新北市",
+      "district": "中和區",
+      "totalDocks": 10,
+      "bikeRisk": 0.358,
+      "dockRisk": 0.246,
+      "combinedRisk": 0.604,
+      "totalObservations": 8685,
+      "workdayBikePeak": {
+        "slot": 20,
+        "timeLabel": "10:00",
+        "bucket": "上午離峰 09:00-12:00",
+        "rate": 0.885
+      },
+      "workdayDockPeak": {
+        "slot": 39,
+        "timeLabel": "19:30",
+        "bucket": "傍晚尖峰 17:00-20:00",
+        "rate": 0.731
+      },
+      "weekendBikePeak": {
+        "slot": 33,
+        "timeLabel": "16:30",
+        "bucket": "下午 14:00-17:00",
+        "rate": 0.846
+      },
+      "weekendDockPeak": {
+        "slot": 44,
+        "timeLabel": "22:00",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 0.654
+      },
+      "clusterId": "st_e6c00776b34974",
+      "clusterSize": 1,
+      "latitude": 24.98184,
+      "longitude": 121.50956
+    },
+    {
+      "stationId": "st_dcca95a6ce79ce",
+      "name": "捷運江子翠站(6號出口)",
+      "city": "新北市",
+      "district": "板橋區",
+      "totalDocks": 22,
+      "bikeRisk": 0.439,
+      "dockRisk": 0.163,
+      "combinedRisk": 0.602,
+      "totalObservations": 8685,
+      "workdayBikePeak": {
+        "slot": 47,
+        "timeLabel": "23:30",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 1
+      },
+      "workdayDockPeak": {
+        "slot": 18,
+        "timeLabel": "09:00",
+        "bucket": "上午離峰 09:00-12:00",
+        "rate": 0.8
+      },
+      "weekendBikePeak": {
+        "slot": 44,
+        "timeLabel": "22:00",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 1
+      },
+      "weekendDockPeak": {
+        "slot": 23,
+        "timeLabel": "11:30",
+        "bucket": "上午離峰 09:00-12:00",
+        "rate": 0.538
+      },
+      "clusterId": "st_023bc09e7858a3",
+      "clusterSize": 6,
+      "latitude": 25.03106,
+      "longitude": 121.47314
+    },
+    {
+      "stationId": "st_5eb9c65d997f70",
+      "name": "捷運江子翠站(1號出口)",
+      "city": "新北市",
+      "district": "板橋區",
+      "totalDocks": 13,
+      "bikeRisk": 0.401,
+      "dockRisk": 0.19,
+      "combinedRisk": 0.591,
+      "totalObservations": 8685,
+      "workdayBikePeak": {
+        "slot": 47,
+        "timeLabel": "23:30",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 0.962
+      },
+      "workdayDockPeak": {
+        "slot": 15,
+        "timeLabel": "07:30",
+        "bucket": "通勤上午 06:00-09:00",
+        "rate": 0.885
+      },
+      "weekendBikePeak": {
+        "slot": 47,
+        "timeLabel": "23:30",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 0.923
+      },
+      "weekendDockPeak": {
+        "slot": 21,
+        "timeLabel": "10:30",
+        "bucket": "上午離峰 09:00-12:00",
+        "rate": 0.615
+      },
+      "clusterId": "st_023bc09e7858a3",
+      "clusterSize": 6,
+      "latitude": 25.03043,
+      "longitude": 121.47162
+    },
+    {
+      "stationId": "st_905a6253b1e815",
+      "name": "台水新莊服務所",
+      "city": "新北市",
+      "district": "新莊區",
+      "totalDocks": 36,
+      "bikeRisk": 0.587,
+      "dockRisk": 0,
+      "combinedRisk": 0.587,
+      "totalObservations": 8685,
+      "workdayBikePeak": {
+        "slot": 14,
+        "timeLabel": "07:00",
+        "bucket": "通勤上午 06:00-09:00",
+        "rate": 0.923
+      },
+      "workdayDockPeak": {
+        "slot": 32,
+        "timeLabel": "16:00",
+        "bucket": "下午 14:00-17:00",
+        "rate": 0.038
+      },
+      "weekendBikePeak": {
+        "slot": 11,
+        "timeLabel": "05:30",
+        "bucket": "凌晨 00:00-06:00",
+        "rate": 0.962
+      },
+      "weekendDockPeak": null,
+      "clusterId": "st_905a6253b1e815",
+      "clusterSize": 2,
+      "latitude": 25.04152,
+      "longitude": 121.46019
+    },
+    {
+      "stationId": "st_e2b5a41a5b6964",
+      "name": "捷運七張站(1號出口)",
+      "city": "新北市",
+      "district": "新店區",
+      "totalDocks": 42,
+      "bikeRisk": 0.564,
+      "dockRisk": 0.008,
+      "combinedRisk": 0.572,
+      "totalObservations": 8685,
+      "workdayBikePeak": {
+        "slot": 45,
+        "timeLabel": "22:30",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 0.962
+      },
+      "workdayDockPeak": {
+        "slot": 15,
+        "timeLabel": "07:30",
+        "bucket": "通勤上午 06:00-09:00",
+        "rate": 0.077
+      },
+      "weekendBikePeak": {
+        "slot": 1,
+        "timeLabel": "00:30",
+        "bucket": "凌晨 00:00-06:00",
+        "rate": 0.962
+      },
+      "weekendDockPeak": {
+        "slot": 29,
+        "timeLabel": "14:30",
+        "bucket": "下午 14:00-17:00",
+        "rate": 0.154
+      },
+      "clusterId": "st_cc1e95adbdadba",
+      "clusterSize": 11,
+      "latitude": 24.975,
+      "longitude": 121.54277
+    },
+    {
+      "stationId": "st_c73f9b3d0aebdc",
+      "name": "中正思源路口(東北側)",
+      "city": "新北市",
+      "district": "新莊區",
+      "totalDocks": 45,
+      "bikeRisk": 0.57,
+      "dockRisk": 0.001,
+      "combinedRisk": 0.57,
+      "totalObservations": 8685,
+      "workdayBikePeak": {
+        "slot": 46,
+        "timeLabel": "23:00",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 0.92
+      },
+      "workdayDockPeak": {
+        "slot": 33,
+        "timeLabel": "16:30",
+        "bucket": "下午 14:00-17:00",
+        "rate": 0.038
+      },
+      "weekendBikePeak": {
+        "slot": 1,
+        "timeLabel": "00:30",
+        "bucket": "凌晨 00:00-06:00",
+        "rate": 0.962
+      },
+      "weekendDockPeak": null,
+      "clusterId": "st_905a6253b1e815",
+      "clusterSize": 2,
+      "latitude": 25.03938,
+      "longitude": 121.46103
+    },
+    {
+      "stationId": "st_d2dc235de9a7ce",
+      "name": "淡金路38巷尾",
+      "city": "新北市",
+      "district": "淡水區",
+      "totalDocks": 10,
+      "bikeRisk": 0.231,
+      "dockRisk": 0.337,
+      "combinedRisk": 0.568,
+      "totalObservations": 8685,
+      "workdayBikePeak": {
+        "slot": 15,
+        "timeLabel": "07:30",
+        "bucket": "通勤上午 06:00-09:00",
+        "rate": 0.654
+      },
+      "workdayDockPeak": {
+        "slot": 11,
+        "timeLabel": "05:30",
+        "bucket": "凌晨 00:00-06:00",
+        "rate": 0.96
+      },
+      "weekendBikePeak": {
+        "slot": 35,
+        "timeLabel": "17:30",
+        "bucket": "傍晚尖峰 17:00-20:00",
+        "rate": 0.692
+      },
+      "weekendDockPeak": {
+        "slot": 11,
+        "timeLabel": "05:30",
+        "bucket": "凌晨 00:00-06:00",
+        "rate": 0.962
+      },
+      "clusterId": "st_d2dc235de9a7ce",
+      "clusterSize": 1,
+      "latitude": 25.16083,
+      "longitude": 121.4579
+    },
+    {
+      "stationId": "st_21bac96ef28b0d",
+      "name": "捷運大坪林站(1號出口)",
+      "city": "新北市",
+      "district": "新店區",
+      "totalDocks": 47,
+      "bikeRisk": 0.536,
+      "dockRisk": 0.029,
+      "combinedRisk": 0.565,
+      "totalObservations": 8685,
+      "workdayBikePeak": {
+        "slot": 47,
+        "timeLabel": "23:30",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 1
+      },
+      "workdayDockPeak": {
+        "slot": 33,
+        "timeLabel": "16:30",
+        "bucket": "下午 14:00-17:00",
+        "rate": 0.308
+      },
+      "weekendBikePeak": {
+        "slot": 47,
+        "timeLabel": "23:30",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 1
+      },
+      "weekendDockPeak": {
+        "slot": 36,
+        "timeLabel": "18:00",
+        "bucket": "傍晚尖峰 17:00-20:00",
+        "rate": 0.385
+      },
+      "clusterId": "st_cc1e95adbdadba",
+      "clusterSize": 11,
+      "latitude": 24.9828,
+      "longitude": 121.541
+    },
+    {
+      "stationId": "st_89910ead489a27",
+      "name": "寶強文化路口",
+      "city": "新北市",
+      "district": "新店區",
+      "totalDocks": 11,
+      "bikeRisk": 0.404,
+      "dockRisk": 0.16,
+      "combinedRisk": 0.565,
+      "totalObservations": 8685,
+      "workdayBikePeak": {
+        "slot": 15,
+        "timeLabel": "07:30",
+        "bucket": "通勤上午 06:00-09:00",
+        "rate": 0.846
+      },
+      "workdayDockPeak": {
+        "slot": 20,
+        "timeLabel": "10:00",
+        "bucket": "上午離峰 09:00-12:00",
+        "rate": 0.577
+      },
+      "weekendBikePeak": {
+        "slot": 15,
+        "timeLabel": "07:30",
+        "bucket": "通勤上午 06:00-09:00",
+        "rate": 0.846
+      },
+      "weekendDockPeak": {
+        "slot": 32,
+        "timeLabel": "16:00",
+        "bucket": "下午 14:00-17:00",
+        "rate": 0.462
+      },
+      "clusterId": "st_cc1e95adbdadba",
+      "clusterSize": 11,
+      "latitude": 24.97914,
+      "longitude": 121.54351
+    },
+    {
+      "stationId": "st_935d60e304ac55",
+      "name": "中華電信學院",
+      "city": "新北市",
+      "district": "板橋區",
+      "totalDocks": 9,
+      "bikeRisk": 0.419,
+      "dockRisk": 0.142,
+      "combinedRisk": 0.561,
+      "totalObservations": 8685,
+      "workdayBikePeak": {
+        "slot": 37,
+        "timeLabel": "18:30",
+        "bucket": "傍晚尖峰 17:00-20:00",
+        "rate": 0.923
+      },
+      "workdayDockPeak": {
+        "slot": 18,
+        "timeLabel": "09:00",
+        "bucket": "上午離峰 09:00-12:00",
+        "rate": 0.538
+      },
+      "weekendBikePeak": {
+        "slot": 23,
+        "timeLabel": "11:30",
+        "bucket": "上午離峰 09:00-12:00",
+        "rate": 0.808
+      },
+      "weekendDockPeak": {
+        "slot": 47,
+        "timeLabel": "23:30",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 0.423
+      },
+      "clusterId": "st_935d60e304ac55",
+      "clusterSize": 1,
+      "latitude": 25.00801,
+      "longitude": 121.46684
+    },
+    {
+      "stationId": "st_c30f45037c8fcf",
+      "name": "捷運江子翠站(2號出口)",
+      "city": "新北市",
+      "district": "板橋區",
+      "totalDocks": 26,
+      "bikeRisk": 0.373,
+      "dockRisk": 0.186,
+      "combinedRisk": 0.559,
+      "totalObservations": 8685,
+      "workdayBikePeak": {
+        "slot": 47,
+        "timeLabel": "23:30",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 0.962
+      },
+      "workdayDockPeak": {
+        "slot": 17,
+        "timeLabel": "08:30",
+        "bucket": "通勤上午 06:00-09:00",
+        "rate": 0.885
+      },
+      "weekendBikePeak": {
+        "slot": 47,
+        "timeLabel": "23:30",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 0.923
+      },
+      "weekendDockPeak": {
+        "slot": 27,
+        "timeLabel": "13:30",
+        "bucket": "午間 12:00-14:00",
+        "rate": 0.615
+      },
+      "clusterId": "st_023bc09e7858a3",
+      "clusterSize": 6,
+      "latitude": 25.02999,
+      "longitude": 121.472
+    },
+    {
+      "stationId": "st_58b945bd309047",
+      "name": "捷運江子翠站(5號出口)",
+      "city": "新北市",
+      "district": "板橋區",
+      "totalDocks": 31,
+      "bikeRisk": 0.453,
+      "dockRisk": 0.094,
+      "combinedRisk": 0.547,
+      "totalObservations": 8685,
+      "workdayBikePeak": {
+        "slot": 1,
+        "timeLabel": "00:30",
+        "bucket": "凌晨 00:00-06:00",
+        "rate": 1
+      },
+      "workdayDockPeak": {
+        "slot": 29,
+        "timeLabel": "14:30",
+        "bucket": "下午 14:00-17:00",
+        "rate": 0.52
+      },
+      "weekendBikePeak": {
+        "slot": 47,
+        "timeLabel": "23:30",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 0.962
+      },
+      "weekendDockPeak": {
+        "slot": 27,
+        "timeLabel": "13:30",
+        "bucket": "午間 12:00-14:00",
+        "rate": 0.269
+      },
+      "clusterId": "st_023bc09e7858a3",
+      "clusterSize": 6,
+      "latitude": 25.03046,
+      "longitude": 121.47291
+    },
+    {
+      "stationId": "st_e2743efa661be7",
+      "name": "湳雅夜市停車場",
+      "city": "新北市",
+      "district": "板橋區",
+      "totalDocks": 10,
+      "bikeRisk": 0.334,
+      "dockRisk": 0.21,
+      "combinedRisk": 0.544,
+      "totalObservations": 8685,
+      "workdayBikePeak": {
+        "slot": 32,
+        "timeLabel": "16:00",
+        "bucket": "下午 14:00-17:00",
+        "rate": 0.769
+      },
+      "workdayDockPeak": {
+        "slot": 11,
+        "timeLabel": "05:30",
+        "bucket": "凌晨 00:00-06:00",
+        "rate": 0.538
+      },
+      "weekendBikePeak": {
+        "slot": 29,
+        "timeLabel": "14:30",
+        "bucket": "下午 14:00-17:00",
+        "rate": 0.731
+      },
+      "weekendDockPeak": {
+        "slot": 14,
+        "timeLabel": "07:00",
+        "bucket": "通勤上午 06:00-09:00",
+        "rate": 0.5
+      },
+      "clusterId": "st_e2743efa661be7",
+      "clusterSize": 1,
+      "latitude": 25.00557,
+      "longitude": 121.45345
+    },
+    {
+      "stationId": "st_f8b6702dd37bcf",
+      "name": "中正民權路口",
+      "city": "新北市",
+      "district": "新店區",
+      "totalDocks": 92,
+      "bikeRisk": 0.524,
+      "dockRisk": 0.016,
+      "combinedRisk": 0.539,
+      "totalObservations": 8685,
+      "workdayBikePeak": {
+        "slot": 7,
+        "timeLabel": "03:30",
+        "bucket": "凌晨 00:00-06:00",
+        "rate": 1
+      },
+      "workdayDockPeak": {
+        "slot": 32,
+        "timeLabel": "16:00",
+        "bucket": "下午 14:00-17:00",
+        "rate": 0.308
+      },
+      "weekendBikePeak": {
+        "slot": 36,
+        "timeLabel": "18:00",
+        "bucket": "傍晚尖峰 17:00-20:00",
+        "rate": 0.846
+      },
+      "weekendDockPeak": {
+        "slot": 35,
+        "timeLabel": "17:30",
+        "bucket": "傍晚尖峰 17:00-20:00",
+        "rate": 0.038
+      },
+      "clusterId": "st_cc1e95adbdadba",
+      "clusterSize": 11,
+      "latitude": 24.98263,
+      "longitude": 121.5336
+    },
+    {
+      "stationId": "st_f1f74c2b3a6bd1",
+      "name": "捷運十四張站",
+      "city": "新北市",
+      "district": "新店區",
+      "totalDocks": 95,
+      "bikeRisk": 0.537,
+      "dockRisk": 0.001,
+      "combinedRisk": 0.538,
+      "totalObservations": 8685,
+      "workdayBikePeak": {
+        "slot": 40,
+        "timeLabel": "20:00",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 0.962
+      },
+      "workdayDockPeak": {
+        "slot": 33,
+        "timeLabel": "16:30",
+        "bucket": "下午 14:00-17:00",
+        "rate": 0.16
+      },
+      "weekendBikePeak": {
+        "slot": 45,
+        "timeLabel": "22:30",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 0.846
+      },
+      "weekendDockPeak": {
+        "slot": 33,
+        "timeLabel": "16:30",
+        "bucket": "下午 14:00-17:00",
+        "rate": 0.038
+      },
+      "clusterId": "st_cc1e95adbdadba",
+      "clusterSize": 11,
+      "latitude": 24.98382,
+      "longitude": 121.52833
+    },
+    {
+      "stationId": "st_5b4b5d79a7fbfb",
+      "name": "永和勵行街口",
+      "city": "新北市",
+      "district": "永和區",
+      "totalDocks": 10,
+      "bikeRisk": 0.418,
+      "dockRisk": 0.119,
+      "combinedRisk": 0.537,
+      "totalObservations": 8685,
+      "workdayBikePeak": {
+        "slot": 45,
+        "timeLabel": "22:30",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 0.885
+      },
+      "workdayDockPeak": {
+        "slot": 25,
+        "timeLabel": "12:30",
+        "bucket": "午間 12:00-14:00",
+        "rate": 0.385
+      },
+      "weekendBikePeak": {
+        "slot": 46,
+        "timeLabel": "23:00",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 0.846
+      },
+      "weekendDockPeak": {
+        "slot": 26,
+        "timeLabel": "13:00",
+        "bucket": "午間 12:00-14:00",
+        "rate": 0.654
+      },
+      "clusterId": "st_5b4b5d79a7fbfb",
+      "clusterSize": 3,
+      "latitude": 25.01455,
+      "longitude": 121.51583
+    },
+    {
+      "stationId": "st_73af4e11afdf98",
+      "name": "捷運三和國中站(2號出口)",
+      "city": "新北市",
+      "district": "三重區",
+      "totalDocks": 17,
+      "bikeRisk": 0.474,
+      "dockRisk": 0.063,
+      "combinedRisk": 0.536,
+      "totalObservations": 8677,
+      "workdayBikePeak": {
+        "slot": 44,
+        "timeLabel": "22:00",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 1
+      },
+      "workdayDockPeak": {
+        "slot": 14,
+        "timeLabel": "07:00",
+        "bucket": "通勤上午 06:00-09:00",
+        "rate": 0.64
+      },
+      "weekendBikePeak": {
+        "slot": 44,
+        "timeLabel": "22:00",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 0.962
+      },
+      "weekendDockPeak": {
+        "slot": 25,
+        "timeLabel": "12:30",
+        "bucket": "午間 12:00-14:00",
+        "rate": 0.538
+      },
+      "clusterId": "st_73af4e11afdf98",
+      "clusterSize": 3,
+      "latitude": 25.07703,
+      "longitude": 121.48635
+    },
+    {
+      "stationId": "st_a2a50e0208617e",
+      "name": "忠誠里(北新路2段97巷)",
+      "city": "新北市",
+      "district": "新店區",
+      "totalDocks": 40,
+      "bikeRisk": 0.531,
+      "dockRisk": 0.004,
+      "combinedRisk": 0.535,
+      "totalObservations": 8685,
+      "workdayBikePeak": {
+        "slot": 20,
+        "timeLabel": "10:00",
+        "bucket": "上午離峰 09:00-12:00",
+        "rate": 0.885
+      },
+      "workdayDockPeak": {
+        "slot": 36,
+        "timeLabel": "18:00",
+        "bucket": "傍晚尖峰 17:00-20:00",
+        "rate": 0.077
+      },
+      "weekendBikePeak": {
+        "slot": 47,
+        "timeLabel": "23:30",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 0.846
+      },
+      "weekendDockPeak": {
+        "slot": 46,
+        "timeLabel": "23:00",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 0.038
+      },
+      "clusterId": "st_cc1e95adbdadba",
+      "clusterSize": 11,
+      "latitude": 24.97427,
+      "longitude": 121.54278
+    },
+    {
+      "stationId": "st_f23b493bc569e3",
+      "name": "龜山活動中心",
+      "city": "新北市",
+      "district": "新店區",
+      "totalDocks": 8,
+      "bikeRisk": 0.449,
+      "dockRisk": 0.086,
+      "combinedRisk": 0.535,
+      "totalObservations": 8685,
+      "workdayBikePeak": {
+        "slot": 10,
+        "timeLabel": "05:00",
+        "bucket": "凌晨 00:00-06:00",
+        "rate": 0.64
+      },
+      "workdayDockPeak": {
+        "slot": 11,
+        "timeLabel": "05:30",
+        "bucket": "凌晨 00:00-06:00",
+        "rate": 0.192
+      },
+      "weekendBikePeak": {
+        "slot": 30,
+        "timeLabel": "15:00",
+        "bucket": "下午 14:00-17:00",
+        "rate": 0.5
+      },
+      "weekendDockPeak": {
+        "slot": 37,
+        "timeLabel": "18:30",
+        "bucket": "傍晚尖峰 17:00-20:00",
+        "rate": 0.115
+      },
+      "clusterId": "st_f23b493bc569e3",
+      "clusterSize": 1,
+      "latitude": 24.90303,
+      "longitude": 121.55224
+    },
+    {
+      "stationId": "st_dfd7e2e00fe6e3",
+      "name": "北新路二段228巷口",
+      "city": "新北市",
+      "district": "新店區",
+      "totalDocks": 12,
+      "bikeRisk": 0.456,
+      "dockRisk": 0.077,
+      "combinedRisk": 0.533,
+      "totalObservations": 8685,
+      "workdayBikePeak": {
+        "slot": 16,
+        "timeLabel": "08:00",
+        "bucket": "通勤上午 06:00-09:00",
+        "rate": 0.84
+      },
+      "workdayDockPeak": {
+        "slot": 25,
+        "timeLabel": "12:30",
+        "bucket": "午間 12:00-14:00",
+        "rate": 0.32
+      },
+      "weekendBikePeak": {
+        "slot": 19,
+        "timeLabel": "09:30",
+        "bucket": "上午離峰 09:00-12:00",
+        "rate": 0.731
+      },
+      "weekendDockPeak": {
+        "slot": 27,
+        "timeLabel": "13:30",
+        "bucket": "午間 12:00-14:00",
+        "rate": 0.231
+      },
+      "clusterId": "st_cc1e95adbdadba",
+      "clusterSize": 11,
+      "latitude": 24.97775,
+      "longitude": 121.54284
+    },
+    {
+      "stationId": "st_4b8b908910d8dc",
+      "name": "板橋戶政事務所海山辦事處",
+      "city": "新北市",
+      "district": "板橋區",
+      "totalDocks": 50,
+      "bikeRisk": 0.532,
+      "dockRisk": 0,
+      "combinedRisk": 0.532,
+      "totalObservations": 4942,
+      "workdayBikePeak": {
+        "slot": 37,
+        "timeLabel": "18:30",
+        "bucket": "傍晚尖峰 17:00-20:00",
+        "rate": 1
+      },
+      "workdayDockPeak": null,
+      "weekendBikePeak": {
+        "slot": 34,
+        "timeLabel": "17:00",
+        "bucket": "傍晚尖峰 17:00-20:00",
+        "rate": 0.8
+      },
+      "weekendDockPeak": null,
+      "clusterId": "st_4b8b908910d8dc",
+      "clusterSize": 1,
+      "latitude": 25.01182,
+      "longitude": 121.47038
+    },
+    {
+      "stationId": "st_4b3443ec9b5cc6",
+      "name": "金城峯廷街口",
+      "city": "新北市",
+      "district": "土城區",
+      "totalDocks": 9,
+      "bikeRisk": 0.372,
+      "dockRisk": 0.158,
+      "combinedRisk": 0.53,
+      "totalObservations": 8685,
+      "workdayBikePeak": {
+        "slot": 16,
+        "timeLabel": "08:00",
+        "bucket": "通勤上午 06:00-09:00",
+        "rate": 0.769
+      },
+      "workdayDockPeak": {
+        "slot": 44,
+        "timeLabel": "22:00",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 0.385
+      },
+      "weekendBikePeak": {
+        "slot": 28,
+        "timeLabel": "14:00",
+        "bucket": "下午 14:00-17:00",
+        "rate": 0.654
+      },
+      "weekendDockPeak": {
+        "slot": 9,
+        "timeLabel": "04:30",
+        "bucket": "凌晨 00:00-06:00",
+        "rate": 0.462
+      },
+      "clusterId": "st_4b3443ec9b5cc6",
+      "clusterSize": 2,
+      "latitude": 24.98814,
+      "longitude": 121.46864
+    },
+    {
+      "stationId": "st_c88ba1308ef38f",
+      "name": "捷運頂溪站(2號出口)",
+      "city": "新北市",
+      "district": "永和區",
+      "totalDocks": 15,
+      "bikeRisk": 0.412,
+      "dockRisk": 0.116,
+      "combinedRisk": 0.529,
+      "totalObservations": 8684,
+      "workdayBikePeak": {
+        "slot": 44,
+        "timeLabel": "22:00",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 1
+      },
+      "workdayDockPeak": {
+        "slot": 13,
+        "timeLabel": "06:30",
+        "bucket": "通勤上午 06:00-09:00",
+        "rate": 0.68
+      },
+      "weekendBikePeak": {
+        "slot": 1,
+        "timeLabel": "00:30",
+        "bucket": "凌晨 00:00-06:00",
+        "rate": 1
+      },
+      "weekendDockPeak": {
+        "slot": 26,
+        "timeLabel": "13:00",
+        "bucket": "午間 12:00-14:00",
+        "rate": 0.615
+      },
+      "clusterId": "st_5b4b5d79a7fbfb",
+      "clusterSize": 3,
+      "latitude": 25.01424,
+      "longitude": 121.51549
+    },
+    {
+      "stationId": "st_669289bbf53bbe",
+      "name": "捷運三民高中站(2號出口)",
+      "city": "新北市",
+      "district": "蘆洲區",
+      "totalDocks": 55,
+      "bikeRisk": 0.468,
+      "dockRisk": 0.06,
+      "combinedRisk": 0.529,
+      "totalObservations": 8685,
+      "workdayBikePeak": {
+        "slot": 44,
+        "timeLabel": "22:00",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 0.923
+      },
+      "workdayDockPeak": {
+        "slot": 33,
+        "timeLabel": "16:30",
+        "bucket": "下午 14:00-17:00",
+        "rate": 0.36
+      },
+      "weekendBikePeak": {
+        "slot": 9,
+        "timeLabel": "04:30",
+        "bucket": "凌晨 00:00-06:00",
+        "rate": 0.885
+      },
+      "weekendDockPeak": {
+        "slot": 26,
+        "timeLabel": "13:00",
+        "bucket": "午間 12:00-14:00",
+        "rate": 0.462
+      },
+      "clusterId": "st_669289bbf53bbe",
+      "clusterSize": 1,
+      "latitude": 25.08577,
+      "longitude": 121.47374
+    },
+    {
+      "stationId": "st_19a1d6c3d1b84c",
+      "name": "文化路二段182巷1弄",
+      "city": "新北市",
+      "district": "板橋區",
+      "totalDocks": 49,
+      "bikeRisk": 0.52,
+      "dockRisk": 0.008,
+      "combinedRisk": 0.528,
+      "totalObservations": 8685,
+      "workdayBikePeak": {
+        "slot": 47,
+        "timeLabel": "23:30",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 0.962
+      },
+      "workdayDockPeak": {
+        "slot": 24,
+        "timeLabel": "12:00",
+        "bucket": "午間 12:00-14:00",
+        "rate": 0.04
+      },
+      "weekendBikePeak": {
+        "slot": 0,
+        "timeLabel": "00:00",
+        "bucket": "凌晨 00:00-06:00",
+        "rate": 0.962
+      },
+      "weekendDockPeak": {
+        "slot": 28,
+        "timeLabel": "14:00",
+        "bucket": "下午 14:00-17:00",
+        "rate": 0.115
+      },
+      "clusterId": "st_023bc09e7858a3",
+      "clusterSize": 6,
+      "latitude": 25.02926,
+      "longitude": 121.47241
+    },
+    {
+      "stationId": "st_f2f38b019741a6",
+      "name": "縣民民生路口",
+      "city": "新北市",
+      "district": "板橋區",
+      "totalDocks": 13,
+      "bikeRisk": 0.417,
+      "dockRisk": 0.107,
+      "combinedRisk": 0.524,
+      "totalObservations": 8685,
+      "workdayBikePeak": {
+        "slot": 35,
+        "timeLabel": "17:30",
+        "bucket": "傍晚尖峰 17:00-20:00",
+        "rate": 0.96
+      },
+      "workdayDockPeak": {
+        "slot": 10,
+        "timeLabel": "05:00",
+        "bucket": "凌晨 00:00-06:00",
+        "rate": 0.538
+      },
+      "weekendBikePeak": {
+        "slot": 26,
+        "timeLabel": "13:00",
+        "bucket": "午間 12:00-14:00",
+        "rate": 0.846
+      },
+      "weekendDockPeak": {
+        "slot": 0,
+        "timeLabel": "00:00",
+        "bucket": "凌晨 00:00-06:00",
+        "rate": 0.346
+      },
+      "clusterId": "st_f2f38b019741a6",
+      "clusterSize": 5,
+      "latitude": 25.01836,
+      "longitude": 121.47072
+    },
+    {
+      "stationId": "st_44cc64d5861b23",
+      "name": "捷運土城站(1號出口)",
+      "city": "新北市",
+      "district": "土城區",
+      "totalDocks": 10,
+      "bikeRisk": 0.292,
+      "dockRisk": 0.231,
+      "combinedRisk": 0.523,
+      "totalObservations": 8685,
+      "workdayBikePeak": {
+        "slot": 45,
+        "timeLabel": "22:30",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 0.962
+      },
+      "workdayDockPeak": {
+        "slot": 17,
+        "timeLabel": "08:30",
+        "bucket": "通勤上午 06:00-09:00",
+        "rate": 0.8
+      },
+      "weekendBikePeak": {
+        "slot": 45,
+        "timeLabel": "22:30",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 0.846
+      },
+      "weekendDockPeak": {
+        "slot": 27,
+        "timeLabel": "13:30",
+        "bucket": "午間 12:00-14:00",
+        "rate": 0.808
+      },
+      "clusterId": "st_44cc64d5861b23",
+      "clusterSize": 2,
+      "latitude": 24.97314,
+      "longitude": 121.44418
+    },
+    {
+      "stationId": "st_25d1cc2d4b8f83",
+      "name": "捷運頂溪站(復興街1巷)",
+      "city": "新北市",
+      "district": "永和區",
+      "totalDocks": 15,
+      "bikeRisk": 0.45,
+      "dockRisk": 0.071,
+      "combinedRisk": 0.521,
+      "totalObservations": 8685,
+      "workdayBikePeak": {
+        "slot": 37,
+        "timeLabel": "18:30",
+        "bucket": "傍晚尖峰 17:00-20:00",
+        "rate": 1
+      },
+      "workdayDockPeak": {
+        "slot": 21,
+        "timeLabel": "10:30",
+        "bucket": "上午離峰 09:00-12:00",
+        "rate": 0.385
+      },
+      "weekendBikePeak": {
+        "slot": 45,
+        "timeLabel": "22:30",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 1
+      },
+      "weekendDockPeak": {
+        "slot": 29,
+        "timeLabel": "14:30",
+        "bucket": "下午 14:00-17:00",
+        "rate": 0.385
+      },
+      "clusterId": "st_5b4b5d79a7fbfb",
+      "clusterSize": 3,
+      "latitude": 25.0131,
+      "longitude": 121.51544
+    },
+    {
+      "stationId": "st_ba8b793b86161d",
+      "name": "捷運南勢角站(4號出口)",
+      "city": "新北市",
+      "district": "中和區",
+      "totalDocks": 96,
+      "bikeRisk": 0.467,
+      "dockRisk": 0.054,
+      "combinedRisk": 0.521,
+      "totalObservations": 8685,
+      "workdayBikePeak": {
+        "slot": 10,
+        "timeLabel": "05:00",
+        "bucket": "凌晨 00:00-06:00",
+        "rate": 1
+      },
+      "workdayDockPeak": {
+        "slot": 35,
+        "timeLabel": "17:30",
+        "bucket": "傍晚尖峰 17:00-20:00",
+        "rate": 0.346
+      },
+      "weekendBikePeak": {
+        "slot": 10,
+        "timeLabel": "05:00",
+        "bucket": "凌晨 00:00-06:00",
+        "rate": 1
+      },
+      "weekendDockPeak": {
+        "slot": 29,
+        "timeLabel": "14:30",
+        "bucket": "下午 14:00-17:00",
+        "rate": 0.346
+      },
+      "clusterId": "st_ba8b793b86161d",
+      "clusterSize": 1,
+      "latitude": 24.98942,
+      "longitude": 121.50998
+    },
+    {
+      "stationId": "st_57258e89f56640",
+      "name": "捷運板橋站(3號出口)",
+      "city": "新北市",
+      "district": "板橋區",
+      "totalDocks": 89,
+      "bikeRisk": 0.471,
+      "dockRisk": 0.046,
+      "combinedRisk": 0.517,
+      "totalObservations": 8685,
+      "workdayBikePeak": {
+        "slot": 11,
+        "timeLabel": "05:30",
+        "bucket": "凌晨 00:00-06:00",
+        "rate": 1
+      },
+      "workdayDockPeak": {
+        "slot": 27,
+        "timeLabel": "13:30",
+        "bucket": "午間 12:00-14:00",
+        "rate": 0.28
+      },
+      "weekendBikePeak": {
+        "slot": 47,
+        "timeLabel": "23:30",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 0.962
+      },
+      "weekendDockPeak": {
+        "slot": 30,
+        "timeLabel": "15:00",
+        "bucket": "下午 14:00-17:00",
+        "rate": 0.269
+      },
+      "clusterId": "st_57258e89f56640",
+      "clusterSize": 1,
+      "latitude": 25.01452,
+      "longitude": 121.46179
+    },
+    {
+      "stationId": "st_14d9b80933349c",
+      "name": "捷運三重國小站",
+      "city": "新北市",
+      "district": "三重區",
+      "totalDocks": 52,
+      "bikeRisk": 0.45,
+      "dockRisk": 0.067,
+      "combinedRisk": 0.517,
+      "totalObservations": 8685,
+      "workdayBikePeak": {
+        "slot": 45,
+        "timeLabel": "22:30",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 1
+      },
+      "workdayDockPeak": {
+        "slot": 14,
+        "timeLabel": "07:00",
+        "bucket": "通勤上午 06:00-09:00",
+        "rate": 0.692
+      },
+      "weekendBikePeak": {
+        "slot": 46,
+        "timeLabel": "23:00",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 1
+      },
+      "weekendDockPeak": {
+        "slot": 29,
+        "timeLabel": "14:30",
+        "bucket": "下午 14:00-17:00",
+        "rate": 0.308
+      },
+      "clusterId": "st_14d9b80933349c",
+      "clusterSize": 1,
+      "latitude": 25.07042,
+      "longitude": 121.49713
+    },
+    {
+      "stationId": "st_8a56aa6d6b2839",
+      "name": "三民翠華街口",
+      "city": "新北市",
+      "district": "板橋區",
+      "totalDocks": 10,
+      "bikeRisk": 0.386,
+      "dockRisk": 0.128,
+      "combinedRisk": 0.514,
+      "totalObservations": 8685,
+      "workdayBikePeak": {
+        "slot": 21,
+        "timeLabel": "10:30",
+        "bucket": "上午離峰 09:00-12:00",
+        "rate": 0.846
+      },
+      "workdayDockPeak": {
+        "slot": 10,
+        "timeLabel": "05:00",
+        "bucket": "凌晨 00:00-06:00",
+        "rate": 0.731
+      },
+      "weekendBikePeak": {
+        "slot": 27,
+        "timeLabel": "13:30",
+        "bucket": "午間 12:00-14:00",
+        "rate": 0.808
+      },
+      "weekendDockPeak": {
+        "slot": 10,
+        "timeLabel": "05:00",
+        "bucket": "凌晨 00:00-06:00",
+        "rate": 0.538
+      },
+      "clusterId": "st_8a56aa6d6b2839",
+      "clusterSize": 2,
+      "latitude": 25.02317,
+      "longitude": 121.48024
+    },
+    {
+      "stationId": "st_147f91b455c48a",
+      "name": "捷運新埔站(4號出口)",
+      "city": "新北市",
+      "district": "板橋區",
+      "totalDocks": 70,
+      "bikeRisk": 0.506,
+      "dockRisk": 0.007,
+      "combinedRisk": 0.513,
+      "totalObservations": 8685,
+      "workdayBikePeak": {
+        "slot": 5,
+        "timeLabel": "02:30",
+        "bucket": "凌晨 00:00-06:00",
+        "rate": 1
+      },
+      "workdayDockPeak": {
+        "slot": 36,
+        "timeLabel": "18:00",
+        "bucket": "傍晚尖峰 17:00-20:00",
+        "rate": 0.04
+      },
+      "weekendBikePeak": {
+        "slot": 47,
+        "timeLabel": "23:30",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 1
+      },
+      "weekendDockPeak": {
+        "slot": 37,
+        "timeLabel": "18:30",
+        "bucket": "傍晚尖峰 17:00-20:00",
+        "rate": 0.077
+      },
+      "clusterId": "st_147f91b455c48a",
+      "clusterSize": 1,
+      "latitude": 25.02341,
+      "longitude": 121.46857
+    },
+    {
+      "stationId": "st_e2654846d8641d",
+      "name": "大觀路二段265巷3弄口",
+      "city": "新北市",
+      "district": "板橋區",
+      "totalDocks": 10,
+      "bikeRisk": 0.373,
+      "dockRisk": 0.138,
+      "combinedRisk": 0.512,
+      "totalObservations": 8685,
+      "workdayBikePeak": {
+        "slot": 26,
+        "timeLabel": "13:00",
+        "bucket": "午間 12:00-14:00",
+        "rate": 0.808
+      },
+      "workdayDockPeak": {
+        "slot": 11,
+        "timeLabel": "05:30",
+        "bucket": "凌晨 00:00-06:00",
+        "rate": 0.6
+      },
+      "weekendBikePeak": {
+        "slot": 30,
+        "timeLabel": "15:00",
+        "bucket": "下午 14:00-17:00",
+        "rate": 0.846
+      },
+      "weekendDockPeak": {
+        "slot": 16,
+        "timeLabel": "08:00",
+        "bucket": "通勤上午 06:00-09:00",
+        "rate": 0.423
+      },
+      "clusterId": "st_e2654846d8641d",
+      "clusterSize": 1,
+      "latitude": 24.99828,
+      "longitude": 121.44286
+    },
+    {
+      "stationId": "st_ec02bec3ca53d8",
+      "name": "捷運新北產業園區站",
+      "city": "新北市",
+      "district": "新莊區",
+      "totalDocks": 70,
+      "bikeRisk": 0.503,
+      "dockRisk": 0.007,
+      "combinedRisk": 0.51,
+      "totalObservations": 8685,
+      "workdayBikePeak": {
+        "slot": 44,
+        "timeLabel": "22:00",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 0.92
+      },
+      "workdayDockPeak": {
+        "slot": 39,
+        "timeLabel": "19:30",
+        "bucket": "傍晚尖峰 17:00-20:00",
+        "rate": 0.115
+      },
+      "weekendBikePeak": {
+        "slot": 44,
+        "timeLabel": "22:00",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 0.962
+      },
+      "weekendDockPeak": {
+        "slot": 37,
+        "timeLabel": "18:30",
+        "bucket": "傍晚尖峰 17:00-20:00",
+        "rate": 0.077
+      },
+      "clusterId": "st_ec02bec3ca53d8",
+      "clusterSize": 2,
+      "latitude": 25.06203,
+      "longitude": 121.45918
+    },
+    {
+      "stationId": "st_60b34282f21286",
+      "name": "三和慈愛街口",
+      "city": "新北市",
+      "district": "三重區",
+      "totalDocks": 11,
+      "bikeRisk": 0.464,
+      "dockRisk": 0.046,
+      "combinedRisk": 0.51,
+      "totalObservations": 8685,
+      "workdayBikePeak": {
+        "slot": 44,
+        "timeLabel": "22:00",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 0.962
+      },
+      "workdayDockPeak": {
+        "slot": 35,
+        "timeLabel": "17:30",
+        "bucket": "傍晚尖峰 17:00-20:00",
+        "rate": 0.2
+      },
+      "weekendBikePeak": {
+        "slot": 45,
+        "timeLabel": "22:30",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 0.962
+      },
+      "weekendDockPeak": {
+        "slot": 36,
+        "timeLabel": "18:00",
+        "bucket": "傍晚尖峰 17:00-20:00",
+        "rate": 0.192
+      },
+      "clusterId": "st_73af4e11afdf98",
+      "clusterSize": 3,
+      "latitude": 25.07814,
+      "longitude": 121.48417
+    },
+    {
+      "stationId": "st_be5338a3744db1",
+      "name": "華江公園",
+      "city": "新北市",
+      "district": "板橋區",
+      "totalDocks": 12,
+      "bikeRisk": 0.448,
+      "dockRisk": 0.061,
+      "combinedRisk": 0.51,
+      "totalObservations": 8685,
+      "workdayBikePeak": {
+        "slot": 35,
+        "timeLabel": "17:30",
+        "bucket": "傍晚尖峰 17:00-20:00",
+        "rate": 0.923
+      },
+      "workdayDockPeak": {
+        "slot": 44,
+        "timeLabel": "22:00",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 0.346
+      },
+      "weekendBikePeak": {
+        "slot": 29,
+        "timeLabel": "14:30",
+        "bucket": "下午 14:00-17:00",
+        "rate": 0.885
+      },
+      "weekendDockPeak": {
+        "slot": 12,
+        "timeLabel": "06:00",
+        "bucket": "通勤上午 06:00-09:00",
+        "rate": 0.269
+      },
+      "clusterId": "st_f2f38b019741a6",
+      "clusterSize": 5,
+      "latitude": 25.01946,
+      "longitude": 121.47099
+    },
+    {
+      "stationId": "st_dbab779ab844f8",
+      "name": "民權二十張路口",
+      "city": "新北市",
+      "district": "新店區",
+      "totalDocks": 14,
+      "bikeRisk": 0.339,
+      "dockRisk": 0.17,
+      "combinedRisk": 0.509,
+      "totalObservations": 8685,
+      "workdayBikePeak": {
+        "slot": 45,
+        "timeLabel": "22:30",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 0.96
+      },
+      "workdayDockPeak": {
+        "slot": 34,
+        "timeLabel": "17:00",
+        "bucket": "傍晚尖峰 17:00-20:00",
+        "rate": 0.72
+      },
+      "weekendBikePeak": {
+        "slot": 0,
+        "timeLabel": "00:00",
+        "bucket": "凌晨 00:00-06:00",
+        "rate": 0.923
+      },
+      "weekendDockPeak": {
+        "slot": 28,
+        "timeLabel": "14:00",
+        "bucket": "下午 14:00-17:00",
+        "rate": 0.615
+      },
+      "clusterId": "st_cc1e95adbdadba",
+      "clusterSize": 11,
+      "latitude": 24.98291,
+      "longitude": 121.53966
+    },
+    {
+      "stationId": "st_c26861829fc4bc",
+      "name": "亞東醫院",
+      "city": "新北市",
+      "district": "板橋區",
+      "totalDocks": 61,
+      "bikeRisk": 0.375,
+      "dockRisk": 0.132,
+      "combinedRisk": 0.507,
+      "totalObservations": 8685,
+      "workdayBikePeak": {
+        "slot": 45,
+        "timeLabel": "22:30",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 0.962
+      },
+      "workdayDockPeak": {
+        "slot": 16,
+        "timeLabel": "08:00",
+        "bucket": "通勤上午 06:00-09:00",
+        "rate": 0.808
+      },
+      "weekendBikePeak": {
+        "slot": 11,
+        "timeLabel": "05:30",
+        "bucket": "凌晨 00:00-06:00",
+        "rate": 0.962
+      },
+      "weekendDockPeak": {
+        "slot": 27,
+        "timeLabel": "13:30",
+        "bucket": "午間 12:00-14:00",
+        "rate": 0.538
+      },
+      "clusterId": "st_c26861829fc4bc",
+      "clusterSize": 2,
+      "latitude": 24.99837,
+      "longitude": 121.45318
+    },
+    {
+      "stationId": "st_72ad61784e017a",
+      "name": "員林平面停車場",
+      "city": "新北市",
+      "district": "土城區",
+      "totalDocks": 9,
+      "bikeRisk": 0.404,
+      "dockRisk": 0.102,
+      "combinedRisk": 0.506,
+      "totalObservations": 8685,
+      "workdayBikePeak": {
+        "slot": 18,
+        "timeLabel": "09:00",
+        "bucket": "上午離峰 09:00-12:00",
+        "rate": 0.846
+      },
+      "workdayDockPeak": {
+        "slot": 45,
+        "timeLabel": "22:30",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 0.4
+      },
+      "weekendBikePeak": {
+        "slot": 33,
+        "timeLabel": "16:30",
+        "bucket": "下午 14:00-17:00",
+        "rate": 0.654
+      },
+      "weekendDockPeak": {
+        "slot": 47,
+        "timeLabel": "23:30",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 0.231
+      },
+      "clusterId": "st_44cc64d5861b23",
+      "clusterSize": 2,
+      "latitude": 24.97681,
+      "longitude": 121.44437
+    },
+    {
+      "stationId": "st_ac8232157fdd65",
+      "name": "十分遊客中心",
+      "city": "新北市",
+      "district": "平溪區",
+      "totalDocks": 42,
+      "bikeRisk": 0.505,
+      "dockRisk": 0,
+      "combinedRisk": 0.505,
+      "totalObservations": 4393,
+      "workdayBikePeak": {
+        "slot": 12,
+        "timeLabel": "06:00",
+        "bucket": "通勤上午 06:00-09:00",
+        "rate": 0.647
+      },
+      "workdayDockPeak": null,
+      "weekendBikePeak": {
+        "slot": 29,
+        "timeLabel": "14:30",
+        "bucket": "下午 14:00-17:00",
+        "rate": 0.731
+      },
+      "weekendDockPeak": null,
+      "clusterId": "st_ac8232157fdd65",
+      "clusterSize": 1,
+      "latitude": 25.04711,
+      "longitude": 121.78279
+    },
+    {
+      "stationId": "st_72e80417fc0554",
+      "name": "三重社會福利服務中心",
+      "city": "新北市",
+      "district": "三重區",
+      "totalDocks": 11,
+      "bikeRisk": 0.393,
+      "dockRisk": 0.109,
+      "combinedRisk": 0.502,
+      "totalObservations": 8685,
+      "workdayBikePeak": {
+        "slot": 18,
+        "timeLabel": "09:00",
+        "bucket": "上午離峰 09:00-12:00",
+        "rate": 0.962
+      },
+      "workdayDockPeak": {
+        "slot": 13,
+        "timeLabel": "06:30",
+        "bucket": "通勤上午 06:00-09:00",
+        "rate": 0.462
+      },
+      "weekendBikePeak": {
+        "slot": 23,
+        "timeLabel": "11:30",
+        "bucket": "上午離峰 09:00-12:00",
+        "rate": 0.885
+      },
+      "weekendDockPeak": {
+        "slot": 8,
+        "timeLabel": "04:00",
+        "bucket": "凌晨 00:00-06:00",
+        "rate": 0.269
+      },
+      "clusterId": "st_72e80417fc0554",
+      "clusterSize": 1,
+      "latitude": 25.07781,
+      "longitude": 121.49128
+    },
+    {
+      "stationId": "st_ba387cb6cb1aaf",
+      "name": "捷運迴龍站(2號出口)",
+      "city": "新北市",
+      "district": "新莊區",
+      "totalDocks": 11,
+      "bikeRisk": 0.386,
+      "dockRisk": 0.113,
+      "combinedRisk": 0.499,
+      "totalObservations": 8685,
+      "workdayBikePeak": {
+        "slot": 3,
+        "timeLabel": "01:30",
+        "bucket": "凌晨 00:00-06:00",
+        "rate": 0.923
+      },
+      "workdayDockPeak": {
+        "slot": 14,
+        "timeLabel": "07:00",
+        "bucket": "通勤上午 06:00-09:00",
+        "rate": 0.731
+      },
+      "weekendBikePeak": {
+        "slot": 46,
+        "timeLabel": "23:00",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 0.769
+      },
+      "weekendDockPeak": {
+        "slot": 14,
+        "timeLabel": "07:00",
+        "bucket": "通勤上午 06:00-09:00",
+        "rate": 0.538
+      },
+      "clusterId": "st_ba387cb6cb1aaf",
+      "clusterSize": 1,
+      "latitude": 25.0211,
+      "longitude": 121.411
+    },
+    {
+      "stationId": "st_354ad6a624f078",
+      "name": "覺明寺(豐年街53巷)",
+      "city": "新北市",
+      "district": "新莊區",
+      "totalDocks": 11,
+      "bikeRisk": 0.306,
+      "dockRisk": 0.191,
+      "combinedRisk": 0.497,
+      "totalObservations": 8685,
+      "workdayBikePeak": {
+        "slot": 30,
+        "timeLabel": "15:00",
+        "bucket": "下午 14:00-17:00",
+        "rate": 0.8
+      },
+      "workdayDockPeak": {
+        "slot": 44,
+        "timeLabel": "22:00",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 0.808
+      },
+      "weekendBikePeak": {
+        "slot": 32,
+        "timeLabel": "16:00",
+        "bucket": "下午 14:00-17:00",
+        "rate": 0.846
+      },
+      "weekendDockPeak": {
+        "slot": 10,
+        "timeLabel": "05:00",
+        "bucket": "凌晨 00:00-06:00",
+        "rate": 0.692
+      },
+      "clusterId": "st_354ad6a624f078",
+      "clusterSize": 1,
+      "latitude": 25.03172,
+      "longitude": 121.44721
+    },
+    {
+      "stationId": "st_930a8ad398cc4f",
+      "name": "縣民漢生東路口",
+      "city": "新北市",
+      "district": "板橋區",
+      "totalDocks": 71,
+      "bikeRisk": 0.489,
+      "dockRisk": 0.005,
+      "combinedRisk": 0.495,
+      "totalObservations": 8685,
+      "workdayBikePeak": {
+        "slot": 19,
+        "timeLabel": "09:30",
+        "bucket": "上午離峰 09:00-12:00",
+        "rate": 0.885
+      },
+      "workdayDockPeak": {
+        "slot": 27,
+        "timeLabel": "13:30",
+        "bucket": "午間 12:00-14:00",
+        "rate": 0.038
+      },
+      "weekendBikePeak": {
+        "slot": 45,
+        "timeLabel": "22:30",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 0.769
+      },
+      "weekendDockPeak": {
+        "slot": 34,
+        "timeLabel": "17:00",
+        "bucket": "傍晚尖峰 17:00-20:00",
+        "rate": 0.077
+      },
+      "clusterId": "st_f2f38b019741a6",
+      "clusterSize": 5,
+      "latitude": 25.01578,
+      "longitude": 121.46779
+    },
+    {
+      "stationId": "st_0d6d9b202807bd",
+      "name": "仁美街/三和路四段145巷口",
+      "city": "新北市",
+      "district": "三重區",
+      "totalDocks": 12,
+      "bikeRisk": 0.435,
+      "dockRisk": 0.058,
+      "combinedRisk": 0.493,
+      "totalObservations": 8685,
+      "workdayBikePeak": {
+        "slot": 19,
+        "timeLabel": "09:30",
+        "bucket": "上午離峰 09:00-12:00",
+        "rate": 0.923
+      },
+      "workdayDockPeak": {
+        "slot": 11,
+        "timeLabel": "05:30",
+        "bucket": "凌晨 00:00-06:00",
+        "rate": 0.28
+      },
+      "weekendBikePeak": {
+        "slot": 31,
+        "timeLabel": "15:30",
+        "bucket": "下午 14:00-17:00",
+        "rate": 0.769
+      },
+      "weekendDockPeak": {
+        "slot": 10,
+        "timeLabel": "05:00",
+        "bucket": "凌晨 00:00-06:00",
+        "rate": 0.192
+      },
+      "clusterId": "st_73af4e11afdf98",
+      "clusterSize": 3,
+      "latitude": 25.07872,
+      "longitude": 121.48636
+    },
+    {
+      "stationId": "st_8fdc06e3cb09bb",
+      "name": "淡水行政中心",
+      "city": "新北市",
+      "district": "淡水區",
+      "totalDocks": 10,
+      "bikeRisk": 0.351,
+      "dockRisk": 0.14,
+      "combinedRisk": 0.491,
+      "totalObservations": 8685,
+      "workdayBikePeak": {
+        "slot": 44,
+        "timeLabel": "22:00",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 0.769
+      },
+      "workdayDockPeak": {
+        "slot": 29,
+        "timeLabel": "14:30",
+        "bucket": "下午 14:00-17:00",
+        "rate": 0.56
+      },
+      "weekendBikePeak": {
+        "slot": 44,
+        "timeLabel": "22:00",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 0.808
+      },
+      "weekendDockPeak": {
+        "slot": 28,
+        "timeLabel": "14:00",
+        "bucket": "下午 14:00-17:00",
+        "rate": 0.385
+      },
+      "clusterId": "st_8fdc06e3cb09bb",
+      "clusterSize": 1,
+      "latitude": 25.18696,
+      "longitude": 121.44407
+    },
+    {
+      "stationId": "st_73dbfa8e4e3a50",
+      "name": "延吉街291巷口",
+      "city": "新北市",
+      "district": "土城區",
+      "totalDocks": 10,
+      "bikeRisk": 0.393,
+      "dockRisk": 0.097,
+      "combinedRisk": 0.49,
+      "totalObservations": 8685,
+      "workdayBikePeak": {
+        "slot": 26,
+        "timeLabel": "13:00",
+        "bucket": "午間 12:00-14:00",
+        "rate": 0.885
+      },
+      "workdayDockPeak": {
+        "slot": 44,
+        "timeLabel": "22:00",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 0.48
+      },
+      "weekendBikePeak": {
+        "slot": 30,
+        "timeLabel": "15:00",
+        "bucket": "下午 14:00-17:00",
+        "rate": 0.846
+      },
+      "weekendDockPeak": {
+        "slot": 17,
+        "timeLabel": "08:30",
+        "bucket": "通勤上午 06:00-09:00",
+        "rate": 0.423
+      },
+      "clusterId": "st_4b3443ec9b5cc6",
+      "clusterSize": 2,
+      "latitude": 24.98394,
+      "longitude": 121.46716
+    },
+    {
+      "stationId": "st_c77837e1e9d4ea",
+      "name": "捷運新店區公所站(1號出口)",
+      "city": "新北市",
+      "district": "新店區",
+      "totalDocks": 42,
+      "bikeRisk": 0.446,
+      "dockRisk": 0.041,
+      "combinedRisk": 0.487,
+      "totalObservations": 8685,
+      "workdayBikePeak": {
+        "slot": 47,
+        "timeLabel": "23:30",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 0.923
+      },
+      "workdayDockPeak": {
+        "slot": 37,
+        "timeLabel": "18:30",
+        "bucket": "傍晚尖峰 17:00-20:00",
+        "rate": 0.385
+      },
+      "weekendBikePeak": {
+        "slot": 1,
+        "timeLabel": "00:30",
+        "bucket": "凌晨 00:00-06:00",
+        "rate": 0.846
+      },
+      "weekendDockPeak": {
+        "slot": 29,
+        "timeLabel": "14:30",
+        "bucket": "下午 14:00-17:00",
+        "rate": 0.154
+      },
+      "clusterId": "st_c77837e1e9d4ea",
+      "clusterSize": 1,
+      "latitude": 24.96737,
+      "longitude": 121.54101
+    },
+    {
+      "stationId": "st_09551e71514cfe",
+      "name": "思源路593巷口",
+      "city": "新北市",
+      "district": "新莊區",
+      "totalDocks": 16,
+      "bikeRisk": 0.478,
+      "dockRisk": 0.005,
+      "combinedRisk": 0.483,
+      "totalObservations": 5422,
+      "workdayBikePeak": {
+        "slot": 46,
+        "timeLabel": "23:00",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 0.941
+      },
+      "workdayDockPeak": {
+        "slot": 47,
+        "timeLabel": "23:30",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 0.125
+      },
+      "weekendBikePeak": {
+        "slot": 46,
+        "timeLabel": "23:00",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 0.875
+      },
+      "weekendDockPeak": {
+        "slot": 23,
+        "timeLabel": "11:30",
+        "bucket": "上午離峰 09:00-12:00",
+        "rate": 0.063
+      },
+      "clusterId": "st_ec02bec3ca53d8",
+      "clusterSize": 2,
+      "latitude": 25.05954,
+      "longitude": 121.45962
+    },
+    {
+      "stationId": "st_7fd4cae50011a8",
+      "name": "建國民權路口",
+      "city": "新北市",
+      "district": "新店區",
+      "totalDocks": 32,
+      "bikeRisk": 0.432,
+      "dockRisk": 0.05,
+      "combinedRisk": 0.482,
+      "totalObservations": 8685,
+      "workdayBikePeak": {
+        "slot": 46,
+        "timeLabel": "23:00",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 0.846
+      },
+      "workdayDockPeak": {
+        "slot": 19,
+        "timeLabel": "09:30",
+        "bucket": "上午離峰 09:00-12:00",
+        "rate": 0.385
+      },
+      "weekendBikePeak": {
+        "slot": 16,
+        "timeLabel": "08:00",
+        "bucket": "通勤上午 06:00-09:00",
+        "rate": 1
+      },
+      "weekendDockPeak": {
+        "slot": 28,
+        "timeLabel": "14:00",
+        "bucket": "下午 14:00-17:00",
+        "rate": 0.154
+      },
+      "clusterId": "st_cc1e95adbdadba",
+      "clusterSize": 11,
+      "latitude": 24.98318,
+      "longitude": 121.53746
+    },
+    {
+      "stationId": "st_4b695754bf6274",
+      "name": "縣民觀光街口",
+      "city": "新北市",
+      "district": "板橋區",
+      "totalDocks": 24,
+      "bikeRisk": 0.43,
+      "dockRisk": 0.05,
+      "combinedRisk": 0.48,
+      "totalObservations": 8685,
+      "workdayBikePeak": {
+        "slot": 17,
+        "timeLabel": "08:30",
+        "bucket": "通勤上午 06:00-09:00",
+        "rate": 0.923
+      },
+      "workdayDockPeak": {
+        "slot": 38,
+        "timeLabel": "19:00",
+        "bucket": "傍晚尖峰 17:00-20:00",
+        "rate": 0.269
+      },
+      "weekendBikePeak": {
+        "slot": 31,
+        "timeLabel": "15:30",
+        "bucket": "下午 14:00-17:00",
+        "rate": 0.615
+      },
+      "weekendDockPeak": {
+        "slot": 36,
+        "timeLabel": "18:00",
+        "bucket": "傍晚尖峰 17:00-20:00",
+        "rate": 0.231
+      },
+      "clusterId": "st_f2f38b019741a6",
+      "clusterSize": 5,
+      "latitude": 25.01702,
+      "longitude": 121.4692
+    },
+    {
+      "stationId": "st_4ba0514d8ba2f5",
+      "name": "民生縣民大道口(東南側)",
+      "city": "新北市",
+      "district": "板橋區",
+      "totalDocks": 22,
+      "bikeRisk": 0.444,
+      "dockRisk": 0.031,
+      "combinedRisk": 0.475,
+      "totalObservations": 7749,
+      "workdayBikePeak": {
+        "slot": 21,
+        "timeLabel": "10:30",
+        "bucket": "上午離峰 09:00-12:00",
+        "rate": 0.957
+      },
+      "workdayDockPeak": {
+        "slot": 47,
+        "timeLabel": "23:30",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 0.261
+      },
+      "weekendBikePeak": {
+        "slot": 27,
+        "timeLabel": "13:30",
+        "bucket": "午間 12:00-14:00",
+        "rate": 1
+      },
+      "weekendDockPeak": {
+        "slot": 2,
+        "timeLabel": "01:00",
+        "bucket": "凌晨 00:00-06:00",
+        "rate": 0.174
+      },
+      "clusterId": "st_f2f38b019741a6",
+      "clusterSize": 5,
+      "latitude": 25.01862,
+      "longitude": 121.47166
+    },
+    {
+      "stationId": "st_1d7685aea741f7",
+      "name": "捷運亞東醫院站(2號出口)",
+      "city": "新北市",
+      "district": "板橋區",
+      "totalDocks": 52,
+      "bikeRisk": 0.457,
+      "dockRisk": 0.018,
+      "combinedRisk": 0.475,
+      "totalObservations": 8685,
+      "workdayBikePeak": {
+        "slot": 47,
+        "timeLabel": "23:30",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 0.923
+      },
+      "workdayDockPeak": {
+        "slot": 34,
+        "timeLabel": "17:00",
+        "bucket": "傍晚尖峰 17:00-20:00",
+        "rate": 0.192
+      },
+      "weekendBikePeak": {
+        "slot": 2,
+        "timeLabel": "01:00",
+        "bucket": "凌晨 00:00-06:00",
+        "rate": 0.923
+      },
+      "weekendDockPeak": {
+        "slot": 37,
+        "timeLabel": "18:30",
+        "bucket": "傍晚尖峰 17:00-20:00",
+        "rate": 0.269
+      },
+      "clusterId": "st_c26861829fc4bc",
+      "clusterSize": 2,
+      "latitude": 24.99763,
+      "longitude": 121.4522
+    },
+    {
+      "stationId": "st_887ce4134a4a1c",
+      "name": "縣民富山街口",
+      "city": "新北市",
+      "district": "板橋區",
+      "totalDocks": 10,
+      "bikeRisk": 0.374,
+      "dockRisk": 0.1,
+      "combinedRisk": 0.474,
+      "totalObservations": 8685,
+      "workdayBikePeak": {
+        "slot": 17,
+        "timeLabel": "08:30",
+        "bucket": "通勤上午 06:00-09:00",
+        "rate": 0.88
+      },
+      "workdayDockPeak": {
+        "slot": 37,
+        "timeLabel": "18:30",
+        "bucket": "傍晚尖峰 17:00-20:00",
+        "rate": 0.462
+      },
+      "weekendBikePeak": {
+        "slot": 29,
+        "timeLabel": "14:30",
+        "bucket": "下午 14:00-17:00",
+        "rate": 0.846
+      },
+      "weekendDockPeak": {
+        "slot": 45,
+        "timeLabel": "22:30",
+        "bucket": "夜間 20:00-24:00",
+        "rate": 0.423
+      },
+      "clusterId": "st_8a56aa6d6b2839",
+      "clusterSize": 2,
+      "latitude": 25.02201,
+      "longitude": 121.47605
+    }
+  ],
+  "clusters": [
+    {
+      "clusterId": "st_cc1e95adbdadba",
+      "size": 11,
+      "districts": [
+        "新店區"
+      ],
+      "stations": [
+        {
+          "stationId": "st_cc1e95adbdadba",
+          "name": "寶橋路29巷",
+          "district": "新店區",
+          "combinedRisk": 0.646
+        },
+        {
+          "stationId": "st_4cac7851513aec",
+          "name": "新北捷運環狀線南機廠",
+          "district": "新店區",
+          "combinedRisk": 0.643
+        },
+        {
+          "stationId": "st_e2b5a41a5b6964",
+          "name": "捷運七張站(1號出口)",
+          "district": "新店區",
+          "combinedRisk": 0.572
+        },
+        {
+          "stationId": "st_21bac96ef28b0d",
+          "name": "捷運大坪林站(1號出口)",
+          "district": "新店區",
+          "combinedRisk": 0.565
+        },
+        {
+          "stationId": "st_89910ead489a27",
+          "name": "寶強文化路口",
+          "district": "新店區",
+          "combinedRisk": 0.565
+        },
+        {
+          "stationId": "st_f8b6702dd37bcf",
+          "name": "中正民權路口",
+          "district": "新店區",
+          "combinedRisk": 0.539
+        },
+        {
+          "stationId": "st_f1f74c2b3a6bd1",
+          "name": "捷運十四張站",
+          "district": "新店區",
+          "combinedRisk": 0.538
+        },
+        {
+          "stationId": "st_a2a50e0208617e",
+          "name": "忠誠里(北新路2段97巷)",
+          "district": "新店區",
+          "combinedRisk": 0.535
+        },
+        {
+          "stationId": "st_dfd7e2e00fe6e3",
+          "name": "北新路二段228巷口",
+          "district": "新店區",
+          "combinedRisk": 0.533
+        },
+        {
+          "stationId": "st_dbab779ab844f8",
+          "name": "民權二十張路口",
+          "district": "新店區",
+          "combinedRisk": 0.509
+        },
+        {
+          "stationId": "st_7fd4cae50011a8",
+          "name": "建國民權路口",
+          "district": "新店區",
+          "combinedRisk": 0.482
+        }
+      ]
+    },
+    {
+      "clusterId": "st_023bc09e7858a3",
+      "size": 6,
+      "districts": [
+        "板橋區"
+      ],
+      "stations": [
+        {
+          "stationId": "st_023bc09e7858a3",
+          "name": "捷運江子翠站(4號出口)",
+          "district": "板橋區",
+          "combinedRisk": 0.623
+        },
+        {
+          "stationId": "st_dcca95a6ce79ce",
+          "name": "捷運江子翠站(6號出口)",
+          "district": "板橋區",
+          "combinedRisk": 0.602
+        },
+        {
+          "stationId": "st_5eb9c65d997f70",
+          "name": "捷運江子翠站(1號出口)",
+          "district": "板橋區",
+          "combinedRisk": 0.591
+        },
+        {
+          "stationId": "st_c30f45037c8fcf",
+          "name": "捷運江子翠站(2號出口)",
+          "district": "板橋區",
+          "combinedRisk": 0.559
+        },
+        {
+          "stationId": "st_58b945bd309047",
+          "name": "捷運江子翠站(5號出口)",
+          "district": "板橋區",
+          "combinedRisk": 0.547
+        },
+        {
+          "stationId": "st_19a1d6c3d1b84c",
+          "name": "文化路二段182巷1弄",
+          "district": "板橋區",
+          "combinedRisk": 0.528
+        }
+      ]
+    },
+    {
+      "clusterId": "st_f2f38b019741a6",
+      "size": 5,
+      "districts": [
+        "板橋區"
+      ],
+      "stations": [
+        {
+          "stationId": "st_f2f38b019741a6",
+          "name": "縣民民生路口",
+          "district": "板橋區",
+          "combinedRisk": 0.524
+        },
+        {
+          "stationId": "st_be5338a3744db1",
+          "name": "華江公園",
+          "district": "板橋區",
+          "combinedRisk": 0.51
+        },
+        {
+          "stationId": "st_930a8ad398cc4f",
+          "name": "縣民漢生東路口",
+          "district": "板橋區",
+          "combinedRisk": 0.495
+        },
+        {
+          "stationId": "st_4b695754bf6274",
+          "name": "縣民觀光街口",
+          "district": "板橋區",
+          "combinedRisk": 0.48
+        },
+        {
+          "stationId": "st_4ba0514d8ba2f5",
+          "name": "民生縣民大道口(東南側)",
+          "district": "板橋區",
+          "combinedRisk": 0.475
+        }
+      ]
+    },
+    {
+      "clusterId": "st_5b4b5d79a7fbfb",
+      "size": 3,
+      "districts": [
+        "永和區"
+      ],
+      "stations": [
+        {
+          "stationId": "st_5b4b5d79a7fbfb",
+          "name": "永和勵行街口",
+          "district": "永和區",
+          "combinedRisk": 0.537
+        },
+        {
+          "stationId": "st_c88ba1308ef38f",
+          "name": "捷運頂溪站(2號出口)",
+          "district": "永和區",
+          "combinedRisk": 0.529
+        },
+        {
+          "stationId": "st_25d1cc2d4b8f83",
+          "name": "捷運頂溪站(復興街1巷)",
+          "district": "永和區",
+          "combinedRisk": 0.521
+        }
+      ]
+    },
+    {
+      "clusterId": "st_73af4e11afdf98",
+      "size": 3,
+      "districts": [
+        "三重區"
+      ],
+      "stations": [
+        {
+          "stationId": "st_73af4e11afdf98",
+          "name": "捷運三和國中站(2號出口)",
+          "district": "三重區",
+          "combinedRisk": 0.536
+        },
+        {
+          "stationId": "st_60b34282f21286",
+          "name": "三和慈愛街口",
+          "district": "三重區",
+          "combinedRisk": 0.51
+        },
+        {
+          "stationId": "st_0d6d9b202807bd",
+          "name": "仁美街/三和路四段145巷口",
+          "district": "三重區",
+          "combinedRisk": 0.493
+        }
+      ]
+    },
+    {
+      "clusterId": "st_905a6253b1e815",
+      "size": 2,
+      "districts": [
+        "新莊區"
+      ],
+      "stations": [
+        {
+          "stationId": "st_905a6253b1e815",
+          "name": "台水新莊服務所",
+          "district": "新莊區",
+          "combinedRisk": 0.587
+        },
+        {
+          "stationId": "st_c73f9b3d0aebdc",
+          "name": "中正思源路口(東北側)",
+          "district": "新莊區",
+          "combinedRisk": 0.57
+        }
+      ]
+    },
+    {
+      "clusterId": "st_4b3443ec9b5cc6",
+      "size": 2,
+      "districts": [
+        "土城區"
+      ],
+      "stations": [
+        {
+          "stationId": "st_4b3443ec9b5cc6",
+          "name": "金城峯廷街口",
+          "district": "土城區",
+          "combinedRisk": 0.53
+        },
+        {
+          "stationId": "st_73dbfa8e4e3a50",
+          "name": "延吉街291巷口",
+          "district": "土城區",
+          "combinedRisk": 0.49
+        }
+      ]
+    },
+    {
+      "clusterId": "st_44cc64d5861b23",
+      "size": 2,
+      "districts": [
+        "土城區"
+      ],
+      "stations": [
+        {
+          "stationId": "st_44cc64d5861b23",
+          "name": "捷運土城站(1號出口)",
+          "district": "土城區",
+          "combinedRisk": 0.523
+        },
+        {
+          "stationId": "st_72ad61784e017a",
+          "name": "員林平面停車場",
+          "district": "土城區",
+          "combinedRisk": 0.506
+        }
+      ]
+    },
+    {
+      "clusterId": "st_8a56aa6d6b2839",
+      "size": 2,
+      "districts": [
+        "板橋區"
+      ],
+      "stations": [
+        {
+          "stationId": "st_8a56aa6d6b2839",
+          "name": "三民翠華街口",
+          "district": "板橋區",
+          "combinedRisk": 0.514
+        },
+        {
+          "stationId": "st_887ce4134a4a1c",
+          "name": "縣民富山街口",
+          "district": "板橋區",
+          "combinedRisk": 0.474
+        }
+      ]
+    },
+    {
+      "clusterId": "st_ec02bec3ca53d8",
+      "size": 2,
+      "districts": [
+        "新莊區"
+      ],
+      "stations": [
+        {
+          "stationId": "st_ec02bec3ca53d8",
+          "name": "捷運新北產業園區站",
+          "district": "新莊區",
+          "combinedRisk": 0.51
+        },
+        {
+          "stationId": "st_09551e71514cfe",
+          "name": "思源路593巷口",
+          "district": "新莊區",
+          "combinedRisk": 0.483
+        }
+      ]
+    },
+    {
+      "clusterId": "st_c26861829fc4bc",
+      "size": 2,
+      "districts": [
+        "板橋區"
+      ],
+      "stations": [
+        {
+          "stationId": "st_c26861829fc4bc",
+          "name": "亞東醫院",
+          "district": "板橋區",
+          "combinedRisk": 0.507
+        },
+        {
+          "stationId": "st_1d7685aea741f7",
+          "name": "捷運亞東醫院站(2號出口)",
+          "district": "板橋區",
+          "combinedRisk": 0.475
+        }
+      ]
+    },
+    {
+      "clusterId": "st_86653145416ac6",
+      "size": 1,
+      "districts": [
+        "平溪區"
+      ],
+      "stations": [
+        {
+          "stationId": "st_86653145416ac6",
+          "name": "平溪國中",
+          "district": "平溪區",
+          "combinedRisk": 0.768
+        }
+      ]
+    },
+    {
+      "clusterId": "st_cefa1b3fee735f",
+      "size": 1,
+      "districts": [
+        "土城區"
+      ],
+      "stations": [
+        {
+          "stationId": "st_cefa1b3fee735f",
+          "name": "金城裕民路口(中正國中)",
+          "district": "土城區",
+          "combinedRisk": 0.615
+        }
+      ]
+    },
+    {
+      "clusterId": "st_e6c00776b34974",
+      "size": 1,
+      "districts": [
+        "中和區"
+      ],
+      "stations": [
+        {
+          "stationId": "st_e6c00776b34974",
+          "name": "審計人員訓練大樓",
+          "district": "中和區",
+          "combinedRisk": 0.604
+        }
+      ]
+    },
+    {
+      "clusterId": "st_d2dc235de9a7ce",
+      "size": 1,
+      "districts": [
+        "淡水區"
+      ],
+      "stations": [
+        {
+          "stationId": "st_d2dc235de9a7ce",
+          "name": "淡金路38巷尾",
+          "district": "淡水區",
+          "combinedRisk": 0.568
+        }
+      ]
+    },
+    {
+      "clusterId": "st_935d60e304ac55",
+      "size": 1,
+      "districts": [
+        "板橋區"
+      ],
+      "stations": [
+        {
+          "stationId": "st_935d60e304ac55",
+          "name": "中華電信學院",
+          "district": "板橋區",
+          "combinedRisk": 0.561
+        }
+      ]
+    },
+    {
+      "clusterId": "st_e2743efa661be7",
+      "size": 1,
+      "districts": [
+        "板橋區"
+      ],
+      "stations": [
+        {
+          "stationId": "st_e2743efa661be7",
+          "name": "湳雅夜市停車場",
+          "district": "板橋區",
+          "combinedRisk": 0.544
+        }
+      ]
+    },
+    {
+      "clusterId": "st_f23b493bc569e3",
+      "size": 1,
+      "districts": [
+        "新店區"
+      ],
+      "stations": [
+        {
+          "stationId": "st_f23b493bc569e3",
+          "name": "龜山活動中心",
+          "district": "新店區",
+          "combinedRisk": 0.535
+        }
+      ]
+    },
+    {
+      "clusterId": "st_4b8b908910d8dc",
+      "size": 1,
+      "districts": [
+        "板橋區"
+      ],
+      "stations": [
+        {
+          "stationId": "st_4b8b908910d8dc",
+          "name": "板橋戶政事務所海山辦事處",
+          "district": "板橋區",
+          "combinedRisk": 0.532
+        }
+      ]
+    },
+    {
+      "clusterId": "st_669289bbf53bbe",
+      "size": 1,
+      "districts": [
+        "蘆洲區"
+      ],
+      "stations": [
+        {
+          "stationId": "st_669289bbf53bbe",
+          "name": "捷運三民高中站(2號出口)",
+          "district": "蘆洲區",
+          "combinedRisk": 0.529
+        }
+      ]
+    },
+    {
+      "clusterId": "st_ba8b793b86161d",
+      "size": 1,
+      "districts": [
+        "中和區"
+      ],
+      "stations": [
+        {
+          "stationId": "st_ba8b793b86161d",
+          "name": "捷運南勢角站(4號出口)",
+          "district": "中和區",
+          "combinedRisk": 0.521
+        }
+      ]
+    },
+    {
+      "clusterId": "st_57258e89f56640",
+      "size": 1,
+      "districts": [
+        "板橋區"
+      ],
+      "stations": [
+        {
+          "stationId": "st_57258e89f56640",
+          "name": "捷運板橋站(3號出口)",
+          "district": "板橋區",
+          "combinedRisk": 0.517
+        }
+      ]
+    },
+    {
+      "clusterId": "st_14d9b80933349c",
+      "size": 1,
+      "districts": [
+        "三重區"
+      ],
+      "stations": [
+        {
+          "stationId": "st_14d9b80933349c",
+          "name": "捷運三重國小站",
+          "district": "三重區",
+          "combinedRisk": 0.517
+        }
+      ]
+    },
+    {
+      "clusterId": "st_147f91b455c48a",
+      "size": 1,
+      "districts": [
+        "板橋區"
+      ],
+      "stations": [
+        {
+          "stationId": "st_147f91b455c48a",
+          "name": "捷運新埔站(4號出口)",
+          "district": "板橋區",
+          "combinedRisk": 0.513
+        }
+      ]
+    },
+    {
+      "clusterId": "st_e2654846d8641d",
+      "size": 1,
+      "districts": [
+        "板橋區"
+      ],
+      "stations": [
+        {
+          "stationId": "st_e2654846d8641d",
+          "name": "大觀路二段265巷3弄口",
+          "district": "板橋區",
+          "combinedRisk": 0.512
+        }
+      ]
+    },
+    {
+      "clusterId": "st_ac8232157fdd65",
+      "size": 1,
+      "districts": [
+        "平溪區"
+      ],
+      "stations": [
+        {
+          "stationId": "st_ac8232157fdd65",
+          "name": "十分遊客中心",
+          "district": "平溪區",
+          "combinedRisk": 0.505
+        }
+      ]
+    },
+    {
+      "clusterId": "st_72e80417fc0554",
+      "size": 1,
+      "districts": [
+        "三重區"
+      ],
+      "stations": [
+        {
+          "stationId": "st_72e80417fc0554",
+          "name": "三重社會福利服務中心",
+          "district": "三重區",
+          "combinedRisk": 0.502
+        }
+      ]
+    },
+    {
+      "clusterId": "st_ba387cb6cb1aaf",
+      "size": 1,
+      "districts": [
+        "新莊區"
+      ],
+      "stations": [
+        {
+          "stationId": "st_ba387cb6cb1aaf",
+          "name": "捷運迴龍站(2號出口)",
+          "district": "新莊區",
+          "combinedRisk": 0.499
+        }
+      ]
+    },
+    {
+      "clusterId": "st_354ad6a624f078",
+      "size": 1,
+      "districts": [
+        "新莊區"
+      ],
+      "stations": [
+        {
+          "stationId": "st_354ad6a624f078",
+          "name": "覺明寺(豐年街53巷)",
+          "district": "新莊區",
+          "combinedRisk": 0.497
+        }
+      ]
+    },
+    {
+      "clusterId": "st_8fdc06e3cb09bb",
+      "size": 1,
+      "districts": [
+        "淡水區"
+      ],
+      "stations": [
+        {
+          "stationId": "st_8fdc06e3cb09bb",
+          "name": "淡水行政中心",
+          "district": "淡水區",
+          "combinedRisk": 0.491
+        }
+      ]
+    },
+    {
+      "clusterId": "st_c77837e1e9d4ea",
+      "size": 1,
+      "districts": [
+        "新店區"
+      ],
+      "stations": [
+        {
+          "stationId": "st_c77837e1e9d4ea",
+          "name": "捷運新店區公所站(1號出口)",
+          "district": "新店區",
+          "combinedRisk": 0.487
+        }
+      ]
+    }
+  ]
+}
