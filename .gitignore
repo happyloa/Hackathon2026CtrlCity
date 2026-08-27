@@ -17,3 +17,6 @@ ml/data/
 ml/output/
 ml/.venv/
 __pycache__/
+
+# Ad hoc analysis reports for local review; not build output, not final artifacts.
+docs/_scratch/

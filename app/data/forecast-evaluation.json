@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0",
-  "generatedAt": "2026-08-26T07:05:56.117Z",
+  "generatedAt": "2026-08-26T14:16:53.708Z",
   "model": {
     "version": "historical-live-inventory-baseline-v2",
     "objective": "預測未來時點是否空車或滿位",

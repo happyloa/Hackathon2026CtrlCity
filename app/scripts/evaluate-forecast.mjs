@@ -17,6 +17,11 @@ const SOURCE_DIR = process.env.CTRL_CITY_DATASET_DIR
   : resolve(REPO_DIR, 'docs', '資料集')
 const ALIAS_FILE = resolve(SCRIPT_DIR, 'station-aliases.json')
 const ADJUSTMENTS_FILE = resolve(APP_DIR, 'data', 'operational-adjustments.json')
+// Optional: station_id,cluster_id,cluster_label rows (300m-proximity groups
+// from app/scripts/analyze-high-risk-stations.mjs) for an ad hoc per-cluster
+// breakdown alongside the per-district one. Silently skipped if absent.
+const CLUSTER_MEMBERSHIP_FILE = resolve(REPO_DIR, 'ml', 'output', 'cluster_membership.csv')
+const CLUSTER_OUTPUT_FILE = resolve(APP_DIR, 'data', 'forecast-evaluation-clusters.json')
 const OUTPUT_DIR = resolve(APP_DIR, 'data')
 const OUTPUT_FILE = resolve(OUTPUT_DIR, 'forecast-evaluation.json')
 const MARKDOWN_FILE = resolve(REPO_DIR, 'docs', '03_實作與驗證', '歷史風險基線評估.md')
@@ -200,6 +205,25 @@ async function listSourceFiles() {
 async function loadAliases() {
   const aliases = JSON.parse(await readFile(ALIAS_FILE, 'utf8'))
   return new Map(Object.entries(aliases).map(([raw, canonical]) => [normalizeText(raw), normalizeText(canonical)]))
+}
+
+async function readClusterMembership() {
+  let raw
+  try {
+    raw = await readFile(CLUSTER_MEMBERSHIP_FILE, 'utf8')
+  } catch (error) {
+    if (error.code === 'ENOENT') return null
+    throw error
+  }
+  const membership = new Map()
+  const labels = new Map()
+  for (const line of raw.trim().split('\n').slice(1)) {
+    const [stationId, clusterId, clusterLabel] = line.split(',')
+    if (!stationId || !clusterId) continue
+    membership.set(stationId, clusterId)
+    labels.set(clusterId, clusterLabel)
+  }
+  return { membership, labels }
 }
 
 async function readAdjustments() {
@@ -695,6 +719,22 @@ async function main() {
     (stationId) => districtByStationId.get(stationId) ?? null,
   )
   const testByDistrict = serializeGroups(testByDistrictGroups)
+
+  const clusterMembership = await readClusterMembership()
+  if (clusterMembership) {
+    const testByClusterGroups = evaluateTimelinesByGroup(
+      timelines.test,
+      profiles,
+      thresholds,
+      (stationId) => clusterMembership.membership.get(stationId) ?? null,
+    )
+    const testByCluster = serializeGroups(testByClusterGroups)
+    for (const [clusterId, entry] of Object.entries(testByCluster)) {
+      entry.label = clusterMembership.labels.get(clusterId) ?? clusterId
+    }
+    await writeAtomically(CLUSTER_OUTPUT_FILE, `${JSON.stringify({ generatedAt: new Date().toISOString(), testByCluster }, null, 2)}\n`)
+    console.log(`Wrote ${CLUSTER_OUTPUT_FILE} (${Object.keys(testByCluster).length} clusters)`)
+  }
 
   const evaluation = {
     schemaVersion: '1.0',
