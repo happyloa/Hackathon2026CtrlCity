@@ -388,3 +388,6 @@ ml/output/station-time-profile-*.csv 已經有現成的訓練期統計，只是�
 目前 threshold.py 選閾值的準則是「純最大化F1」。可以改成「在 precision ≥ 某個下限（例如35%）的限制下最大化F1」，直接針對「Precision 明顯高於baseline」這句判準去優化，而不是任由F1自動決定要犧牲多少precision換recall。這個也是零成本，只要改 select_threshold 的排序邏輯重跑。
 
 建議順序：先做 1（幾分鐘驗證有沒有用），如果有感再做
+
+1. N-Beat VS xBGoost
+2. 增加 TFT (加上時間序列特徵,weather, holiday, etc)
