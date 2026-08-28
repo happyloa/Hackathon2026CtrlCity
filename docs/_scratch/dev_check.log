@@ -1,0 +1,29 @@
+
+> dev
+> nuxt dev
+
+
+[41m[30m ERROR [39m[49m
+Another Nuxt dev server is already running:
+
+  URL:     http://[::1]:3000
+  PID:     36024
+  Dir:     C:/Users/hughc/OneDrive/文件/project/AWS-AI/Hackathon2026CtrlCity/app
+  Started: 2026/8/27 下午6:46:18
+
+Run [36mtaskkill /PID 36024 /F[39m to stop it, or connect to http://[::1]:3000
+Set NUXT_IGNORE_LOCK=1 to bypass this check.
+
+
+
+[41m[30m ERROR [39m[49m Another Nuxt dev is already running (PID 36024).
+
+    [90mat [39m#acquireDevLock ([36m/C:/Users/hughc/OneDrive/%E6%96%87%E4%BB%B6/project/AWS-AI/Hackathon2026CtrlCity/app/node_modules/@nuxt/cli/dist/dev-DHhrJk9w.mjs:580:10[39m)
+    [90mat [39mNuxtDevServer.init ([36m/C:/Users/hughc/OneDrive/%E6%96%87%E4%BB%B6/project/AWS-AI/Hackathon2026CtrlCity/app/node_modules/@nuxt/cli/dist/dev-DHhrJk9w.mjs:404:23[39m)
+    [90mat [39masync initialize ([36m/C:/Users/hughc/OneDrive/%E6%96%87%E4%BB%B6/project/AWS-AI/Hackathon2026CtrlCity/app/node_modules/@nuxt/cli/dist/dev-DHhrJk9w.mjs:753:2[39m)
+    [90mat [39masync Object.run ([36m/C:/Users/hughc/OneDrive/%E6%96%87%E4%BB%B6/project/AWS-AI/Hackathon2026CtrlCity/app/node_modules/@nuxt/cli/dist/dev-Cbii5ek4.mjs:198:51[39m)
+    [90mat [39masync runCommand ([36m/C:/Users/hughc/OneDrive/%E6%96%87%E4%BB%B6/project/AWS-AI/Hackathon2026CtrlCity/app/node_modules/citty/dist/index.mjs:228:47[39m)
+    [90mat [39masync runCommand ([36m/C:/Users/hughc/OneDrive/%E6%96%87%E4%BB%B6/project/AWS-AI/Hackathon2026CtrlCity/app/node_modules/citty/dist/index.mjs:217:5[39m)
+    [90mat [39masync runMain ([36m/C:/Users/hughc/OneDrive/%E6%96%87%E4%BB%B6/project/AWS-AI/Hackathon2026CtrlCity/app/node_modules/citty/dist/index.mjs:394:10[39m) 
+
+

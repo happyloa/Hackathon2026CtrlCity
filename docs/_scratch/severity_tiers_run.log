@@ -1,0 +1,31 @@
+GPU available: False, used: False
+TPU available: False, using: 0 TPU cores
+\U0001f4a1 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+\U0001f4a1 Tip: For seamless cloud uploads and versioning, try installing [litmodels](https://pypi.org/project/litmodels/) to enable LitModelCheckpoint, which syncs automatically with the Lightning model registry.
+`Trainer.fit` stopped: `max_epochs=12` reached.
+GPU available: False, used: False
+TPU available: False, using: 0 TPU cores
+\U0001f4a1 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+\U0001f4a1 Tip: For seamless cloud uploads and versioning, try installing [litmodels](https://pypi.org/project/litmodels/) to enable LitModelCheckpoint, which syncs automatically with the Lightning model registry.
+GPU available: False, used: False
+TPU available: False, using: 0 TPU cores
+\U0001f4a1 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+\U0001f4a1 Tip: For seamless cloud uploads and versioning, try installing [litmodels](https://pypi.org/project/litmodels/) to enable LitModelCheckpoint, which syncs automatically with the Lightning model registry.
+=== XGBoost ===
+  XGBoost [complete] threshold=0.81 (val F1=0.391) TEST precision=0.264 recall=0.563 f1=0.359
+  XGBoost [near] threshold=0.56 (val F1=0.654) TEST precision=0.527 recall=0.731 f1=0.613
+
+=== N-BEATS ===
+  N-BEATS trained for st_cefa1b3fee735f
+  N-BEATS trained for st_f1f74c2b3a6bd1
+  N-BEATS trained for st_4b8b908910d8dc
+  N-BEATS trained for st_f8b6702dd37bcf
+  N-BEATS trained for st_ac8232157fdd65
+  N-BEATS [complete] threshold=2.3 (val F1=0.319) TEST precision=0.232 recall=0.357 f1=0.281
+  N-BEATS [near] threshold=4.3 (val F1=0.628) TEST precision=0.46 recall=0.704 f1=0.556
+
+=== TFT ===
+  TFT [complete] threshold=3.8 (val F1=0.303) TEST precision=0.154 recall=0.629 f1=0.248
+  TFT [near] threshold=3.9 (val F1=0.604) TEST precision=0.493 recall=0.614 f1=0.547
+
+Wrote C:\Users\hughc\OneDrive\¤å¥ó\project\AWS-AI\Hackathon2026CtrlCity\ml\output\severity_tier_evaluation.json
