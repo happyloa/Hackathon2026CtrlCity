@@ -494,3 +494,38 @@ XGBoost 在兩個嚴重度層級都領先，`near`（早期預警）門檻的三
 腳本：`ml/src/evaluate_severity_tiers.py`，輸出 `ml/output/severity_tier_evaluation.json`，站點清單 `docs/_scratch/lowf1_bikerisk.csv`（baseline F1<40%）與 `docs/_scratch/lowf1_60_all.csv`（baseline F1≤60%，1469站）。
 
 **總結論**：目前所有嘗試（全站、低F1子集、不同嚴重度定義）都指向同一個結論——XGBoost（含鄰站特徵）穩定小幅領先規則基線，兩個深度學習方向（N-BEATS單站、TFT跨站）都還打不過 XGBoost。建議維持 XGBoost + 規則基線的混合部署，`near`(n≤2) 早期預警門檻值得納入警報系統設計討論。
+
+### 即時 XGBoost 缺車/滿車警報：為什麼現在只能手動 demo，以及 AWS 上怎麼平移
+
+**目標**：營運總覽頁面加 Baseline/XGBoost 切換，XGBoost 模式下對「baseline 60分鐘F1≤60%」的站（既有混合部署門檻，見上方「已完成：候選方向1」與 `xgboost-vs-baseline-district-tradeoff` 記憶）改用 XGBoost 算 30/60分鐘的缺車/滿車風險，並用整數（無條件進位）顯示要補幾台車、要拉幾台車，用類似購物車的懸浮警報 icon（Warning-30／Warning-60）呈現。
+
+**卡關點：模型檔案太大，塞不進純靜態的 Cloudflare Pages。**
+
+把 `model_30.json`/`model_60.json` 匯出成瀏覽器能讀的格式後，實測分別是 **80MB／134MB**——主因是 `station_id` 有 1,569 種類別，很多樹節點在對 station_id 做類別分裂時得存下多達一千多個候選類別代碼，撐大了檔案。這遠遠超過 Cloudflare Pages 單一靜態資產 25MiB 的硬上限（就是先前 `station-details.bin` 卡住部署的同一個限制），瀏覽器也不可能為了算風險分數下載這麼大的檔案。
+
+過程中還修正了一個關鍵 bug：手刻的 JS/Python 樹狀模型辨識器，一開始把「類別分裂時，特徵值有在類別清單裡」的方向搞反了（應該是走右子節點，不是左子節點）。修正後用500筆測試資料對照官方 `predict_proba()`，機率誤差降到平均0.25個百分點、最大約3.8個百分點（殘餘誤差來自 XGBoost 內部用 float32、比較切分門檻時的浮點精度差異，屬已知且可接受的小落差）。這套驗證過的樹狀分裂邏輯，程式碼在 `ml/src/validate_tree_walker.py`。
+
+**現階段（純靜態 Cloudflare Pages）做法：本機手動觸發 demo**
+
+新增 `npm run predict:xgboost`（`ml/src/export_model_for_web.py` 匯出模型 + 一支 Node 腳本讀取匯出檔跑推論），流程：
+
+1. 抓一次官方即時資料
+2. 只對 `app/data/station-risk-evaluation.json` 裡 baseline 60分鐘 F1≤60% 的站（既有混合部署站清單）算 XGBoost 風險分數（30分鐘用 `model_30.json`，18個特徵、無鄰站特徵；60分鐘用 `model_60.json`，20個特徵、含鄰站特徵）
+3. 鄰站缺車率用即時資料現場算（300m半徑，跟 `ml/src/build_neighbors.py` 同一套邏輯）；lag特徵這次demo沒有歷史快照可用，一率視為缺值——XGBoost樹本身就有缺值繞行邏輯（`default_left`），不會噴錯，只是準確度會比有完整lag特徵時低
+4. 輸出一份小的靜態 JSON（`app/public/data/xgboost/live-predictions.json`，只含預測分數與整數台數建議，不含134MB的模型本身）
+5. 這份小 JSON 手動 commit 進版控、正常部署——網友看到的是「你最後一次手動跑的結果」，不是每次刷新都重新推論
+
+`model_30.json`/`model_60.json`（134MB/80MB）**不進版控**，只留在本機/CI環境跑這支腳本用。
+
+**之後如果要部署到 AWS，可以怎麼平移**
+
+Cloudflare Pages 這個 25MiB 限制是「純靜態託管平台」特有的，AWS 上有真正的伺服器端運算，完全不需要現在這種「手動觸發、寫死小JSON」的變通做法：
+
+| | 現況（Cloudflare Pages） | AWS 平移後 |
+|---|---|---|
+| 模型存放 | 不能進版控/部署（134MB > 25MiB上限） | **S3**，沒有這種檔案大小限制 |
+| 推論引擎 | 手刻的 JS/Python 樹狀模型辨識器（有已知的浮點精度誤差） | 直接用**正牌 Python `xgboost` 套件**的 `predict_proba()`，類別特徵原生正確處理，沒有精度誤差問題 |
+| 觸發方式 | 人工手動跑 `npm run predict:xgboost`，結果是靜態快照 | **Lambda + API Gateway**：Lambda 冷啟動時從 S3 載入模型進記憶體，前端每次打 API 即時算最新風險分數，做法跟現有 `useLiveDashboard` 呼叫官方即時資料的模式幾乎一樣，只是多一個真的會跑 XGBoost 的後端端點 |
+| 更新頻率 | 只在手動觸發那一刻 | 可以做到跟官方即時資料一樣「每次刷新都算最新」 |
+
+也就是說：現在的手動demo版本完全可以直接沿用同一套特徵計算邏輯（鄰站300m即時缺車率、混合部署站點清單、整數補車/拉車台數），差別只在於「用 Node 手刻樹狀模型辨識器」換成「用 Lambda 跑正牌 Python xgboost」，以及「手動觸發存靜態檔」換成「即時 API」。兩邊都能重用同一批已經驗證過的 `ml/output/model_{30,60}.json`。
