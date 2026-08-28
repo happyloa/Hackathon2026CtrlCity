@@ -20,5 +20,10 @@ ml/output/
 ml/.venv/
 __pycache__/
 
+# pytorch-lightning's default Trainer writes these to the CWD (repo root,
+# since ml/src scripts are run via `python ml/src/train_tft.py` from there).
+checkpoints/
+lightning_logs/
+
 # Ad hoc analysis reports for local review; not build output, not final artifacts.
 # docs/_scratch/

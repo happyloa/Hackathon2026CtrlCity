@@ -5,6 +5,7 @@ export interface RoiMapPoint {
   station: RoiStation
   index: number
   cell: RoiCell | null
+  baselineF1?: number | null
 }
 
 const props = withDefaults(defineProps<{
@@ -44,6 +45,18 @@ function colourFor(rate: number | null): string {
   return BANDS.find(band => rate < band.limit)!.colour
 }
 
+/** Baseline F1 >= 60% is a rare, strong-performing station -- flagged with a
+ * distinct border so it stands out from the fill-colour scale (which encodes
+ * empty/full rate, an unrelated metric) without needing a second legend. */
+const BASELINE_F1_HIGHLIGHT_THRESHOLD = 0.60
+const BASELINE_F1_HIGHLIGHT_COLOUR = '#f0781d'
+
+function borderColourFor(baselineF1: number | null | undefined, isSelected: boolean): string {
+  if (isSelected) return '#ffffff'
+  if (baselineF1 != null && baselineF1 >= BASELINE_F1_HIGHLIGHT_THRESHOLD) return BASELINE_F1_HIGHLIGHT_COLOUR
+  return 'rgba(0,0,0,0.45)'
+}
+
 /** Bigger stations get a bigger dot so capacity is legible alongside the rate. */
 function radiusFor(totalDocks: number): number {
   return Math.max(4, Math.min(11, 3 + Math.sqrt(totalDocks)))
@@ -69,10 +82,11 @@ function render() {
   for (const point of mapped.value) {
     const rate = point.cell ? point.cell[props.metric] : null
     const isSelected = point.station.id === props.selectedId
+    const isHighBaselineF1 = !isSelected && point.baselineF1 != null && point.baselineF1 >= BASELINE_F1_HIGHLIGHT_THRESHOLD
     const marker = leaflet.circleMarker([point.station.latitude, point.station.longitude], {
       radius: isSelected ? radiusFor(point.station.totalDocks) + 4 : radiusFor(point.station.totalDocks),
-      color: isSelected ? '#ffffff' : 'rgba(0,0,0,0.45)',
-      weight: isSelected ? 3 : 1,
+      color: borderColourFor(point.baselineF1, isSelected),
+      weight: isSelected ? 3 : isHighBaselineF1 ? 2 : 1,
       fillColor: colourFor(rate),
       fillOpacity: 0.85,
     })
@@ -151,6 +165,10 @@ watch(() => [props.points, props.selectedId, props.metric], () => render(), { de
       </span>
       <span class="inline-flex items-center gap-1.5">
         <span class="inline-block size-3 rounded-full" style="background-color: #52525b" /> 無觀測
+      </span>
+      <span class="inline-flex items-center gap-1.5">
+        <span class="inline-block size-3 rounded-full border-2" style="border-color: #f0781d; background-color: transparent" />
+        規則基線 F1 ≥ 60%
       </span>
       <span class="ml-auto">圓點大小代表總車柱數 · 共 {{ mapped.length.toLocaleString() }} 站</span>
     </div>

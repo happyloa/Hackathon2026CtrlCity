@@ -391,3 +391,106 @@ ml/output/station-time-profile-*.csv 已經有現成的訓練期統計，只是�
 
 1. N-Beat VS xBGoost
 2. 增加 TFT (加上時間序列特徵,weather, holiday, etc)
+
+### 已嘗試但失敗：候選方向 N-BEATS（純時間序列模型，單站獨立訓練）
+
+用 top15 缺車率最高的站，各自獨立訓練 N-BEATS（generic、from-scratch、PyTorch），60分鐘視野，跟規則基線/XGBoost 同一批站做逐站比較。
+
+結果：N-BEATS 在 14/15 有效比較的站全部墊底（13站三者最差、1站略贏 XGBoost 但仍輸基線）。平溪國中是 0/0 邊界情況三者同。
+
+| 站點 | 規則基線 F1 | XGBoost F1 | N-BEATS F1 |
+|---|---|---|---|
+| 新北捷運環狀線南機廠 | 43.5 | 53.4 | 33.7 |
+| 金城裕民路口 | 30.0 | 26.1 | 28.3 |
+| 台水新莊服務所 | 59.8 | 60.6 | 51.7 |
+| 中正思源路口 | 61.7 | 66.1 | 53.5 |
+| 捷運七張站 | 51.8 | 55.2 | 43.4 |
+| 捷運十四張站 | 37.1 | 40.3 | 29.7 |
+| 捷運大坪林站 | 51.3 | 56.0 | 47.7 |
+| 板橋戶政事務所 | 32.9 | 38.0 | 27.7 |
+| 忠誠里 | 47.6 | 52.7 | 28.9 |
+| 中正民權路口 | 33.3 | 33.5 | 24.4 |
+| 文化路二段182巷 | 65.9 | 72.3 | 66.2 |
+| 捷運新埔站 | 57.8 | 61.8 | 53.0 |
+| 十分遊客中心 | 22.2 | 25.0 | 21.1 |
+| 捷運新北產業園區站 | 44.6 | 50.2 | 34.3 |
+
+判讀：
+1. 滿柱（docks==0）事件太稀有，N-BEATS 的驗證期門檻搜尋幾乎都選到「永不觸發」（`threshold=-0.5, val F1=0.000`），滿柱這條線基本失能。
+2. 單站獨立訓練、純時間序列——完全看不到鄰站狀態、跨站共用的 station_id 樹狀切分等 XGBoost 已證實有效的資訊。
+3. 單站訓練樣本量（train ~5,700 筆）對深度網路偏薄，XGBoost 在這種中小型表格資料上本來就有優勢。
+
+結論：問題出在架構本身（單站獨立、無跨站資訊、對稀有事件不敏感），不是樣本數不夠，所以沒有繼續擴大到 60 站或做 global N-BEATS，改試 TFT（見下）。程式碼保留在 `ml/src/train_nbeats.py`，輸出 `ml/output/nbeats_evaluation.json`。
+
+### 已嘗試但同樣落後：候選方向 TFT（Temporal Fusion Transformer，加天氣/假日特徵）
+
+跟 N-BEATS 不同，TFT 是跨站共用權重的 global model（`station_id` 當 static categorical），同一批 top15 站一起訓練。特徵：own history（bikes/docks）+ 天氣（`docs/_scratch/weather_hourly.csv`，兩站平均展開成30分鐘格）+ `is_holiday`/`is_workday`（`docs/_scratch/calandar.md` 的6段日期）+ slot/weekday 的 sin/cos 週期編碼。用 `pytorch-forecasting` 的 `TemporalFusionTransformer`，60分鐘視野，Jan-Apr train / May 選閾值 / June test，跟其他模型同一凍結切分。
+
+因為是 global model，沒有做逐站拆分，直接看 15 站合併（pooled）的結果，跟 baseline / XGBoost 同樣把這15站的 tp/fp/fn/tn 加總比較：
+
+| | Precision | Recall | F1 |
+|---|---|---|---|
+| 規則基線（pooled） | 37.7% | 75.5% | 50.3% |
+| XGBoost（pooled） | 42.7% | 75.7% | **54.6%** |
+| TFT（pooled） | 36.6% | 51.4% | 42.8% |
+
+TFT 一樣兩者都輸，但輸的原因跟 N-BEATS 不同：
+1. Precision 其實跟基線差不多（36.6% vs 37.7%），問題主要出在 **Recall 只有 51.4%**，比基線/XGBoost 的 75% 低了 24 個百分點——閾值搜尋出來的模型明顯偏保守，漏掉大量真實事件。
+2. 滿柱（docks）目標的驗證期 F1 只有 0.111，比 N-BEATS 的 0（完全失能）好一點但仍然很弱，稀有事件對這兩種深度模型都是共同弱點。
+3. 跨站共用權重確實比 N-BEATS 的單站獨立訓練好上一截（pooled F1 42.8% vs N-BEATS 各站多半在 20-35% 之間），驗證了「有跨站資訊」的方向是對的，但目前這個小 hidden_size（16）、CPU-only、僅12 epoch 的設定還沒能追上 XGBoost。
+
+結論：兩個深度學習方向（N-BEATS、TFT）目前都輸給 XGBoost，且 XGBoost 額外具備「不用GPU、訓練快、可解釋」的優勢。除非有人手/算力可以繼續調 TFT（更大 hidden_size、更多 epoch、GPU），否則現階段建議維持 XGBoost + 規則基線的混合部署策略，不繼續往深度學習方向投入。程式碼保留在 `ml/src/train_tft.py`，輸出 `ml/output/tft_evaluation.json`。
+
+### 目前所有模型測試結果總覽（2026-08-28 整理）
+
+#### 1. 全站規則基線 F1 分布（1,565站，60分鐘視野）
+
+| F1 區段 | 站數 | 佔比（排除0/0後） |
+|---|---|---|
+| ≥80% | 3 | 0.2% |
+| 60%~80% | 31 | 2.1% |
+| 40%~60% | 237 | 15.8% |
+| 20%~40% | 768 | 51.2% |
+| 0%~20%（有真實事件） | 460 | 30.7% |
+| 0/0 邊界情況（測試期無真實事件，不算F1） | 66 | — |
+
+過半數站落在 20%~40%，加上 0%~20% 超過 8 成站點 baseline F1 低於 40%。F1≥60% 的站只有 34 站（2.3%），是極少數。
+
+#### 2. 全站合併版（缺車+滿車 issue，60分鐘，1,565站）
+
+| | Precision | Recall | F1 |
+|---|---|---|---|
+| 規則基線 | 28.4% | 45.0% | 34.8% |
+| XGBoost（含鄰站特徵） | 32.2% | 47.6% | **38.4%**（+3.6pp） |
+
+#### 3. 缺車單獨（不含滿車），限定 baseline 60分鐘合併F1≤60% 的 1,469 站
+
+用既有已訓練 `model_60.json`（含鄰站特徵），只重新在驗證集挑一次閾值（因為 target 從 issue 換成 empty），未重訓模型。
+
+| | Precision | Recall | F1 |
+|---|---|---|---|
+| 規則基線（threshold=0.4，沿用系統既有值） | 26.9% | 49.4% | 34.8% |
+| XGBoost（threshold=0.85，針對這個target重選） | 30.5% | 47.4% | **37.1%**（+2.3pp） |
+
+腳本：`ml/src/evaluate_lowf1_bikeshortage.py`，輸出 `ml/output/lowf1_bikeshortage_evaluation.json`。
+
+#### 4. N-BEATS vs TFT vs XGBoost，逐站/pooled（top15_bikerisk，見上方兩節完整表格）
+
+- N-BEATS（單站獨立訓練）：14/15 站全部墊底，兩者都輸。
+- TFT（跨站 global model，加天氣+假日特徵）：pooled F1 42.8%，比 N-BEATS 好但仍輸 baseline（50.3%）與 XGBoost（54.6%）。
+
+#### 5. 嚴重度分層（complete=完全缺車 n=0 / near=即將沒車 n≤2），限定 baseline F1<40% 的 5 站（top15_bikerisk 子集）
+
+規則基線刻意不重算，維持原定義。N-BEATS/TFT 重訓為缺車單一目標（不含滿車），三模型都用各自驗證集挑過的閾值。
+
+| | complete (n=0) F1 | near (n≤2) F1 |
+|---|---|---|
+| XGBoost | **35.9%**（P26.4/R56.3） | **61.3%**（P52.7/R73.1） |
+| N-BEATS | 28.1%（P23.2/R35.7） | 55.6%（P46.0/R70.4） |
+| TFT | 24.8%（P15.4/R62.9） | 54.7%（P49.3/R61.4） |
+
+XGBoost 在兩個嚴重度層級都領先，`near`（早期預警）門檻的三個模型 F1 都比 `complete`（嚴格等於0）高出一大截，代表「即將缺車」這個較寬鬆的定義本身就更容易預測準確，可以考慮作為警報系統的實際觸發條件（比等到真的空了才報快一步）。
+
+腳本：`ml/src/evaluate_severity_tiers.py`，輸出 `ml/output/severity_tier_evaluation.json`，站點清單 `docs/_scratch/lowf1_bikerisk.csv`（baseline F1<40%）與 `docs/_scratch/lowf1_60_all.csv`（baseline F1≤60%，1469站）。
+
+**總結論**：目前所有嘗試（全站、低F1子集、不同嚴重度定義）都指向同一個結論——XGBoost（含鄰站特徵）穩定小幅領先規則基線，兩個深度學習方向（N-BEATS單站、TFT跨站）都還打不過 XGBoost。建議維持 XGBoost + 規則基線的混合部署，`near`(n≤2) 早期預警門檻值得納入警報系統設計討論。
