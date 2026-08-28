@@ -1,12 +1,17 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
 import { buildDispatchRoutePlans } from '~/shared/dispatch-route-planner'
+import { buildLiveOperations } from '~/shared/live-operations'
+import { overrideStationsWithXgboost } from '~/shared/xgboost-overrides'
+import { briefingFacts, summarize } from '~/composables/useLiveDashboard'
 import type { HorizonKey, StationRisk } from '~/shared/ops'
 
 const route = useRoute()
 const router = useRouter()
-const selectedStationId = ref('')
+const selectedStationId = ref(typeof route.query.station === 'string' ? route.query.station : '')
 const horizon: HorizonKey = '60'
+const predictionMode = useState<'baseline' | 'xgboost'>('prediction-mode', () => 'baseline')
+const xgboost = useXgboostPredictions()
 const live = useLiveDashboard()
 const {
   selectedDistrict,
@@ -19,9 +24,29 @@ const {
   initialDistrict: () => typeof route.query.district === 'string' ? route.query.district : '',
 })
 
-useLivePolling(live.refresh, computed(() => true))
+const baselineDashboard = computed(() => live.dashboardForDistrict(selectedDistrict.value) || undefined)
 
-const dashboard = computed(() => live.dashboardForDistrict(selectedDistrict.value) || undefined)
+/**
+ * XGBoost mode swaps in `npm run predict:xgboost`'s snapshot for the stations
+ * the hybrid deployment routed to it (baseline 60min F1 <= 60%); everything
+ * else -- including the districts/stations picker source, which stays on
+ * `live.dashboard` -- keeps using the rule baseline unchanged. Alerts,
+ * dispatches, and the summary card are rebuilt from the overridden stations
+ * via the same `buildLiveOperations` the baseline dashboard already uses, so
+ * every downstream consumer (RiskMap, TaskQueue, StationDetailPanel,
+ * AgentReviewCard) needs no XGBoost-specific handling.
+ */
+const dashboard = computed(() => {
+  const base = baselineDashboard.value
+  if (!base || predictionMode.value === 'baseline' || !xgboost.payload.value) return base
+
+  const stations = overrideStationsWithXgboost(
+    base.stations, xgboost.payload.value.stations, base.meta.asOf, xgboost.payload.value.generatedAt,
+  )
+  const plan = buildLiveOperations(stations, base.meta.asOf)
+  const summary = summarize(stations, plan.alerts, plan.dispatches)
+  return { ...base, stations, alerts: plan.alerts, dispatches: plan.dispatches, summary, briefingFacts: briefingFacts(summary) }
+})
 const contextQuery = computed<Record<string, string>>(() => {
   const query: Record<string, string> = {}
   if (selectedDistrict.value) query.district = selectedDistrict.value
@@ -73,6 +98,13 @@ watch(() => route.query.district, (district) => {
 
 watch(dashboard, (value) => {
   if (selectedStationId.value && !value?.stations.some(station => station.id === selectedStationId.value)) selectedStationId.value = ''
+})
+
+// The floating warning cart (in the layout) deep-links here via ?station=,
+// which needs picking up even when index.vue is already mounted (Nuxt reuses
+// the page component across an in-app navigateTo to the same route).
+watch(() => route.query.station, (station) => {
+  if (typeof station === 'string' && station) selectedStationId.value = station
 })
 </script>
 

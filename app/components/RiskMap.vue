@@ -332,6 +332,11 @@ async function initialiseMap() {
   markerLayer = leaflet.layerGroup().addTo(leafletMap)
   fitCurrentScope()
   renderMarkers()
+  // A station picked before this component ever mounted (e.g. the warning
+  // cart's ?station= deep link from another page) sets `selectedId` at
+  // creation time, so the `watch(selectedId, ...)` below never fires for it
+  // -- watchers only react to *changes*, not the starting value.
+  focusSelectedStation()
 
   resizeObserver = new ResizeObserver(() => leafletMap?.invalidateSize({ pan: false }))
   resizeObserver.observe(mapElement.value)
