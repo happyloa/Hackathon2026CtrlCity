@@ -15,6 +15,7 @@
     "data:profile": "node --max-old-space-size=12288 scripts/station-time-profile.mjs",
     "data:frozen": "node scripts/detect-frozen-stations.mjs",
     "data:live-static": "node scripts/export-dev-static.mjs",
+    "predict:xgboost": "node scripts/predict-xgboost.mjs",
     "impact:evaluate": "node scripts/evaluate-operational-impact.mjs",
     "aws:preflight": "node scripts/aws-preflight.mjs",
     "aws:deploy": "node scripts/aws-deploy.mjs",

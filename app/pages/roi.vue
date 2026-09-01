@@ -71,6 +71,7 @@ const mapPoints = computed<RoiMapPoint[]>(() => districtStations.value.map(entry
   station: entry.station,
   index: entry.index,
   cell: stationCell(entry.index, weekday.value, slot.value),
+  baselineF1: stationRiskLookup[entry.station.id]?.baseline?.['60']?.f1 ?? null,
 })))
 
 const slotLabel = computed(() => SLOT_OPTIONS[slot.value]?.label ?? '')

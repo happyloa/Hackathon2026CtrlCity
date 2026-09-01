@@ -16,6 +16,97 @@
 
 ---
 
+## Precision / Recall / F1 計算式（全文所有分數共用同一套定義）
+
+以「站點 × 時段」為一筆預測，`TP`/`FP`/`FN`/`TN` 定義：
+
+| | 實際發生缺車或滿柱 | 實際沒發生 |
+|---|---|---|
+| 系統發出警報 | TP（命中） | FP（誤報） |
+| 系統沒發警報 | FN（漏報） | TN（正確判斷沒事） |
+
+```
+Precision = TP / (TP + FP)   -- 發出的警報裡，有多少比例是真的
+Recall    = TP / (TP + FN)   -- 真實發生的事件裡，有多少比例被警報抓到
+F1        = 2 × Precision × Recall / (Precision + Recall)   -- 兩者的調和平均
+```
+假設我們要預測「未來 30 分鐘這個 YouBike 站會不會缺車」。
+
+	實際真的缺車	實際沒有缺車
+系統有警報	TP：抓到了 ✅	FP：亂叫 ⚠️
+系統沒警報	FN：漏掉了 ❌	TN：正確沒叫 ✅
+
+先把三個指標翻成人話：
+
+Precision：「我叫的警報，有多少是真的？」
+
+例如系統今天總共發出 10 次缺車警報：
+
+其中 8 次後來真的缺車 → TP = 8
+其中 2 次其實沒缺車 → FP = 2
+
+所以：
+
+Precision = 8 / (8 + 2) = 80%
+
+意思就是：
+
+系統每發出 10 次警報，大約 8 次是真的，2 次是誤報。
+
+所以 Precision 越高 = 越不會亂叫。
+
+Recall：「真正發生的缺車，我抓到了多少？」
+
+換個角度看。
+
+今天實際上總共發生 10 次缺車事件：
+
+系統有提前警告其中 7 次 → TP = 7
+另外 3 次完全沒警告 → FN = 3
+
+所以：
+
+Recall = 7 / (7 + 3) = 70%
+
+意思就是：
+
+每 10 次真正的缺車事件，系統大概可以提前抓到 7 次，但會漏掉 3 次。
+
+所以 Recall 越高 = 越不容易漏掉危險。
+
+這對 YouBike 調度其實非常重要。因為如果 Recall 太低，就會出現：
+
+「你的系統警報很準沒錯，但真正缺車的時候常常沒叫，那我要這套預測幹嘛？」
+F1 就是拿來看：
+
+你既不要亂叫，也不要漏掉太多，兩件事情平衡得怎麼樣？
+
+例如：
+
+Precision = 80%
+Recall = 60%
+
+F1 大約就是 69%。
+
+它不是普通平均，而會特別懲罰「其中一項很爛」的情況。
+
+例如：
+
+| Precision | Recall | F1 | 白話 |
+|---|---|---|---|
+| 90% | 90% | 90% | 很漂亮 |
+| 90% | 50% | 64% | 很準，但漏很多 |
+| 50% | 90% | 64% | 抓很多，但誤報很多 |
+| 70% | 70% | 70% | 相對平衡 |
+
+
+
+- 分母只計「營運中」時段（排除雙0停運快照與長期故障站的排除窗），細節見下方「〇、進度更新」與「七、停運資料實測」。
+- 「警報」= 風險分數（規則基線的 `emptyRisk`/`fullRisk`，或 XGBoost 的 `predict_proba`）達到選定門檻（threshold）。門檻怎麼選見第三節「1. 切分必須沿用...」與 `ml/src/threshold.py`。
+- Precision/Recall 都是 0 的時候（TP+FP=0 或 TP+FN=0），照慣例定義成 0，不是除以零報錯——這種情況通常代表該範圍樣本太少或從未發生事件，UI 上會特別標示為「0/0 邊界情況」而不是「模型失準」（見「已完成：單站層級評估擴大到全部站別」一節）。
+
+---
+
 ## 〇、進度更新（2026-08-26，CtrlCity 專案內 session）
 
 > **本節數字取代第一節與第五節裡已過時的內容。** 細節見 git log（`Hugh_v0.0` 分支）。第一、五節原文保留不動，僅供對照歷史決策過程。
@@ -391,3 +482,141 @@ ml/output/station-time-profile-*.csv 已經有現成的訓練期統計，只是�
 
 1. N-Beat VS xBGoost
 2. 增加 TFT (加上時間序列特徵,weather, holiday, etc)
+
+### 已嘗試但失敗：候選方向 N-BEATS（純時間序列模型，單站獨立訓練）
+
+用 top15 缺車率最高的站，各自獨立訓練 N-BEATS（generic、from-scratch、PyTorch），60分鐘視野，跟規則基線/XGBoost 同一批站做逐站比較。
+
+結果：N-BEATS 在 14/15 有效比較的站全部墊底（13站三者最差、1站略贏 XGBoost 但仍輸基線）。平溪國中是 0/0 邊界情況三者同。
+
+| 站點 | 規則基線 F1 | XGBoost F1 | N-BEATS F1 |
+|---|---|---|---|
+| 新北捷運環狀線南機廠 | 43.5 | 53.4 | 33.7 |
+| 金城裕民路口 | 30.0 | 26.1 | 28.3 |
+| 台水新莊服務所 | 59.8 | 60.6 | 51.7 |
+| 中正思源路口 | 61.7 | 66.1 | 53.5 |
+| 捷運七張站 | 51.8 | 55.2 | 43.4 |
+| 捷運十四張站 | 37.1 | 40.3 | 29.7 |
+| 捷運大坪林站 | 51.3 | 56.0 | 47.7 |
+| 板橋戶政事務所 | 32.9 | 38.0 | 27.7 |
+| 忠誠里 | 47.6 | 52.7 | 28.9 |
+| 中正民權路口 | 33.3 | 33.5 | 24.4 |
+| 文化路二段182巷 | 65.9 | 72.3 | 66.2 |
+| 捷運新埔站 | 57.8 | 61.8 | 53.0 |
+| 十分遊客中心 | 22.2 | 25.0 | 21.1 |
+| 捷運新北產業園區站 | 44.6 | 50.2 | 34.3 |
+
+判讀：
+1. 滿柱（docks==0）事件太稀有，N-BEATS 的驗證期門檻搜尋幾乎都選到「永不觸發」（`threshold=-0.5, val F1=0.000`），滿柱這條線基本失能。
+2. 單站獨立訓練、純時間序列——完全看不到鄰站狀態、跨站共用的 station_id 樹狀切分等 XGBoost 已證實有效的資訊。
+3. 單站訓練樣本量（train ~5,700 筆）對深度網路偏薄，XGBoost 在這種中小型表格資料上本來就有優勢。
+
+結論：問題出在架構本身（單站獨立、無跨站資訊、對稀有事件不敏感），不是樣本數不夠，所以沒有繼續擴大到 60 站或做 global N-BEATS，改試 TFT（見下）。程式碼保留在 `ml/src/train_nbeats.py`，輸出 `ml/output/nbeats_evaluation.json`。
+
+### 已嘗試但同樣落後：候選方向 TFT（Temporal Fusion Transformer，加天氣/假日特徵）
+
+跟 N-BEATS 不同，TFT 是跨站共用權重的 global model（`station_id` 當 static categorical），同一批 top15 站一起訓練。特徵：own history（bikes/docks）+ 天氣（`docs/_scratch/weather_hourly.csv`，兩站平均展開成30分鐘格）+ `is_holiday`/`is_workday`（`docs/_scratch/calandar.md` 的6段日期）+ slot/weekday 的 sin/cos 週期編碼。用 `pytorch-forecasting` 的 `TemporalFusionTransformer`，60分鐘視野，Jan-Apr train / May 選閾值 / June test，跟其他模型同一凍結切分。
+
+因為是 global model，沒有做逐站拆分，直接看 15 站合併（pooled）的結果，跟 baseline / XGBoost 同樣把這15站的 tp/fp/fn/tn 加總比較：
+
+| | Precision | Recall | F1 |
+|---|---|---|---|
+| 規則基線（pooled） | 37.7% | 75.5% | 50.3% |
+| XGBoost（pooled） | 42.7% | 75.7% | **54.6%** |
+| TFT（pooled） | 36.6% | 51.4% | 42.8% |
+
+TFT 一樣兩者都輸，但輸的原因跟 N-BEATS 不同：
+1. Precision 其實跟基線差不多（36.6% vs 37.7%），問題主要出在 **Recall 只有 51.4%**，比基線/XGBoost 的 75% 低了 24 個百分點——閾值搜尋出來的模型明顯偏保守，漏掉大量真實事件。
+2. 滿柱（docks）目標的驗證期 F1 只有 0.111，比 N-BEATS 的 0（完全失能）好一點但仍然很弱，稀有事件對這兩種深度模型都是共同弱點。
+3. 跨站共用權重確實比 N-BEATS 的單站獨立訓練好上一截（pooled F1 42.8% vs N-BEATS 各站多半在 20-35% 之間），驗證了「有跨站資訊」的方向是對的，但目前這個小 hidden_size（16）、CPU-only、僅12 epoch 的設定還沒能追上 XGBoost。
+
+結論：兩個深度學習方向（N-BEATS、TFT）目前都輸給 XGBoost，且 XGBoost 額外具備「不用GPU、訓練快、可解釋」的優勢。除非有人手/算力可以繼續調 TFT（更大 hidden_size、更多 epoch、GPU），否則現階段建議維持 XGBoost + 規則基線的混合部署策略，不繼續往深度學習方向投入。程式碼保留在 `ml/src/train_tft.py`，輸出 `ml/output/tft_evaluation.json`。
+
+### 目前所有模型測試結果總覽（2026-08-28 整理）
+
+#### 1. 全站規則基線 F1 分布（1,565站，60分鐘視野）
+
+| F1 區段 | 站數 | 佔比（排除0/0後） |
+|---|---|---|
+| ≥80% | 3 | 0.2% |
+| 60%~80% | 31 | 2.1% |
+| 40%~60% | 237 | 15.8% |
+| 20%~40% | 768 | 51.2% |
+| 0%~20%（有真實事件） | 460 | 30.7% |
+| 0/0 邊界情況（測試期無真實事件，不算F1） | 66 | — |
+
+過半數站落在 20%~40%，加上 0%~20% 超過 8 成站點 baseline F1 低於 40%。F1≥60% 的站只有 34 站（2.3%），是極少數。
+
+#### 2. 全站合併版（缺車+滿車 issue，60分鐘，1,565站）
+
+| | Precision | Recall | F1 |
+|---|---|---|---|
+| 規則基線 | 28.4% | 45.0% | 34.8% |
+| XGBoost（含鄰站特徵） | 32.2% | 47.6% | **38.4%**（+3.6pp） |
+
+#### 3. 缺車單獨（不含滿車），限定 baseline 60分鐘合併F1≤60% 的 1,469 站
+
+用既有已訓練 `model_60.json`（含鄰站特徵），只重新在驗證集挑一次閾值（因為 target 從 issue 換成 empty），未重訓模型。
+
+| | Precision | Recall | F1 |
+|---|---|---|---|
+| 規則基線（threshold=0.4，沿用系統既有值） | 26.9% | 49.4% | 34.8% |
+| XGBoost（threshold=0.85，針對這個target重選） | 30.5% | 47.4% | **37.1%**（+2.3pp） |
+
+腳本：`ml/src/evaluate_lowf1_bikeshortage.py`，輸出 `ml/output/lowf1_bikeshortage_evaluation.json`。
+
+#### 4. N-BEATS vs TFT vs XGBoost，逐站/pooled（top15_bikerisk，見上方兩節完整表格）
+
+- N-BEATS（單站獨立訓練）：14/15 站全部墊底，兩者都輸。
+- TFT（跨站 global model，加天氣+假日特徵）：pooled F1 42.8%，比 N-BEATS 好但仍輸 baseline（50.3%）與 XGBoost（54.6%）。
+
+#### 5. 嚴重度分層（complete=完全缺車 n=0 / near=即將沒車 n≤2），限定 baseline F1<40% 的 5 站（top15_bikerisk 子集）
+
+規則基線刻意不重算，維持原定義。N-BEATS/TFT 重訓為缺車單一目標（不含滿車），三模型都用各自驗證集挑過的閾值。
+
+| | complete (n=0) F1 | near (n≤2) F1 |
+|---|---|---|
+| XGBoost | **35.9%**（P26.4/R56.3） | **61.3%**（P52.7/R73.1） |
+| N-BEATS | 28.1%（P23.2/R35.7） | 55.6%（P46.0/R70.4） |
+| TFT | 24.8%（P15.4/R62.9） | 54.7%（P49.3/R61.4） |
+
+XGBoost 在兩個嚴重度層級都領先，`near`（早期預警）門檻的三個模型 F1 都比 `complete`（嚴格等於0）高出一大截，代表「即將缺車」這個較寬鬆的定義本身就更容易預測準確，可以考慮作為警報系統的實際觸發條件（比等到真的空了才報快一步）。
+
+腳本：`ml/src/evaluate_severity_tiers.py`，輸出 `ml/output/severity_tier_evaluation.json`，站點清單 `docs/_scratch/lowf1_bikerisk.csv`（baseline F1<40%）與 `docs/_scratch/lowf1_60_all.csv`（baseline F1≤60%，1469站）。
+
+**總結論**：目前所有嘗試（全站、低F1子集、不同嚴重度定義）都指向同一個結論——XGBoost（含鄰站特徵）穩定小幅領先規則基線，兩個深度學習方向（N-BEATS單站、TFT跨站）都還打不過 XGBoost。建議維持 XGBoost + 規則基線的混合部署，`near`(n≤2) 早期預警門檻值得納入警報系統設計討論。
+
+### 即時 XGBoost 缺車/滿車警報：為什麼現在只能手動 demo，以及 AWS 上怎麼平移
+
+**目標**：營運總覽頁面加 Baseline/XGBoost 切換，XGBoost 模式下對「baseline 60分鐘F1≤60%」的站（既有混合部署門檻，見上方「已完成：候選方向1」與 `xgboost-vs-baseline-district-tradeoff` 記憶）改用 XGBoost 算 30/60分鐘的缺車/滿車風險，並用整數（無條件進位）顯示要補幾台車、要拉幾台車，用類似購物車的懸浮警報 icon（Warning-30／Warning-60）呈現。
+
+**卡關點：模型檔案太大，塞不進純靜態的 Cloudflare Pages。**
+
+把 `model_30.json`/`model_60.json` 匯出成瀏覽器能讀的格式後，實測分別是 **80MB／134MB**——主因是 `station_id` 有 1,569 種類別，很多樹節點在對 station_id 做類別分裂時得存下多達一千多個候選類別代碼，撐大了檔案。這遠遠超過 Cloudflare Pages 單一靜態資產 25MiB 的硬上限（就是先前 `station-details.bin` 卡住部署的同一個限制），瀏覽器也不可能為了算風險分數下載這麼大的檔案。
+
+過程中還修正了一個關鍵 bug：手刻的 JS/Python 樹狀模型辨識器，一開始把「類別分裂時，特徵值有在類別清單裡」的方向搞反了（應該是走右子節點，不是左子節點）。修正後用500筆測試資料對照官方 `predict_proba()`，機率誤差降到平均0.25個百分點、最大約3.8個百分點（殘餘誤差來自 XGBoost 內部用 float32、比較切分門檻時的浮點精度差異，屬已知且可接受的小落差）。這套驗證過的樹狀分裂邏輯，程式碼在 `ml/src/validate_tree_walker.py`。
+
+**現階段（純靜態 Cloudflare Pages）做法：本機手動觸發 demo**
+
+新增 `npm run predict:xgboost`（`ml/src/export_model_for_web.py` 匯出模型 + 一支 Node 腳本讀取匯出檔跑推論），流程：
+
+1. 抓一次官方即時資料
+2. 只對 `app/data/station-risk-evaluation.json` 裡 baseline 60分鐘 F1≤60% 的站（既有混合部署站清單）算 XGBoost 風險分數（30分鐘用 `model_30.json`，18個特徵、無鄰站特徵；60分鐘用 `model_60.json`，20個特徵、含鄰站特徵）
+3. 鄰站缺車率用即時資料現場算（300m半徑，跟 `ml/src/build_neighbors.py` 同一套邏輯）；lag特徵這次demo沒有歷史快照可用，一率視為缺值——XGBoost樹本身就有缺值繞行邏輯（`default_left`），不會噴錯，只是準確度會比有完整lag特徵時低
+4. 輸出一份小的靜態 JSON（`app/public/data/xgboost/live-predictions.json`，只含預測分數與整數台數建議，不含134MB的模型本身）
+5. 這份小 JSON 手動 commit 進版控、正常部署——網友看到的是「你最後一次手動跑的結果」，不是每次刷新都重新推論
+
+`model_30.json`/`model_60.json`（134MB/80MB）**不進版控**，只留在本機/CI環境跑這支腳本用。
+
+**之後如果要部署到 AWS，可以怎麼平移**
+
+Cloudflare Pages 這個 25MiB 限制是「純靜態託管平台」特有的，AWS 上有真正的伺服器端運算，完全不需要現在這種「手動觸發、寫死小JSON」的變通做法：
+
+| | 現況（Cloudflare Pages） | AWS 平移後 |
+|---|---|---|
+| 模型存放 | 不能進版控/部署（134MB > 25MiB上限） | **S3**，沒有這種檔案大小限制 |
+| 推論引擎 | 手刻的 JS/Python 樹狀模型辨識器（有已知的浮點精度誤差） | 直接用**正牌 Python `xgboost` 套件**的 `predict_proba()`，類別特徵原生正確處理，沒有精度誤差問題 |
+| 觸發方式 | 人工手動跑 `npm run predict:xgboost`，結果是靜態快照 | **Lambda + API Gateway**：Lambda 冷啟動時從 S3 載入模型進記憶體，前端每次打 API 即時算最新風險分數，做法跟現有 `useLiveDashboard` 呼叫官方即時資料的模式幾乎一樣，只是多一個真的會跑 XGBoost 的後端端點 |
+| 更新頻率 | 只在手動觸發那一刻 | 可以做到跟官方即時資料一樣「每次刷新都算最新」 |
+
+也就是說：現在的手動demo版本完全可以直接沿用同一套特徵計算邏輯（鄰站300m即時缺車率、混合部署站點清單、整數補車/拉車台數），差別只在於「用 Node 手刻樹狀模型辨識器」換成「用 Lambda 跑正牌 Python xgboost」，以及「手動觸發存靜態檔」換成「即時 API」。兩邊都能重用同一批已經驗證過的 `ml/output/model_{30,60}.json`。

@@ -20,5 +20,17 @@ ml/output/
 ml/.venv/
 __pycache__/
 
+# pytorch-lightning's default Trainer writes these to the CWD (repo root,
+# since ml/src scripts are run via `python ml/src/train_tft.py` from there).
+checkpoints/
+lightning_logs/
+
+# Full XGBoost models exported for the local `npm run predict:xgboost` demo
+# (ml/src/export_model_for_web.py) -- 80-134MB each once category lists are
+# included, far past Cloudflare Pages' 25MiB per-asset cap and not meant to
+# be deployed. Only their small live-predictions.json output is committed.
+# See docs/PoC交接.md's "即時 XGBoost 缺車/滿車警報" section.
+app/public/data/xgboost/model-*.json
+
 # Ad hoc analysis reports for local review; not build output, not final artifacts.
 # docs/_scratch/

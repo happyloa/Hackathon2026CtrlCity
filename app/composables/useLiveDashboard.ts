@@ -156,7 +156,7 @@ function qualityFlagsFor(station: LiveStation, forecasts: Record<HorizonKey, For
   return flags
 }
 
-function summarize(stations: StationRisk[], alerts: Alert[], dispatches: DispatchRecommendation[]): DashboardSummary {
+export function summarize(stations: StationRisk[], alerts: Alert[], dispatches: DispatchRecommendation[]): DashboardSummary {
   return {
     totalStations: stations.length,
     emptyNow: stations.filter(station => station.currentState === 'empty_now').length,
@@ -171,7 +171,7 @@ function summarize(stations: StationRisk[], alerts: Alert[], dispatches: Dispatc
   }
 }
 
-function briefingFacts(summary: DashboardSummary) {
+export function briefingFacts(summary: DashboardSummary) {
   return [
     { label: '即時庫存風險', value: summary.inventoryAlerts },
     { label: '可行搬運建議', value: summary.recommendedMoves },

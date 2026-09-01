@@ -1,7 +1,53 @@
 <script setup lang="ts">
 import { Icon } from "@iconify/vue";
+import { overrideStationsWithXgboost } from "~/shared/xgboost-overrides";
 
 const route = useRoute();
+
+const predictionMode = useState<"baseline" | "xgboost">(
+  "prediction-mode",
+  () => "baseline",
+);
+const xgboost = useXgboostPredictions();
+const live = useLiveDashboard();
+useLivePolling(live.refresh, computed(() => true));
+
+watch(
+  predictionMode,
+  (mode) => {
+    if (mode === "xgboost") void xgboost.load();
+  },
+  { immediate: true },
+);
+
+/** Site-wide (not scoped to any one district), so the floating warning carts
+ * stay accurate no matter which page is open. */
+const warningStations = computed(() => {
+  const stations = live.dashboard.value?.stations;
+  const asOf = live.dashboard.value?.meta.asOf;
+  if (!stations || !asOf) return [];
+  if (predictionMode.value === "baseline" || !xgboost.payload.value) return stations;
+  return overrideStationsWithXgboost(
+    stations,
+    xgboost.payload.value.stations,
+    asOf,
+    xgboost.payload.value.generatedAt,
+  );
+});
+
+/**
+ * The warning cart lists stations across every district (it reads the
+ * unscoped `live.dashboard`), but the homepage's own `dashboard` is filtered
+ * to whichever district is selected there -- and clears `selectedStationId`
+ * the moment it points at a station outside that filter. So a station from
+ * a different district than the one currently selected on `/` would silently
+ * get deselected right after navigating. Dropping `district` here (instead
+ * of preserving it via `navigationQuery`) resets the homepage to "all
+ * districts" so the picked station is always present in its dashboard.
+ */
+function goToStation(stationId: string) {
+  void navigateTo({ path: "/", query: { station: stationId } });
+}
 
 const navigation = [
   { to: "/", label: "營運總覽", icon: "solar:radar-2-outline" },
@@ -113,6 +159,24 @@ const navigationTarget = (path: string) => ({
             </h1>
           </div>
           <div class="flex flex-wrap items-center gap-2">
+            <div
+              class="inline-flex min-h-11 items-center rounded-lg border border-line bg-surface p-1 text-base font-bold"
+              role="group"
+              aria-label="預測模型"
+            >
+              <button
+                type="button"
+                class="min-h-9 rounded-md px-3 transition-colors"
+                :class="predictionMode === 'baseline' ? 'bg-accent text-on-accent' : 'text-muted hover:text-ink'"
+                @click="predictionMode = 'baseline'"
+              >Baseline</button>
+              <button
+                type="button"
+                class="min-h-9 rounded-md px-3 transition-colors"
+                :class="predictionMode === 'xgboost' ? 'bg-accent text-on-accent' : 'text-muted hover:text-ink'"
+                @click="predictionMode = 'xgboost'"
+              >XGBoost</button>
+            </div>
             <span
               class="inline-flex min-h-11 items-center gap-2 rounded-lg bg-surface px-3 text-base font-semibold text-muted"
               ><Icon
@@ -123,8 +187,20 @@ const navigationTarget = (path: string) => ({
             >
           </div>
         </div>
+        <p
+          v-if="predictionMode === 'xgboost'"
+          class="mx-auto w-full max-w-screen-2xl px-4 pb-3 text-base text-muted sm:px-6 lg:px-8"
+        >
+          <template v-if="xgboost.error.value">{{ xgboost.error.value }}</template>
+          <template v-else-if="xgboost.pending.value">正在載入 XGBoost 推論結果…</template>
+          <template v-else-if="xgboost.payload.value">
+            XGBoost 快照產出於 {{ new Date(xgboost.payload.value.generatedAt).toLocaleString('zh-TW', { hour12: false }) }}，
+            只涵蓋規則基線 F1≤60% 的站（{{ xgboost.payload.value.method.routing }}），其餘站仍用規則基線。
+          </template>
+        </p>
       </header>
       <slot />
     </main>
+    <WarningCarts :stations="warningStations" @select="goToStation" />
   </div>
 </template>
