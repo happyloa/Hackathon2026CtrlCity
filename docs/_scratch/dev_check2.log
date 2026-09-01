@@ -15,3 +15,7 @@
 [90m[[90mnitro[90m][39m [32m✔[39m Nuxt Nitro server built in 1369ms
 [36mℹ[39m Vite client warmed up in 105ms
 [36mℹ[39m [32mhmr update [39m[2m/components/RiskMap.vue, /@fs/C:/Users/hughc/OneDrive/文件/project/AWS-AI/Hackathon2026CtrlCity/app/assets/css/main.css?direct, /assets/css/main.css[22m
+[36mℹ[39m [32mhmr update [39m[2m/@fs/C:/Users/hughc/OneDrive/文件/project/AWS-AI/Hackathon2026CtrlCity/app/assets/css/main.css?direct, /assets/css/main.css[22m
+[90m[[90mnuxt[90m][39m [36mℹ[39m Compiled [36mplugins.server.mjs[39m in 628.57ms
+[90m[[90mnuxt[90m][39m [36mℹ[39m Compiled [36mtypes/plugins.d.ts[39m in 631.38ms
+[90m[[90mnuxt[90m][39m [36mℹ[39m Compiled [36mplugins.client.mjs[39m in 632.56ms
