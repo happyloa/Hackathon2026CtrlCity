@@ -6,6 +6,8 @@
  * far past Cloudflare Pages' 25MiB per-asset cap and can't run in the
  * browser. See docs/PoC交接.md's "即時 XGBoost 缺車/滿車警報" section.
  */
+import { useState } from '#app'
+
 export interface XgboostHorizonPrediction {
   riskScore: number
   condition: 'empty' | 'full'
