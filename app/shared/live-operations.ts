@@ -9,6 +9,7 @@ import {
 import {
   DEFAULT_LIVE_OPERATION_POLICY as SHARED_DEFAULT_LIVE_OPERATION_POLICY,
   alertDataQuality as sharedAlertDataQuality,
+  refillAmountFor as sharedRefillAmountFor,
   safetyStockFor as sharedSafetyStockFor,
   scoreAlertPriority as sharedScoreAlertPriority,
 } from './operational-policy.mjs'
@@ -260,7 +261,7 @@ function actionableAlert(
 
   riskScore = clamp(riskScore, 0, 1)
   const inventory = Math.max(0, finiteNumber(predictedInventory(station, condition, forecast)))
-  const gap = Math.max(0, Math.ceil(safetyStock - inventory))
+  const gap = sharedRefillAmountFor(station, inventory, policy)
   const emptyCondition = condition === 'empty_now' || condition === 'empty_forecast'
   const inventoryLabel = emptyCondition ? '可借車' : '可還位'
   const timingLabel = currentFailure ? '目前' : `${policy.horizon} 分鐘預測`

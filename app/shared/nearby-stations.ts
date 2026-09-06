@@ -1,3 +1,4 @@
+import { safetyStockFor } from './operational-policy.mjs'
 import { displayStationName, type HorizonKey, type StationRisk } from './ops.ts'
 
 export interface NearbyReturnStation {
@@ -44,7 +45,7 @@ export function nearbyReturnStations(
     .flatMap((station) => {
       const forecast = station.forecast.horizons[horizon]
       if (forecast.baselineStatus !== 'matched') return []
-      const safetyDocks = Math.max(2, Math.ceil(station.totalDocks * .1))
+      const safetyDocks = safetyStockFor(station)
       const projectedDocks = Math.min(station.availableDocks, forecast.predictedDocks)
       const distanceMeters = distanceMetersBetween(target, station)
       if (

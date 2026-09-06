@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
+import { refillAmountFor } from '~/shared/operational-policy.mjs'
 import type { HorizonKey, StationRisk } from '~/shared/ops'
 
 const props = defineProps<{ stations: StationRisk[] }>()
@@ -21,9 +22,8 @@ function itemsFor(horizon: HorizonKey) {
     .map((station) => {
       const forecast = station.forecast.horizons[horizon]!
       const isEmpty = forecast.emptyRisk >= forecast.fullRisk
-      const safetyStock = Math.max(2, Math.ceil(station.totalDocks * .1))
       const predicted = isEmpty ? forecast.predictedBikes : forecast.predictedDocks
-      const gap = Math.max(0, Math.ceil(safetyStock - predicted))
+      const gap = refillAmountFor(station, predicted)
       return { station, level: forecast.level, isEmpty, gap, predicted }
     })
     .sort((left, right) => right.gap - left.gap)

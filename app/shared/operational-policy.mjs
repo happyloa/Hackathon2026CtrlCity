@@ -14,6 +14,20 @@ export const ALERT_PRIORITY_THRESHOLDS = Object.freeze({
   high: 30,
 })
 
+// Single source of truth for "how severe is this station right now". Order is
+// priority: each station gets the first level whose condition matches, so the
+// six levels stay mutually exclusive by construction.
+export const SEVERITY_LEVELS = Object.freeze({
+  SERVICE_DISRUPTION: 'service_disruption',
+  FULL: 'full',
+  EMPTY: 'empty',
+  NEAR_EMPTY: 'near_empty',
+  LOW: 'low',
+  NORMAL: 'normal',
+})
+
+const NEAR_EMPTY_BIKES = 2
+
 function finite(value, fallback = 0) {
   return Number.isFinite(value) ? value : fallback
 }
@@ -38,6 +52,36 @@ export function safetyStockFor(station, options = {}) {
   )))
   const capacity = Math.max(0, Math.round(finite(station.totalDocks)))
   return Math.min(capacity, Math.max(minimum, Math.ceil(capacity * ratio)))
+}
+
+/**
+ * Classifies a station into one of the six mutually exclusive severity levels,
+ * judged purely by available bikes/docks rather than a modelled risk score.
+ * Service disruption always wins first: once a station can't be served,
+ * its inventory numbers no longer mean anything.
+ */
+export function stationSeverityFor(station) {
+  if (station.serviceStatus !== 'operational') return SEVERITY_LEVELS.SERVICE_DISRUPTION
+  const availableBikes = Math.max(0, finite(station.availableBikes))
+  const availableDocks = Math.max(0, finite(station.availableDocks))
+  const totalDocks = Math.max(0, finite(station.totalDocks))
+  if (availableDocks === 0) return SEVERITY_LEVELS.FULL
+  if (availableBikes === 0) return SEVERITY_LEVELS.EMPTY
+  if (availableBikes < NEAR_EMPTY_BIKES) return SEVERITY_LEVELS.NEAR_EMPTY
+  if (availableBikes < totalDocks / 2) return SEVERITY_LEVELS.LOW
+  return SEVERITY_LEVELS.NORMAL
+}
+
+/**
+ * Bikes needed to refill a station up to its safety stock, not merely up to
+ * the near-empty threshold. The threshold decides *when* to act; this decides
+ * *how much*, so a 60-dock station doesn't get the same 2-bike top-up as a
+ * 10-dock one.
+ */
+export function refillAmountFor(station, inventory, options = {}) {
+  const safetyStock = safetyStockFor(station, options)
+  const currentInventory = Math.max(0, finite(inventory))
+  return Math.max(0, Math.ceil(safetyStock - currentInventory))
 }
 
 export function scoreAlertPriority(input) {
