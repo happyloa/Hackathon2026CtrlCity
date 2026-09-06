@@ -38,3 +38,8 @@ app/public/data/xgboost/model-*.json
 # Stitch 匯出的設計稿圖檔(約 19MB),只留本機:設計方向已在 grilling 定案，
 # 對它們的盤點分析 docs/_scratch/stitch/INVENTORY.md 有進版控，圖檔本身沒有。
 docs/_scratch/**/*.png
+
+.agents/
+.claude/
+CLAUDE.md
+skills-lock.json
