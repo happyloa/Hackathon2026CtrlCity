@@ -1,12 +1,7 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
-import { safetyStockFor } from '~/shared/live-operations'
+import { stationSeverityFor, type SeverityLevel } from '~/shared/operational-policy.mjs'
 import { displayStationName, type DataMode, type HorizonKey, type PredictionCoverage, type StationRisk } from '~/shared/ops'
-import {
-  clusterNearbyRiskStations,
-  stableInventoryTone,
-  type StableInventoryTone,
-} from '~/shared/risk-map-visuals'
 
 const props = defineProps<{
   stations: StationRisk[]
@@ -22,9 +17,7 @@ const emit = defineEmits<{ select: [stationId: string], retryBaseline: [] }>()
 
 type LeafletModule = typeof import('leaflet')
 type LeafletMap = import('leaflet').Map
-type LeafletLayerGroup = import('leaflet').LayerGroup
-type LeafletCircleMarker = import('leaflet').CircleMarker
-type LeafletRenderer = import('leaflet').Renderer
+type LeafletMouseEvent = import('leaflet').LeafletMouseEvent
 
 const mapElement = ref<HTMLElement | null>(null)
 const isLive = computed(() => props.dataMode === 'live')
@@ -70,208 +63,228 @@ const baselineNotice = computed(() => {
 
 let leaflet: LeafletModule | null = null
 let leafletMap: LeafletMap | null = null
-let hotspotLayer: LeafletLayerGroup | null = null
-let markerLayer: LeafletLayerGroup | null = null
-let hotspotRenderer: LeafletRenderer | null = null
-let canvasRenderer: LeafletRenderer | null = null
+let overlay: HTMLCanvasElement | null = null
 let resizeObserver: ResizeObserver | null = null
-const markerById = new globalThis.Map<string, LeafletCircleMarker>()
-const htmlEntities: Record<string, string> = {
-  '&': '&amp;',
-  '<': '&lt;',
-  '>': '&gt;',
-  "'": '&#039;',
-  '"': '&quot;',
-}
-
-type MarkerTone = 'stable' | 'empty-risk' | 'full-risk' | 'service-review' | 'inventory-only'
-
-const STABLE_MARKER_COLORS: Record<StableInventoryTone, string> = {
-  balanced: '#8a5a09',
-  'bike-heavy': '#23B8F7',
-  'dock-heavy': '#DB987B',
-  // 'dock-heavy': '#1787a0',
-}
-const MARKER_COLORS: Record<Exclude<MarkerTone, 'stable'>, string> = {
-  'empty-risk': '#a93a34',
-  'full-risk': '#1216FF',
-  'service-review': '#65706b',
-  'inventory-only': '#8a5a09',
-}
-const HOTSPOT_FILL = '#ec4899'
-const HOTSPOT_STROKE = '#f472b6'
+let redrawFrame = 0
+const hoveredStationId = ref<string | null>(null)
+const hoverPoint = ref<{ x: number, y: number } | null>(null)
 
 function forecastFor(station: StationRisk) {
   return station.forecast.horizons[props.horizon]
 }
 
-function markerTone(station: StationRisk): MarkerTone {
-  if (station.serviceStatus !== 'operational') return 'service-review'
-  if (station.currentState === 'empty_now') return 'empty-risk'
-  if (station.currentState === 'full_now') return 'full-risk'
-
-  const forecast = forecastFor(station)
-  if (isLive.value && forecast.baselineStatus !== 'matched' && !showAllStations.value) return 'inventory-only'
-  if (forecast.emptyRisk >= forecast.alertThreshold && forecast.emptyRisk >= forecast.fullRisk) return 'empty-risk'
-  if (forecast.fullRisk >= forecast.alertThreshold) return 'full-risk'
-  return 'stable'
+/**
+ * The map's severity colour never depends on the forecast horizon -- it is
+ * judged purely by current available bikes/docks, same as everywhere else
+ * severity is decided (shared/operational-policy). The `horizon` prop only
+ * affects the baseline-coverage caption above the map.
+ */
+function severityFor(station: StationRisk) {
+  return stationSeverityFor(station)
 }
 
 function isActionable(station: StationRisk) {
-  const tone = markerTone(station)
-  return tone === 'empty-risk' || tone === 'full-risk' || tone === 'service-review'
+  return severityFor(station) !== 'normal'
 }
 
-function isInventoryRisk(station: StationRisk) {
-  const tone = markerTone(station)
-  return tone === 'empty-risk' || tone === 'full-risk'
+// ── Soft-blend overlay ───────────────────────────────────────────────────
+//
+// Stations are painted individually onto a canvas overlaid on the Leaflet
+// map; the "neighbourhood" a dispatcher reads is whatever emerges from the
+// overlap of those soft-edged blobs, not a precomputed shape (see the
+// "鄰近群不是著色單位" entry in CONTEXT.md). Leaflet itself only supplies the
+// basemap tiles and screen-coordinate conversion.
+//
+// Parameters below come from the throwaway prototype at commit 6e52619,
+// validated against the full 1,526-station dataset -- see
+// .scratch/dispatch-homepage-redesign/issues/02-map-soft-blend-rendering.md.
+
+const BLEND_RADIUS_METERS = 500
+const BASE_LAYER_PEAK_ALPHA = 0.10
+
+type Severity = SeverityLevel
+
+const SEVERITY_RGB: Record<Severity, [number, number, number]> = {
+  service_disruption: [156, 163, 175],
+  full: [34, 211, 238],
+  empty: [239, 68, 68],
+  near_empty: [249, 115, 22],
+  low: [234, 179, 8],
+  normal: [34, 197, 94],
 }
 
-const riskProximityClusters = computed(() => clusterNearbyRiskStations(
-  mappedStations.value.filter(isInventoryRisk),
-))
-const riskClusterSizeByStationId = computed(() => new Map(riskProximityClusters.value.flatMap(
-  cluster => cluster.memberIds.map(stationId => [stationId, cluster.memberIds.length] as const),
-)))
-const hasVisibleStableStations = computed(() => mappedStations.value.some(station => markerTone(station) === 'stable'))
-const hasVisibleInventoryOnlyStations = computed(() => mappedStations.value.some(station => markerTone(station) === 'inventory-only'))
-
-function markerColor(station: StationRisk) {
-  const tone = markerTone(station)
-  return tone === 'stable'
-    ? STABLE_MARKER_COLORS[stableInventoryTone(station)]
-    : MARKER_COLORS[tone]
+// Light-to-dark paint order: later entries cover earlier ones, so empty
+// (red) is always drawn last and never gets buried under a lighter colour.
+const UPPER_LAYER_ORDER: Exclude<Severity, 'normal'>[] = ['service_disruption', 'low', 'full', 'near_empty', 'empty']
+const UPPER_LAYER_PEAK_ALPHA: Record<Exclude<Severity, 'normal'>, number> = {
+  service_disruption: 0.22,
+  low: 0.20,
+  full: 0.36,
+  near_empty: 0.36,
+  empty: 0.36,
 }
 
-function stableInventoryStatus(station: StationRisk) {
-  const tone = stableInventoryTone(station)
-  const capacity = Math.max(1, station.totalDocks)
-  if (tone === 'bike-heavy') return `穩定・可借約 ${Math.round(Math.min(1, station.availableBikes / capacity) * 100)}%`
-  if (tone === 'dock-heavy') return `穩定・可還約 ${Math.round(Math.min(1, station.availableDocks / capacity) * 100)}%`
-  return '穩定・供需均衡'
+const SEVERITY_LEGEND: { severity: Severity, label: string }[] = [
+  { severity: 'service_disruption', label: '服務異常' },
+  { severity: 'full', label: '滿柱・可還車位 0' },
+  { severity: 'empty', label: '完全缺車・可借車數 0' },
+  { severity: 'near_empty', label: '近端缺車・可借車數 < 2' },
+  { severity: 'low', label: '偏低・低於總車格一半' },
+  { severity: 'normal', label: '正常' },
+]
+
+function metersPerPixel(latitude: number, zoom: number) {
+  return (156543.03392 * Math.cos(latitude * Math.PI / 180)) / 2 ** zoom
 }
 
-function markerStatus(station: StationRisk) {
-  const tone = markerTone(station)
-  if (tone === 'service-review') {
-    return station.serviceStatus === 'official_inactive'
-      ? '官方停用・不排路線'
-      : '服務異常・不排路線'
-  }
-  if (tone === 'inventory-only') return '沒有歷史基線・只看即時庫存'
-  if (station.currentState === 'empty_now') return '目前無車可借'
-  if (station.currentState === 'full_now') return '目前無位可還'
-  if (tone === 'empty-risk') return isLive.value ? '60 分鐘缺車風險' : '預測缺車風險'
-  if (tone === 'full-risk') return isLive.value ? '60 分鐘缺位風險' : '預測缺位風險'
-  return stableInventoryStatus(station)
+/** A soft-edged circle: full colour at the centre, fading to transparent at the radius. */
+function paintBlob(ctx: CanvasRenderingContext2D, x: number, y: number, radius: number, rgb: [number, number, number], peakAlpha: number) {
+  const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius)
+  const [red, green, blue] = rgb
+  gradient.addColorStop(0, `rgba(${red},${green},${blue},${peakAlpha})`)
+  gradient.addColorStop(0.55, `rgba(${red},${green},${blue},${peakAlpha * 0.5})`)
+  gradient.addColorStop(1, `rgba(${red},${green},${blue},0)`)
+  ctx.fillStyle = gradient
+  ctx.beginPath()
+  ctx.arc(x, y, radius, 0, Math.PI * 2)
+  ctx.fill()
 }
 
-function interventionGap(station: StationRisk) {
-  const forecast = forecastFor(station)
-  const buffer = safetyStockFor(station)
-  const tone = markerTone(station)
-  if (tone === 'empty-risk') return Math.max(1, buffer - Math.min(station.availableBikes, forecast.predictedBikes))
-  if (tone === 'full-risk') return Math.max(1, buffer - Math.min(station.availableDocks, forecast.predictedDocks))
-  return tone === 'service-review' ? 2 : 0
-}
+// The last frame's projected stations, reused for hover/click hit-testing so
+// pointer handlers don't reproject the whole visible set on every mousemove.
+let lastVisible: { station: StationRisk, severity: Severity, x: number, y: number }[] = []
+const HIT_TEST_TOLERANCE_PIXELS = 14
 
-function escapeHtml(value: string) {
-  return value.replace(/[&<>'"]/g, character => htmlEntities[character] || character)
-}
-
-function tooltipContent(station: StationRisk) {
-  const forecast = forecastFor(station)
-  const tone = markerTone(station)
-  const inventory = `可借 ${station.availableBikes}・可還 ${station.availableDocks}`
-  const direction = station.currentState === 'empty_now'
-    ? '官方即時：目前無車可借'
-    : station.currentState === 'full_now'
-      ? '官方即時：目前無位可還'
-      : tone === 'empty-risk'
-        ? `${props.horizon} 分鐘缺車風險 ${Math.round(forecast.emptyRisk * 100)}／100`
-        : tone === 'full-risk'
-          ? `${props.horizon} 分鐘缺位風險 ${Math.round(forecast.fullRisk * 100)}／100`
-          : markerStatus(station)
-  const context = forecast.baselineStatus === 'matched' || station.currentState !== 'normal'
-    ? direction
-    : markerStatus(station)
-  const clusterSize = riskClusterSizeByStationId.value.get(station.id) || 0
-  const clusterContext = clusterSize > 1
-    ? `<span>300 公尺鄰近群組・共 ${clusterSize} 站</span>`
-    : ''
-  return `<strong>${escapeHtml(displayStationName(station.name))}</strong><span>${escapeHtml(station.district || '新北市')}・${inventory}</span><span>${escapeHtml(context)}</span>${clusterContext}`
-}
-
-function markerOptions(station: StationRisk) {
-  const selected = station.id === props.selectedId
-  const gap = interventionGap(station)
-  return {
-    radius: Math.max(4.5, 5 + Math.min(7, Math.sqrt(gap) * 1.7)) + (selected ? 2 : 0),
-    color: selected ? '#f4f4f5' : '#242428',
-    weight: selected ? 3 : 1.25,
-    fillColor: markerColor(station),
-    fillOpacity: selected ? 1 : .92,
-  }
-}
-
-function renderRiskHotspots() {
-  if (!leaflet || !leafletMap || !hotspotLayer || !hotspotRenderer) return
-  hotspotLayer.clearLayers()
-  for (const cluster of riskProximityClusters.value) {
-    leaflet.circle([cluster.latitude, cluster.longitude], {
-      renderer: hotspotRenderer,
-      pane: 'risk-hotspots',
-      radius: cluster.radiusMeters,
-      color: HOTSPOT_STROKE,
-      weight: 1.25,
-      opacity: .46,
-      fillColor: HOTSPOT_FILL,
-      fillOpacity: .24,
-      interactive: false,
-      bubblingMouseEvents: false,
-    }).addTo(hotspotLayer)
-  }
-}
-
-function renderMarkers() {
-  if (!leaflet || !leafletMap || !markerLayer || !canvasRenderer) return
-  renderRiskHotspots()
-
-  const visibleIds = new Set<string>()
-  for (const station of mappedStations.value) {
-    if (station.latitude === null || station.longitude === null) continue
-    visibleIds.add(station.id)
-
-    const existing = markerById.get(station.id)
-    if (existing) {
-      existing.setLatLng([station.latitude, station.longitude])
-      existing.setRadius(markerOptions(station).radius)
-      existing.setStyle(markerOptions(station))
-      existing.setTooltipContent(tooltipContent(station))
-      continue
+function stationAt(point: { x: number, y: number }) {
+  let nearest: (typeof lastVisible)[number] | null = null
+  let nearestDistance = HIT_TEST_TOLERANCE_PIXELS
+  for (const entry of lastVisible) {
+    const distance = Math.hypot(entry.x - point.x, entry.y - point.y)
+    if (distance <= nearestDistance) {
+      nearestDistance = distance
+      nearest = entry
     }
+  }
+  return nearest
+}
 
-    const marker = leaflet.circleMarker([station.latitude, station.longitude], {
-      ...markerOptions(station),
-      renderer: canvasRenderer,
-      bubblingMouseEvents: false,
-    })
-    marker.bindTooltip(tooltipContent(station), {
-      direction: 'top',
-      offset: [0, -4],
-      opacity: 1,
-      sticky: true,
-    })
-    marker.on('click', () => emit('select', station.id))
-    marker.addTo(markerLayer)
-    markerById.set(station.id, marker)
+/**
+ * Leaflet zooms by CSS-transforming its own tile/marker panes smoothly over
+ * ~250ms, then snapping everything to exact pixel positions once the
+ * animation settles (`zoomend`). Our canvas is redrawn only on that final
+ * snap, computed at the target zoom -- so without this handler it would
+ * jump to the new (correct) content immediately, then sit still while the
+ * basemap keeps visibly animating underneath it, reading as a static mask
+ * stuck on top for the remaining ~250ms. This mirrors the same "CSS
+ * transform the raster during the animation, redraw crisply once it ends"
+ * pattern Leaflet's own image/tile layers use, computed here with only
+ * public Map APIs (`project`/`getSize`/`getZoomScale`) since the canvas
+ * stays outside Leaflet's own panes -- it draws in container-point space,
+ * not layer-point space, so it can be redrawn correctly on every pan frame
+ * without needing pane-relative positioning.
+ */
+function onZoomAnim(event: import('leaflet').ZoomAnimEvent) {
+  if (!leafletMap || !overlay) return
+  const map = leafletMap
+  const topLeftLatLng = map.containerPointToLatLng([0, 0])
+  const scale = map.getZoomScale(event.zoom, map.getZoom())
+  const targetCenterPixel = map.project(event.center, event.zoom)
+  const referencePointPixel = map.project(topLeftLatLng, event.zoom)
+  const newTopLeft = referencePointPixel.subtract(targetCenterPixel).add(map.getSize().divideBy(2))
+  overlay.style.transition = 'transform 0.25s cubic-bezier(0,0,0.25,1)'
+  overlay.style.transform = `translate3d(${newTopLeft.x}px, ${newTopLeft.y}px, 0) scale(${scale})`
+}
+
+function redrawOverlay() {
+  if (!leafletMap || !overlay) return
+  const map = leafletMap
+  overlay.style.transition = 'none'
+  overlay.style.transform = 'none'
+  const size = map.getSize()
+  const devicePixelRatio = Math.min(window.devicePixelRatio || 1, 2)
+
+  if (overlay.width !== size.x * devicePixelRatio || overlay.height !== size.y * devicePixelRatio) {
+    overlay.width = size.x * devicePixelRatio
+    overlay.height = size.y * devicePixelRatio
+    overlay.style.width = `${size.x}px`
+    overlay.style.height = `${size.y}px`
   }
 
-  for (const [stationId, marker] of markerById) {
-    if (visibleIds.has(stationId)) continue
-    markerLayer.removeLayer(marker)
-    markerById.delete(stationId)
+  const ctx = overlay.getContext('2d')
+  if (!ctx) return
+  ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0)
+  ctx.clearRect(0, 0, size.x, size.y)
+
+  const radiusPixels = BLEND_RADIUS_METERS / metersPerPixel(map.getCenter().lat, map.getZoom())
+  if (radiusPixels < 1) return
+
+  // Only project stations near the viewport (padded by one radius) -- with
+  // 1,526 stations, projecting the whole dataset every frame is wasted work.
+  const pad = radiusPixels + 4
+  const visible: { station: StationRisk, severity: Severity, x: number, y: number }[] = []
+  for (const station of allMappedStations.value) {
+    const point = map.latLngToContainerPoint([station.latitude as number, station.longitude as number])
+    if (point.x < -pad || point.y < -pad || point.x > size.x + pad || point.y > size.y + pad) continue
+    visible.push({ station, severity: severityFor(station), x: point.x, y: point.y })
   }
+  lastVisible = visible
+
+  ctx.globalCompositeOperation = 'source-over'
+
+  // Base layer: every operational station gets exactly one green blob, so a
+  // dense-but-healthy district never reads as more severe than a sparse one.
+  for (const entry of visible) {
+    if (entry.severity === 'service_disruption') continue
+    paintBlob(ctx, entry.x, entry.y, radiusPixels, SEVERITY_RGB.normal, BASE_LAYER_PEAK_ALPHA)
+  }
+
+  // Upper layers: grouped by severity, painted light-to-dark.
+  const grouped = new globalThis.Map<Exclude<Severity, 'normal'>, { x: number, y: number }[]>()
+  for (const entry of visible) {
+    if (entry.severity === 'normal') continue
+    const list = grouped.get(entry.severity) ?? []
+    list.push({ x: entry.x, y: entry.y })
+    grouped.set(entry.severity, list)
+  }
+  for (const severity of UPPER_LAYER_ORDER) {
+    const list = grouped.get(severity)
+    if (!list) continue
+    const peakAlpha = UPPER_LAYER_PEAK_ALPHA[severity]
+    for (const point of list) paintBlob(ctx, point.x, point.y, radiusPixels, SEVERITY_RGB[severity], peakAlpha)
+  }
+
+  if (props.selectedId) {
+    const selected = visible.find(entry => entry.station.id === props.selectedId)
+    if (selected) {
+      ctx.beginPath()
+      ctx.arc(selected.x, selected.y, Math.max(5, radiusPixels * 0.1), 0, Math.PI * 2)
+      ctx.fillStyle = '#f4f4f5'
+      ctx.fill()
+      ctx.lineWidth = 2
+      ctx.strokeStyle = '#18181b'
+      ctx.stroke()
+    }
+  }
+}
+
+// Leaflet's `_move()` -- called synchronously right when a zoom animation
+// starts, already carrying the *target* zoom/center -- fires plain 'move'
+// and 'zoom' events immediately, a full ~250ms before the animation Leaflet
+// itself is running actually finishes. Letting those trigger a hard redraw
+// snapped the overlay to the target content one frame in, undoing
+// `onZoomAnim`'s transform after a single frame -- a visible flash of
+// content in the wrong (untransformed-then-briefly-transformed) place.
+// Suppressing redraws between 'zoomstart' and 'zoomend' leaves `onZoomAnim`
+// as the only thing moving the overlay during the animation.
+let isZoomAnimating = false
+
+function scheduleRedraw() {
+  if (isZoomAnimating) return
+  if (redrawFrame) cancelAnimationFrame(redrawFrame)
+  redrawFrame = requestAnimationFrame(() => {
+    redrawFrame = 0
+    redrawOverlay()
+  })
 }
 
 function fitCurrentScope() {
@@ -299,6 +312,35 @@ function chooseSearchResult(stationId: string) {
   stationQuery.value = ''
 }
 
+const hoveredStation = computed(() => hoveredStationId.value
+  ? allMappedStations.value.find(station => station.id === hoveredStationId.value) ?? null
+  : null)
+const hoveredSeverityLabel = computed(() => {
+  if (!hoveredStation.value) return ''
+  return SEVERITY_LEGEND.find(entry => entry.severity === severityFor(hoveredStation.value!))?.label ?? ''
+})
+
+// The overlay canvas is `pointer-events: none` so panning/zooming keeps
+// hitting Leaflet's own layers underneath; hover and click are handled here
+// off Leaflet's own mouse events instead, hit-tested against the blend
+// layer's last-painted station positions.
+function onMapPointerMove(event: LeafletMouseEvent) {
+  const hit = stationAt(event.containerPoint)
+  hoveredStationId.value = hit?.station.id ?? null
+  hoverPoint.value = hit ? { x: event.containerPoint.x, y: event.containerPoint.y } : null
+  if (mapElement.value) mapElement.value.style.cursor = hit ? 'pointer' : ''
+}
+
+function onMapPointerLeave() {
+  hoveredStationId.value = null
+  hoverPoint.value = null
+}
+
+function onMapClick(event: LeafletMouseEvent) {
+  const hit = stationAt(event.containerPoint)
+  if (hit) emit('select', hit.station.id)
+}
+
 function focusSelectedStation() {
   if (!leafletMap || !props.selectedId) return
   const selected = allMappedStations.value.find(station => station.id === props.selectedId)
@@ -313,7 +355,7 @@ async function initialiseMap() {
   leafletMap = leaflet.map(mapElement.value, {
     attributionControl: false,
     preferCanvas: true,
-    scrollWheelZoom: false,
+    scrollWheelZoom: true,
     zoomControl: true,
     minZoom: 9,
     maxZoom: 19,
@@ -323,36 +365,46 @@ async function initialiseMap() {
     maxZoom: 19,
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors',
   }).addTo(leafletMap)
-  const hotspotPane = leafletMap.createPane('risk-hotspots')
-  hotspotPane.style.zIndex = '350'
-  hotspotPane.style.pointerEvents = 'none'
-  hotspotRenderer = leaflet.canvas({ pane: 'risk-hotspots', padding: .5 })
-  canvasRenderer = leaflet.canvas({ padding: .5 })
-  hotspotLayer = leaflet.layerGroup().addTo(leafletMap)
-  markerLayer = leaflet.layerGroup().addTo(leafletMap)
+
+  overlay = document.createElement('canvas')
+  overlay.style.position = 'absolute'
+  overlay.style.inset = '0'
+  overlay.style.pointerEvents = 'none'
+  overlay.style.zIndex = '450'
+  mapElement.value.appendChild(overlay)
+  leafletMap.on('move zoom resize moveend', scheduleRedraw)
+  leafletMap.on('zoomanim', onZoomAnim)
+  leafletMap.on('zoomstart', () => { isZoomAnimating = true })
+  leafletMap.on('zoomend', () => {
+    isZoomAnimating = false
+    scheduleRedraw()
+  })
+  leafletMap.on('mousemove', onMapPointerMove)
+  leafletMap.on('mouseout', onMapPointerLeave)
+  leafletMap.on('click', onMapClick)
+
   fitCurrentScope()
-  renderMarkers()
+  scheduleRedraw()
   // A station picked before this component ever mounted (e.g. the warning
   // cart's ?station= deep link from another page) sets `selectedId` at
   // creation time, so the `watch(selectedId, ...)` below never fires for it
   // -- watchers only react to *changes*, not the starting value.
   focusSelectedStation()
 
-  resizeObserver = new ResizeObserver(() => leafletMap?.invalidateSize({ pan: false }))
+  resizeObserver = new ResizeObserver(() => {
+    leafletMap?.invalidateSize({ pan: false })
+    scheduleRedraw()
+  })
   resizeObserver.observe(mapElement.value)
 }
 
-const stationSignature = computed(() => `${hasBaselineLoadError.value}|${mappedStations.value
-  .map((station) => {
-    const forecast = forecastFor(station)
-    return `${station.id}:${station.latitude}:${station.longitude}:${station.totalDocks}:${station.availableBikes}:${station.availableDocks}:${station.currentState}:${station.serviceStatus}:${forecast.emptyRisk}:${forecast.fullRisk}:${forecast.predictedBikes}:${forecast.predictedDocks}:${forecast.baselineStatus}`
-  })
+const stationSignature = computed(() => `${hasBaselineLoadError.value}|${props.selectedId}|${allMappedStations.value
+  .map(station => `${station.id}:${station.latitude}:${station.longitude}:${station.totalDocks}:${station.availableBikes}:${station.availableDocks}:${station.serviceStatus}`)
   .join('|')}`)
 
-watch(stationSignature, () => renderMarkers())
+watch(stationSignature, () => scheduleRedraw())
 watch(() => props.selectedId, () => {
   if (props.selectedId) stationQuery.value = ''
-  renderMarkers()
   focusSelectedStation()
 })
 watch(() => props.district, async () => {
@@ -360,16 +412,15 @@ watch(() => props.district, async () => {
   await nextTick()
   fitCurrentScope()
 })
-watch([() => props.dataMode, () => props.horizon], () => renderMarkers())
 
 onMounted(() => { void initialiseMap() })
 onBeforeUnmount(() => {
   resizeObserver?.disconnect()
-  markerById.clear()
+  if (redrawFrame) cancelAnimationFrame(redrawFrame)
   leafletMap?.remove()
   leafletMap = null
-  hotspotLayer = null
-  hotspotRenderer = null
+  overlay = null
+  lastVisible = []
 })
 </script>
 
@@ -443,13 +494,19 @@ onBeforeUnmount(() => {
       class="geographic-map map-height relative z-0 isolate mx-3.5 min-h-112 overflow-hidden rounded-lg border border-line bg-map"
       role="region" :aria-label="mapAriaLabel">
       <div ref="mapElement" class="map-canvas map-height min-h-112 w-full" />
-      <p v-if="!mappedStations.length"
+      <div v-if="hoveredStation && hoverPoint" class="map-hover-card pointer-events-none absolute z-20 grid gap-0.5 rounded-md border border-line-strong bg-panel px-2.5 py-2 text-base leading-snug text-ink shadow-lg"
+        :style="{ left: `${hoverPoint.x}px`, top: `${hoverPoint.y}px` }">
+        <strong class="truncate">{{ displayStationName(hoveredStation.name) }}</strong>
+        <span class="text-muted">{{ hoveredStation.district || '新北市' }}・可借 {{ hoveredStation.availableBikes }}・可還 {{ hoveredStation.availableDocks }}</span>
+        <span class="text-muted">{{ hoveredSeverityLabel }}</span>
+      </div>
+      <p v-if="!allMappedStations.length"
         class="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 rounded-lg border border-line-strong bg-panel p-3 text-base font-bold text-ink">
         目前沒有可定位的站點資料。</p>
     </div>
     <div class="map-caption grid gap-2 px-4 pt-3">
       <p class="inline-flex items-center gap-1.5 text-base font-semibold text-muted">
-        <Icon class="text-xl text-accent-strong" icon="solar:cursor-square-outline" /> 點選站點查看詳情
+        <Icon class="text-xl text-accent-strong" icon="solar:info-circle-outline" /> 綠底代表有服務涵蓋，顏色越深表示越需要處置；將滑鼠移到色斑上看站名與即時庫存，點選開啟詳情
       </p>
       <p v-if="baselineNotice" class="flex flex-wrap items-start gap-1.5 text-base font-semibold"
         :class="hasBaselineLoadError ? 'text-warning' : 'text-muted'">
@@ -462,34 +519,11 @@ onBeforeUnmount(() => {
           <Icon class="text-lg" icon="solar:refresh-circle-outline" /> 重新比對
         </button>
       </p>
-      <div class="flex flex-wrap gap-x-3 gap-y-1.5 text-base font-semibold text-muted" aria-label="風險方向圖例">
-        <span v-if="riskProximityClusters.length" class="inline-flex items-center gap-1.5"><i
-            class="h-3 w-5 shrink-0 rounded-full border"
-            :style="{ backgroundColor: `${HOTSPOT_FILL}24`, borderColor: HOTSPOT_STROKE }" />粉紅底｜300 公尺鄰近群</span>
-        <template v-if="hasVisibleStableStations">
-          <span class="inline-flex min-w-0 items-center gap-1.5 leading-snug"><i
-              class="h-2.5 w-2.5 shrink-0 rounded-full border border-line-strong"
-              :style="{ backgroundColor: STABLE_MARKER_COLORS.balanced }" />黃褐｜穩定均衡</span>
-          <span class="inline-flex min-w-0 items-center gap-1.5 leading-snug"><i
-              class="h-2.5 w-2.5 shrink-0 rounded-full border border-line-strong"
-              :style="{ backgroundColor: STABLE_MARKER_COLORS['bike-heavy'] }" />可借車位 ≥ 2/3</span>
-          <span class="inline-flex min-w-0 items-center gap-1.5 leading-snug"><i
-              class="h-2.5 w-2.5 shrink-0 rounded-full border border-line-strong"
-              :style="{ backgroundColor: STABLE_MARKER_COLORS['dock-heavy'] }" />可還車位 ≥ 2/3</span>
-        </template>
-        <span class="inline-flex min-w-0 items-center gap-1.5 leading-snug"><i
-            class="h-2.5 w-2.5 shrink-0 rounded-full border border-line-strong"
-            :style="{ backgroundColor: MARKER_COLORS['empty-risk'] }" />紅｜缺車,可借車位0</span>
-        <span class="inline-flex min-w-0 items-center gap-1.5 leading-snug"><i
-            class="h-2.5 w-2.5 shrink-0 rounded-full border border-line-strong"
-            :style="{ backgroundColor: MARKER_COLORS['full-risk'] }" />藍｜缺位,可還車位0</span>
-        <span class="inline-flex min-w-0 items-center gap-1.5 leading-snug"><i
-            class="h-2.5 w-2.5 shrink-0 rounded-full border border-line-strong"
-            :style="{ backgroundColor: MARKER_COLORS['service-review'] }" />灰｜服務異常</span>
-        <span v-if="isLive && !hasBaselineLoadError && hasVisibleInventoryOnlyStations"
-          class="inline-flex min-w-0 items-center gap-1.5 leading-snug"><i
-            class="h-2.5 w-2.5 shrink-0 rounded-full border border-line-strong"
-            :style="{ backgroundColor: MARKER_COLORS['inventory-only'] }" />黃｜沒有基線</span>
+      <div class="flex flex-wrap gap-x-3 gap-y-1.5 text-base font-semibold text-muted" aria-label="嚴重度圖例">
+        <span v-for="entry in SEVERITY_LEGEND" :key="entry.severity" class="inline-flex min-w-0 items-center gap-1.5 leading-snug">
+          <i class="h-2.5 w-2.5 shrink-0 rounded-full border border-line-strong"
+            :style="{ backgroundColor: `rgb(${SEVERITY_RGB[entry.severity].join(',')})` }" />{{ entry.label }}
+        </span>
       </div>
     </div>
     <div class="h-4" aria-hidden="true" />
@@ -499,6 +533,11 @@ onBeforeUnmount(() => {
 <style scoped>
 .geographic-map-panel {
   container-type: inline-size;
+}
+
+.map-hover-card {
+  max-width: 14rem;
+  transform: translate(-50%, calc(-100% - 12px));
 }
 
 @container (max-width: 760px) {
