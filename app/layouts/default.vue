@@ -53,12 +53,20 @@ const navigation = [
   { to: "/", label: "營運總覽", icon: "solar:radar-2-outline" },
   { to: "/stations", label: "站點總覽", icon: "solar:map-point-wave-outline" },
   { to: "/dispatch", label: "調度規劃", icon: "solar:routing-2-outline" },
-  { to: "/roi", label: "營運ROI", icon: "solar:chart-square-outline" },
-  { to: "/adjustments", label: "營運調整", icon: "solar:calendar-mark-outline" },
 ];
 
+/** Admin pages (`/admin/*`) are reached by direct URL, not the sidebar, so
+ * they need their header label listed separately from `navigation`. */
+const adminLabels: Record<string, string> = {
+  "/admin/roi": "營運ROI",
+  "/admin/adjustments": "營運調整",
+};
+
 const activeLabel = computed(
-  () => navigation.find((item) => item.to === route.path)?.label || "站點資訊",
+  () =>
+    navigation.find((item) => item.to === route.path)?.label ||
+    adminLabels[route.path] ||
+    "站點資訊",
 );
 const navigationQuery = computed(() =>
   Object.fromEntries(

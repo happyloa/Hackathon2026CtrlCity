@@ -15,13 +15,13 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
-- [ ] 左側 sidebar 固定顯示,含首頁、站點總覽、調度規劃三項
-- [ ] sidebar 標示目前所在頁面
-- [ ] 營運 ROI 可由 `/admin` 底下的路徑進入
-- [ ] 營運調整可由 `/admin` 底下的路徑進入
-- [ ] 這兩頁不出現在 sidebar
-- [ ] 兩頁搬移後功能未退化,頁內既有連結仍然有效
-- [ ] 靜態產製後兩頁仍可正常存取
-- [ ] `npm test` 全綠
+- [x] 左側 sidebar 固定顯示,含首頁、站點總覽、調度規劃三項
+- [x] sidebar 標示目前所在頁面
+- [x] 營運 ROI 可由 `/admin` 底下的路徑進入
+- [x] 營運調整可由 `/admin` 底下的路徑進入
+- [x] 這兩頁不出現在 sidebar
+- [x] 兩頁搬移後功能未退化,頁內既有連結仍然有效
+- [x] 靜態產製後兩頁仍可正常存取
+- [x] `npm test` 全綠

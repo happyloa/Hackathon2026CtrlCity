@@ -12,6 +12,25 @@
 
 歷史資料只用於基線與離線驗證。平台不建立工單，也不送出派車命令。
 
+## 路由架構
+
+Nuxt 檔案式路由（`app/pages/`）。左側 sidebar 只放調度人員的日常動線三項；營運 ROI 與營運調整是分析師／管理員頁面，移到 `/admin` 之下但不進 sidebar，以網址直接進入。
+
+```text
+/
+├─ /                          首頁（營運總覽）           ┐
+├─ /stations                  站點總覽                   │ 左側 sidebar
+│   └─ /stations/:stationId   站點詳情                   │ （調度人員日常動線）
+├─ /dispatch                  調度規劃                   ┘
+│
+├─ /admin                     不進 sidebar，以網址直接進入
+│   ├─ /admin/roi             營運 ROI（分析師）
+│   └─ /admin/adjustments     營運調整（分析師）
+│
+├─ /alerts                    舊網址，重導向到 /stations
+└─ /prototype/map-blend       拋棄式原型，待清理
+```
+
 ## 本機執行
 
 ```powershell
