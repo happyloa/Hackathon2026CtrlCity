@@ -2,6 +2,13 @@
 import { Icon } from '@iconify/vue'
 import { stationSeverityFor, type SeverityLevel } from '~/shared/operational-policy.mjs'
 import { displayStationName, type DataMode, type HorizonKey, type PredictionCoverage, type StationRisk } from '~/shared/ops'
+import { groupOperationalStations } from '~/shared/risk-map-visuals'
+import type { DispatchRouteStop, DispatchRouteStopAction } from '~/shared/dispatch-route-planner'
+// font-gis's icon-font CSS mangles its `content: "\eb1d"` glyph codepoints
+// somewhere in Vite's dev-time CSS-to-JS transform (verified: the parsed
+// CSSOM rule ends up with an empty `content`), so the package is used via
+// its SVG sprite instead -- same icon, no CSS unicode-escape involved.
+import fontGisSprite from 'font-gis/dist/font-gis.svg?url'
 
 const props = defineProps<{
   stations: StationRisk[]
@@ -11,6 +18,8 @@ const props = defineProps<{
   district?: string
   profileCoverage?: PredictionCoverage | null
   profileError?: string
+  /** The currently "observed" dispatch route's stops, drawn as coloured pins on top of everything else. */
+  routeStops?: DispatchRouteStop[] | null
 }>()
 
 const emit = defineEmits<{ select: [stationId: string], retryBaseline: [] }>()
@@ -68,6 +77,78 @@ let resizeObserver: ResizeObserver | null = null
 let redrawFrame = 0
 const hoveredStationId = ref<string | null>(null)
 const hoverPoint = ref<{ x: number, y: number } | null>(null)
+const selectedStationPoint = ref<{ x: number, y: number } | null>(null)
+const routeStopPoints = ref<{ x: number, y: number, stop: DispatchRouteStop }[]>([])
+const hoveredRouteStationId = ref<string | null>(null)
+
+// 薄荷綠 for pickup, 珊瑚紅 for dropoff -- matches RouteCard's pickup/dropoff
+// colouring so the map and the route summary agree on what each colour means.
+// "mixed" (a station serves both, whether in one visit or across two) gets
+// its own colour rather than silently reusing one of the two.
+const ROUTE_STOP_TEXT_CLASS: Record<DispatchRouteStopAction, string> = {
+  pickup: 'text-[#3ecf8e]',
+  dropoff: 'text-[#ff6f61]',
+  mixed: 'text-[#a78bfa]',
+}
+
+interface RouteStopMarker {
+  stationId: string
+  x: number
+  y: number
+  action: DispatchRouteStopAction
+  stops: DispatchRouteStop[]
+}
+
+/**
+ * The heuristic planner inserts one dispatch at a time and never reorders
+ * stops already placed, so it can send the vehicle back to a station it
+ * already visited (see dispatch-route-planner.ts's docstring) -- typically
+ * because the bikes being dropped off there weren't picked up yet at the
+ * time of the earlier visit. Two stop entries at the same coordinate would
+ * otherwise render as two pins stacked exactly on top of each other, which
+ * reads as one stop and hides that a second trip is happening; grouping by
+ * station and labelling every sequence number together keeps that visible.
+ */
+const routeStopMarkers = computed(() => {
+  const byStation = new globalThis.Map<string, RouteStopMarker>()
+  for (const entry of routeStopPoints.value) {
+    const existing = byStation.get(entry.stop.stationId)
+    if (existing) {
+      existing.stops.push(entry.stop)
+      if (existing.action !== entry.stop.action) existing.action = 'mixed'
+    } else {
+      byStation.set(entry.stop.stationId, {
+        stationId: entry.stop.stationId,
+        x: entry.x,
+        y: entry.y,
+        action: entry.stop.action,
+        stops: [entry.stop],
+      })
+    }
+  }
+  return [...byStation.values()]
+})
+
+const hoveredRouteStopMarker = computed(() => hoveredRouteStationId.value
+  ? routeStopMarkers.value.find(marker => marker.stationId === hoveredRouteStationId.value) ?? null
+  : null)
+
+function routeStopMarkerLabel(marker: RouteStopMarker) {
+  return `路線第 ${marker.stops.map(stop => stop.sequence).join('、')} 站：${marker.stops[0]?.stationName ?? ''}`
+}
+
+function routeStopMarkerName(marker: RouteStopMarker) {
+  return marker.stops[0]?.stationName ?? ''
+}
+
+function routeStopMarkerBikes(marker: RouteStopMarker, field: 'pickupBikes' | 'dropoffBikes') {
+  return marker.stops.reduce((total, stop) => total + stop[field], 0)
+}
+
+// Stops are already in visiting order (see buildDispatchRoutePlans), so a
+// polyline through them in the same order is the actual driving path -- if
+// the route revisits a station later on, the line will too, on purpose.
+const routeLinePoints = computed(() => routeStopPoints.value.map(entry => `${entry.x},${entry.y}`).join(' '))
 
 function forecastFor(station: StationRisk) {
   return station.forecast.horizons[props.horizon]
@@ -87,6 +168,40 @@ function isActionable(station: StationRisk) {
   return severityFor(station) !== 'normal'
 }
 
+// ── Neighbour-group expansion ────────────────────────────────────────────
+//
+// A neighbour group answers "this area is served by which stations", distinct
+// from the colour blending above (see "鄰近群不是著色單位" in CONTEXT.md).
+// Clicking anywhere a station's blob reaches expands the full group that
+// station belongs to, not just the stations directly under the pointer, so a
+// click near one edge of a spread-out group still lists every member.
+const neighbourGroups = computed(() => groupOperationalStations(allMappedStations.value))
+const neighbourGroupByStationId = computed(() => {
+  const lookup = new globalThis.Map<string, string[]>()
+  for (const group of neighbourGroups.value) {
+    for (const memberId of group.memberIds) lookup.set(memberId, group.memberIds)
+  }
+  return lookup
+})
+
+const clickedGroupPoint = ref<{ x: number, y: number } | null>(null)
+const clickedGroupMemberIds = ref<globalThis.Set<string> | null>(null)
+const clickedGroupStations = computed(() => {
+  const members = clickedGroupMemberIds.value
+  if (!members) return []
+  return allMappedStations.value.filter(station => members.has(station.id))
+})
+
+function closeClickedGroup() {
+  clickedGroupPoint.value = null
+  clickedGroupMemberIds.value = null
+}
+
+function selectFromClickedGroup(stationId: string) {
+  emit('select', stationId)
+  closeClickedGroup()
+}
+
 // ── Soft-blend overlay ───────────────────────────────────────────────────
 //
 // Stations are painted individually onto a canvas overlaid on the Leaflet
@@ -101,6 +216,19 @@ function isActionable(station: StationRisk) {
 
 const BLEND_RADIUS_METERS = 500
 const BASE_LAYER_PEAK_ALPHA = 0.10
+
+// ── Station markers ──────────────────────────────────────────────────────
+//
+// The blend layer answers "which area is struggling"; it was never meant to
+// answer "which dot is which station" (see "站點標記" in CONTEXT.md, and
+// docs/adr/0001-station-markers-above-zoom-threshold.md for why this exists
+// alongside the blend instead of replacing it). Below a district-level zoom
+// the ~1,600 stations would still overlap into unreadable clutter -- the same
+// density problem the blend was built to avoid -- so markers only appear once
+// zoomed in far enough to see them apart. Tune the threshold by changing
+// MARKER_MIN_ZOOM.
+const MARKER_MIN_ZOOM = 13
+const MARKER_RADIUS_PIXELS = 6
 
 type Severity = SeverityLevel
 
@@ -150,9 +278,22 @@ function paintBlob(ctx: CanvasRenderingContext2D, x: number, y: number, radius: 
   ctx.fill()
 }
 
+/** A small solid dot marking one station's exact location, coloured by severity. */
+function paintMarker(ctx: CanvasRenderingContext2D, x: number, y: number, rgb: [number, number, number]) {
+  const [red, green, blue] = rgb
+  ctx.beginPath()
+  ctx.arc(x, y, MARKER_RADIUS_PIXELS, 0, Math.PI * 2)
+  ctx.fillStyle = `rgba(${red},${green},${blue},0.5)`
+  ctx.fill()
+  ctx.lineWidth = 2.5
+  ctx.strokeStyle = `rgb(${red},${green},${blue})`
+  ctx.stroke()
+}
+
 // The last frame's projected stations, reused for hover/click hit-testing so
 // pointer handlers don't reproject the whole visible set on every mousemove.
 let lastVisible: { station: StationRisk, severity: Severity, x: number, y: number }[] = []
+let lastRadiusPixels = 0
 const HIT_TEST_TOLERANCE_PIXELS = 14
 
 function stationAt(point: { x: number, y: number }) {
@@ -200,6 +341,9 @@ function redrawOverlay() {
   const map = leafletMap
   overlay.style.transition = 'none'
   overlay.style.transform = 'none'
+  // While a route is being observed, fade the severity blend so its colours
+  // don't fight the route line/pins drawn above it for contrast.
+  overlay.style.opacity = props.routeStops?.length ? '0.45' : '1'
   const size = map.getSize()
   const devicePixelRatio = Math.min(window.devicePixelRatio || 1, 2)
 
@@ -216,6 +360,7 @@ function redrawOverlay() {
   ctx.clearRect(0, 0, size.x, size.y)
 
   const radiusPixels = BLEND_RADIUS_METERS / metersPerPixel(map.getCenter().lat, map.getZoom())
+  lastRadiusPixels = radiusPixels
   if (radiusPixels < 1) return
 
   // Only project stations near the viewport (padded by one radius) -- with
@@ -253,18 +398,26 @@ function redrawOverlay() {
     for (const point of list) paintBlob(ctx, point.x, point.y, radiusPixels, SEVERITY_RGB[severity], peakAlpha)
   }
 
-  if (props.selectedId) {
-    const selected = visible.find(entry => entry.station.id === props.selectedId)
-    if (selected) {
-      ctx.beginPath()
-      ctx.arc(selected.x, selected.y, Math.max(5, radiusPixels * 0.1), 0, Math.PI * 2)
-      ctx.fillStyle = '#f4f4f5'
-      ctx.fill()
-      ctx.lineWidth = 2
-      ctx.strokeStyle = '#18181b'
-      ctx.stroke()
-    }
+  // Station markers: only once zoomed in past MARKER_MIN_ZOOM, drawn on top
+  // of every blend layer so they stay visible regardless of what's underneath.
+  if (map.getZoom() >= MARKER_MIN_ZOOM) {
+    for (const entry of visible) paintMarker(ctx, entry.x, entry.y, SEVERITY_RGB[entry.severity])
   }
+
+  // The selected-station indicator is a DOM pin (see the template), not a
+  // canvas shape, so it can use a real icon; this just tracks where it goes.
+  const selected = props.selectedId ? visible.find(entry => entry.station.id === props.selectedId) : undefined
+  selectedStationPoint.value = selected ? { x: selected.x, y: selected.y } : null
+
+  // The observed route's stops are DOM pins too (see the template), computed
+  // independently of the padded `visible` list above so a stop just off-screen
+  // still gets a real (if unseen) position rather than being dropped.
+  routeStopPoints.value = (props.routeStops ?? []).flatMap((stop) => {
+    const station = props.stations.find(candidate => candidate.id === stop.stationId)
+    if (!station || station.latitude === null || station.longitude === null) return []
+    const point = map.latLngToContainerPoint([station.latitude, station.longitude])
+    return [{ x: point.x, y: point.y, stop }]
+  })
 }
 
 // Leaflet's `_move()` -- called synchronously right when a zoom animation
@@ -298,7 +451,7 @@ function fitCurrentScope() {
   leafletMap.fitBounds(leaflet.latLngBounds(points), {
     animate: !reduceMotion,
     duration: reduceMotion ? 0 : .35,
-    maxZoom: props.district ? 14 : 13,
+    maxZoom: props.district ? 13 : 12,
     padding: [28, 28],
   })
 }
@@ -315,10 +468,10 @@ function chooseSearchResult(stationId: string) {
 const hoveredStation = computed(() => hoveredStationId.value
   ? allMappedStations.value.find(station => station.id === hoveredStationId.value) ?? null
   : null)
-const hoveredSeverityLabel = computed(() => {
-  if (!hoveredStation.value) return ''
-  return SEVERITY_LEGEND.find(entry => entry.severity === severityFor(hoveredStation.value!))?.label ?? ''
-})
+function severityLabelFor(station: StationRisk) {
+  return SEVERITY_LEGEND.find(entry => entry.severity === severityFor(station))?.label ?? ''
+}
+const hoveredSeverityLabel = computed(() => hoveredStation.value ? severityLabelFor(hoveredStation.value) : '')
 
 // The overlay canvas is `pointer-events: none` so panning/zooming keeps
 // hitting Leaflet's own layers underneath; hover and click are handled here
@@ -337,8 +490,45 @@ function onMapPointerLeave() {
 }
 
 function onMapClick(event: LeafletMouseEvent) {
-  const hit = stationAt(event.containerPoint)
-  if (hit) emit('select', hit.station.id)
+  const point = event.containerPoint
+  // Below MARKER_MIN_ZOOM there's no visible marker to click precisely on --
+  // the blob radius and the hover hit-tolerance are close in size at that
+  // zoom, so treating every click as "the precise station" would make the
+  // neighbour-group popup below unreachable. Only trust a precise hit once
+  // the marker it's supposed to represent actually exists on screen.
+  const showingMarkers = Boolean(leafletMap && leafletMap.getZoom() >= MARKER_MIN_ZOOM)
+  const hit = showingMarkers ? stationAt(point) : null
+  if (hit) {
+    // A precise hit is the station marker itself -- that's an unambiguous
+    // "I want this one station", so it wins outright instead of also opening
+    // the broader neighbour-group popup underneath it.
+    emit('select', hit.station.id)
+    closeClickedGroup()
+    return
+  }
+
+  // Anything within the blend radius of a station's blob counts as "clicked
+  // that blob", which is a much larger target than the precise dot above.
+  // Service-disrupted stations aren't offering service, so a click on their
+  // grey blob shouldn't surface them as if they served the area (they are
+  // never grouped -- see groupOperationalStations).
+  const covering = lastRadiusPixels > 0
+    ? lastVisible.filter(entry => entry.severity !== 'service_disruption'
+      && Math.hypot(entry.x - point.x, entry.y - point.y) <= lastRadiusPixels)
+    : []
+  if (!covering.length) {
+    closeClickedGroup()
+    return
+  }
+
+  const memberIds = new globalThis.Set<string>()
+  for (const entry of covering) {
+    const group = neighbourGroupByStationId.value.get(entry.station.id)
+    if (group) group.forEach(id => memberIds.add(id))
+    else memberIds.add(entry.station.id)
+  }
+  clickedGroupMemberIds.value = memberIds
+  clickedGroupPoint.value = { x: point.x, y: point.y }
 }
 
 function focusSelectedStation() {
@@ -357,12 +547,12 @@ async function initialiseMap() {
     preferCanvas: true,
     scrollWheelZoom: true,
     zoomControl: true,
-    minZoom: 9,
-    maxZoom: 19,
+    minZoom: 11,
+    maxZoom: 18,
   })
   leaflet.control.attribution({ position: 'bottomright', prefix: false }).addTo(leafletMap)
   leaflet.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
+    maxZoom: 18,
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors',
   }).addTo(leafletMap)
 
@@ -382,6 +572,7 @@ async function initialiseMap() {
   leafletMap.on('mousemove', onMapPointerMove)
   leafletMap.on('mouseout', onMapPointerLeave)
   leafletMap.on('click', onMapClick)
+  leafletMap.on('movestart zoomstart', closeClickedGroup)
 
   fitCurrentScope()
   scheduleRedraw()
@@ -403,12 +594,14 @@ const stationSignature = computed(() => `${hasBaselineLoadError.value}|${props.s
   .join('|')}`)
 
 watch(stationSignature, () => scheduleRedraw())
+watch(() => props.routeStops, () => scheduleRedraw())
 watch(() => props.selectedId, () => {
   if (props.selectedId) stationQuery.value = ''
   focusSelectedStation()
 })
 watch(() => props.district, async () => {
   stationQuery.value = ''
+  closeClickedGroup()
   await nextTick()
   fitCurrentScope()
 })
@@ -421,6 +614,10 @@ onBeforeUnmount(() => {
   leafletMap = null
   overlay = null
   lastVisible = []
+  selectedStationPoint.value = null
+  routeStopPoints.value = []
+  hoveredRouteStationId.value = null
+  closeClickedGroup()
 })
 </script>
 
@@ -440,7 +637,7 @@ onBeforeUnmount(() => {
         <span class="text-base text-ink">{{ headerLabel }}</span>
         <small v-if="isLive" class="mt-1 text-base font-semibold text-muted">{{ hasBaselineLoadError ? '基線暫不可用' :
           (profileCoverage ? `已對照 ${profileCoverage.matchedStations}／${profileCoverage.liveStations}` : '正在載入基線')
-        }}</small>
+          }}</small>
       </div>
     </div>
 
@@ -480,7 +677,7 @@ onBeforeUnmount(() => {
         class="flex min-h-13 items-center justify-between gap-2 rounded-md border border-line bg-panel px-2.5 py-2 text-left text-base text-ink transition-colors hover:border-accent-strong hover:bg-surface"
         type="button" @click="chooseSearchResult(station.id)">
         <span class="grid min-w-0 gap-0.5"><strong class="truncate">{{ displayStationName(station.name)
-        }}</strong><small class="text-base text-muted">{{ station.district || '新北市' }}</small></span>
+            }}</strong><small class="text-base text-muted">{{ station.district || '新北市' }}</small></span>
         <b class="shrink-0 whitespace-nowrap font-mono text-base text-accent-strong">{{ station.availableBikes }} 車／{{
           station.availableDocks }} 位</b>
       </button>
@@ -491,23 +688,88 @@ onBeforeUnmount(() => {
     </div>
 
     <div
-      class="geographic-map map-height relative z-0 isolate mx-3.5 min-h-112 overflow-hidden rounded-lg border border-line bg-map"
+      class="geographic-map map-height relative z-0 isolate mx-3.5 min-h-240 overflow-hidden rounded-lg border border-line bg-map"
       role="region" :aria-label="mapAriaLabel">
-      <div ref="mapElement" class="map-canvas map-height min-h-112 w-full" />
-      <div v-if="hoveredStation && hoverPoint" class="map-hover-card pointer-events-none absolute z-20 grid gap-0.5 rounded-md border border-line-strong bg-panel px-2.5 py-2 text-base leading-snug text-ink shadow-lg"
+      <div ref="mapElement" class="map-canvas map-height min-h-240 w-full" />
+
+      <svg v-if="routeStopPoints.length > 1" class="map-route-line pointer-events-none absolute inset-0 h-full w-full"
+        aria-hidden="true">
+        <polyline :points="routeLinePoints" fill="none" stroke="#3b82f6" stroke-width="3" stroke-linecap="round"
+          stroke-linejoin="round" />
+      </svg>
+      <svg v-if="selectedStationPoint" class="map-selected-pin pointer-events-none absolute text-accent-strong"
+        :style="{ left: `${selectedStationPoint.x}px`, top: `${selectedStationPoint.y}px` }" width="40" height="40"
+        aria-hidden="true">
+        <use :href="`${fontGisSprite}#fg-poi-info-o`" />
+      </svg>
+      <div v-for="marker in routeStopMarkers" :key="marker.stationId"
+        class="map-route-stop-marker absolute cursor-pointer" :style="{ left: `${marker.x}px`, top: `${marker.y}px` }"
+        role="img" :aria-label="routeStopMarkerLabel(marker)"
+        @mouseenter="hoveredRouteStationId = marker.stationId" @mouseleave="hoveredRouteStationId = null"
+        @click.stop="emit('select', marker.stationId)">
+        <svg class="map-route-stop-pin block" :class="ROUTE_STOP_TEXT_CLASS[marker.action]" width="32" height="32">
+          <use :href="`${fontGisSprite}#fg-location-poi`" />
+        </svg>
+        <!-- Always visible, not just on hover: a station visited twice in one
+             route (see routeStopMarkers) would otherwise show as a single pin
+             with no sign that stop 3 and stop 6 are the same place. -->
+        <span class="map-route-stop-badge absolute rounded-full bg-[#111827] px-1 font-mono text-[11px] font-bold leading-[1.4] text-white">{{ marker.stops.map(stop => stop.sequence).join('・') }}</span>
+      </div>
+      <div v-if="hoveredRouteStopMarker"
+        class="map-route-stop-pill pointer-events-none absolute flex items-center gap-1.5 rounded-full border border-line-strong bg-panel px-3 py-1.5 text-base leading-none text-ink shadow-lg"
+        :style="{ left: `${hoveredRouteStopMarker.x}px`, top: `${hoveredRouteStopMarker.y}px` }">
+        <span class="grid size-5 shrink-0 place-items-center rounded-full bg-accent font-mono text-[11px] font-bold text-on-accent">{{ hoveredRouteStopMarker.stops.map(stop => stop.sequence).join('・') }}</span>
+        <strong class="truncate">{{ routeStopMarkerName(hoveredRouteStopMarker) }}</strong>
+        <span class="whitespace-nowrap text-muted">
+          <template v-if="routeStopMarkerBikes(hoveredRouteStopMarker, 'pickupBikes')">取 {{
+            routeStopMarkerBikes(hoveredRouteStopMarker, 'pickupBikes') }} 台</template>
+          <template
+            v-if="routeStopMarkerBikes(hoveredRouteStopMarker, 'pickupBikes') && routeStopMarkerBikes(hoveredRouteStopMarker, 'dropoffBikes')">／</template>
+          <template v-if="routeStopMarkerBikes(hoveredRouteStopMarker, 'dropoffBikes')">卸 {{
+            routeStopMarkerBikes(hoveredRouteStopMarker, 'dropoffBikes') }} 台</template>
+        </span>
+      </div>
+      <div v-if="hoveredStation && hoverPoint"
+        class="map-hover-card pointer-events-none absolute grid gap-0.5 rounded-md border border-line-strong bg-panel px-2.5 py-2 text-base leading-snug text-ink shadow-lg"
         :style="{ left: `${hoverPoint.x}px`, top: `${hoverPoint.y}px` }">
         <strong class="truncate">{{ displayStationName(hoveredStation.name) }}</strong>
-        <span class="text-muted">{{ hoveredStation.district || '新北市' }}・可借 {{ hoveredStation.availableBikes }}・可還 {{ hoveredStation.availableDocks }}</span>
+        <span class="text-muted">{{ hoveredStation.district || '新北市' }}・可借 {{ hoveredStation.availableBikes }}・可還 {{
+          hoveredStation.availableDocks }}</span>
         <span class="text-muted">{{ hoveredSeverityLabel }}</span>
+      </div>
+      <div v-if="clickedGroupPoint && clickedGroupStations.length"
+        class="map-group-card absolute grid max-w-72 gap-1.5 rounded-lg border border-line-strong bg-panel p-3 text-base leading-snug text-ink shadow-lg"
+        :style="{ left: `${clickedGroupPoint.x}px`, top: `${clickedGroupPoint.y}px` }" @click.stop>
+        <div class="flex items-start justify-between gap-2">
+          <strong>這一帶由 {{ clickedGroupStations.length }} 站服務</strong>
+          <button type="button"
+            class="grid h-6 w-6 shrink-0 place-items-center rounded text-muted transition-colors hover:bg-accent-strong hover:text-on-accent"
+            aria-label="關閉鄰近群清單" @click="closeClickedGroup">
+            <Icon class="text-lg" icon="solar:close-circle-outline" />
+          </button>
+        </div>
+        <ul class="grid max-h-56 gap-1 overflow-y-auto">
+          <li v-for="station in clickedGroupStations" :key="station.id">
+            <button type="button"
+              class="flex w-full min-w-0 items-center justify-between gap-2 rounded-md px-1.5 py-1 text-left transition-colors hover:bg-panel-muted"
+              @click="selectFromClickedGroup(station.id)">
+              <span class="grid min-w-0 gap-0.5"><strong class="truncate">{{ displayStationName(station.name)
+                  }}</strong>
+                <small class="text-muted">{{ station.district || '新北市' }}・{{ severityLabelFor(station) }}</small></span>
+              <b class="shrink-0 whitespace-nowrap font-mono text-accent-strong">{{ station.availableBikes }} 車</b>
+            </button>
+          </li>
+        </ul>
       </div>
       <p v-if="!allMappedStations.length"
         class="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 rounded-lg border border-line-strong bg-panel p-3 text-base font-bold text-ink">
         目前沒有可定位的站點資料。</p>
     </div>
     <div class="map-caption grid gap-2 px-4 pt-3">
-      <p class="inline-flex items-center gap-1.5 text-base font-semibold text-muted">
-        <Icon class="text-xl text-accent-strong" icon="solar:info-circle-outline" /> 綠底代表有服務涵蓋，顏色越深表示越需要處置；將滑鼠移到色斑上看站名與即時庫存，點選開啟詳情
-      </p>
+      <!-- <p class="inline-flex items-center gap-1.5 text-base font-semibold text-muted">
+        <Icon class="text-xl text-accent-strong" icon="solar:info-circle-outline" />
+        綠底代表有服務涵蓋，顏色越深表示越需要處置；放大到街道層級會看到逐站標記，點選標記查看該站資料；點選色斑其餘範圍會展開該處鄰近群的站點清單
+      </p> -->
       <p v-if="baselineNotice" class="flex flex-wrap items-start gap-1.5 text-base font-semibold"
         :class="hasBaselineLoadError ? 'text-warning' : 'text-muted'">
         <Icon class="mt-0.5 shrink-0 text-xl" :class="hasBaselineLoadError ? 'text-warning' : 'text-accent-strong'"
@@ -519,8 +781,17 @@ onBeforeUnmount(() => {
           <Icon class="text-lg" icon="solar:refresh-circle-outline" /> 重新比對
         </button>
       </p>
+      <div v-if="routeStops && routeStops.length" class="flex flex-wrap gap-x-3 gap-y-1.5 text-base font-semibold text-muted" aria-label="路線觀察圖例">
+        <span class="inline-flex min-w-0 items-center gap-1.5 leading-snug">
+          <i class="h-2.5 w-2.5 shrink-0 rounded-full border border-line-strong" style="background-color: #3ecf8e" />取車：薄荷綠
+        </span>
+        <span class="inline-flex min-w-0 items-center gap-1.5 leading-snug">
+          <i class="h-2.5 w-2.5 shrink-0 rounded-full border border-line-strong" style="background-color: #ff6f61" />卸車：珊瑚紅
+        </span>
+      </div>
       <div class="flex flex-wrap gap-x-3 gap-y-1.5 text-base font-semibold text-muted" aria-label="嚴重度圖例">
-        <span v-for="entry in SEVERITY_LEGEND" :key="entry.severity" class="inline-flex min-w-0 items-center gap-1.5 leading-snug">
+        <span v-for="entry in SEVERITY_LEGEND" :key="entry.severity"
+          class="inline-flex min-w-0 items-center gap-1.5 leading-snug">
           <i class="h-2.5 w-2.5 shrink-0 rounded-full border border-line-strong"
             :style="{ backgroundColor: `rgb(${SEVERITY_RGB[entry.severity].join(',')})` }" />{{ entry.label }}
         </span>
@@ -535,14 +806,75 @@ onBeforeUnmount(() => {
   container-type: inline-size;
 }
 
+/*
+ * `.map-canvas`'s children (the blend/marker canvas, appended in
+ * initialiseMap, inline style `zIndex: '450'`) and everything below share one
+ * stacking context with `.geographic-map`'s other direct children -- Leaflet's
+ * container is `position: relative` but never sets its own z-index, so it
+ * doesn't start a new context. That means every DOM overlay below needs a
+ * z-index above 450 or the canvas paints over it (pointer events still pass
+ * through, since the canvas is `pointer-events: none`, so this only breaks
+ * what's visible, not what's clickable). Only enough headroom to clear that
+ * 450 and stay ordered among ourselves -- nothing here needs to fend off
+ * Leaflet's own controls (z-index 1000, see the same note in
+ * RoiMap.client.vue), so there is no reason to reach for a large number.
+ */
+.map-route-line,
+.map-selected-pin,
+.map-route-stop-marker {
+  /* The line and the pins tie on purpose: DOM order (line first) puts the
+     pins on top of the line's endpoints without needing a separate tier. */
+  z-index: 451;
+}
+
+.map-hover-card,
+.map-route-stop-pill {
+  /* Tooltips read above a pin, not equal to it. */
+  z-index: 452;
+}
+
+.map-group-card {
+  /* The one overlay that can take focus (buttons, a scrollable list), so it
+     wins over a passive tooltip if both ever end up stacked. */
+  z-index: 453;
+}
+
 .map-hover-card {
   max-width: 14rem;
   transform: translate(-50%, calc(-100% - 12px));
 }
 
+.map-group-card {
+  transform: translate(-50%, calc(-100% - 12px));
+}
+
+.map-selected-pin {
+  /* Anchors the pin's point (near the bottom of its viewBox) at the
+     station's coordinate, the same way a Leaflet marker icon does. */
+  transform: translate(-50%, -96%);
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.6));
+}
+
+.map-route-stop-marker {
+  transform: translate(-50%, -96%);
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.6));
+}
+
+.map-route-stop-badge {
+  top: -4px;
+  right: -6px;
+  padding-inline: 0.25rem;
+  white-space: nowrap;
+}
+
+.map-route-stop-pill {
+  max-width: 16rem;
+  transform: translate(-50%, calc(-100% - 32px));
+}
+
 @container (max-width: 760px) {
   .map-height {
-    min-height: 22rem;
+    min-height: 48rem;
   }
 
   .map-command-row {
@@ -580,7 +912,7 @@ onBeforeUnmount(() => {
 
 @container (max-width: 480px) {
   .map-height {
-    min-height: 20rem;
+    min-height: 36rem;
   }
 
   .map-heading {

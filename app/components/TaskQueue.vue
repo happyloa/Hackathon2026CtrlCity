@@ -1,25 +1,31 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
-import { buildDispatchRoutePlans, DEFAULT_DISPATCH_ROUTE_POLICY } from '~/shared/dispatch-route-planner'
-import type { Alert, DispatchRecommendation, StationRisk } from '~/shared/ops'
+import { buildDispatchRoutePlans, type DispatchRouteStop } from '~/shared/dispatch-route-planner'
+import { buildLiveOperationsForHorizon, type DispatchHorizon } from '~/shared/live-operations'
+import type { Alert, StationRisk } from '~/shared/ops'
 
 const props = defineProps<{
   alerts: Alert[]
-  dispatches: DispatchRecommendation[]
   stations: StationRisk[]
+  asOf: string
   contextQuery?: Record<string, string>
 }>()
 
-const emit = defineEmits<{ select: [stationId: string] }>()
+const emit = defineEmits<{ select: [stationId: string], observeRoute: [stops: DispatchRouteStop[] | null] }>()
+const activeHorizon = ref<DispatchHorizon>('now')
 const inventoryAlerts = computed(() => props.alerts.filter(alert => alert.condition !== 'unavailable'))
 const serviceAlertCount = computed(() => props.alerts.filter(alert => alert.condition === 'unavailable').length)
-const routeCount = computed(() => buildDispatchRoutePlans(props.dispatches, props.stations).routes.length)
+// Kept in sync with DispatchRouteSummary's active tab (via v-model) so this
+// count always describes what the panel below is actually showing.
+const routeCount = computed(() => {
+  const dispatches = buildLiveOperationsForHorizon(props.stations, props.asOf, activeHorizon.value).dispatches
+  return buildDispatchRoutePlans(dispatches, props.stations).routes.length
+})
 const headline = computed(() => routeCount.value
-  ? `${routeCount.value} 條搬運路線`
+  ? `${routeCount.value} 條派遣路線`
   : inventoryAlerts.value.length
     ? `${inventoryAlerts.value.length} 個風險站暫無可行供需配對`
     : '目前沒有需要處理的庫存風險')
-const allRoutesTarget = computed(() => ({ path: '/dispatch', query: props.contextQuery || {} }))
 const allStationsTarget = computed(() => ({ path: '/stations', query: props.contextQuery || {} }))
 </script>
 
@@ -27,24 +33,15 @@ const allStationsTarget = computed(() => ({ path: '/stations', query: props.cont
   <section class="panel overflow-hidden" aria-labelledby="task-queue-title">
     <header class="flex flex-col gap-3 border-b border-line p-4 sm:flex-row sm:items-start sm:justify-between">
       <div>
-        <p class="section-kicker text-base"><Icon icon="solar:routing-2-outline" /> 搬運摘要</p>
+        <p class="section-kicker text-base"><Icon icon="solar:routing-2-outline" /> 派遣摘要</p>
         <h2 id="task-queue-title" class="m-0 mt-1 text-xl font-bold tracking-tight text-ink">{{ headline }}</h2>
       </div>
       <span class="self-start rounded-md border border-line bg-panel-muted px-2 py-1 text-base font-semibold text-muted">{{ inventoryAlerts.length }} 個風險站</span>
     </header>
 
     <div class="divide-y divide-line">
-      <section aria-labelledby="route-step-title">
-        <div class="flex flex-wrap items-start gap-3 p-4 pb-2">
-          <span class="grid size-8 shrink-0 place-items-center rounded-full bg-accent font-mono text-base font-bold text-on-accent">1</span>
-          <div class="min-w-0 flex-1">
-            <strong id="route-step-title" class="block text-base text-ink">多站搬運規劃</strong>
-            <small class="mt-1 block text-base leading-6 text-muted">每車 {{ DEFAULT_DISPATCH_ROUTE_POLICY.vehicleCapacity }} 台，合併附近需求。</small>
-          </div>
-          <NuxtLink :to="allRoutesTarget" class="text-link ml-auto min-h-11 text-base">完整規劃 <Icon icon="solar:arrow-right-up-outline" /></NuxtLink>
-        </div>
-        <RoutePlanList embedded compact :max-items="1" :dispatches="dispatches" :stations="stations" :context-query="contextQuery" @select="emit('select', $event)" />
-      </section>
+      <DispatchRouteSummary v-model="activeHorizon" :stations="stations" :as-of="asOf" :context-query="contextQuery"
+        @select="emit('select', $event)" @observe-route="emit('observeRoute', $event)" />
 
       <section aria-labelledby="alert-step-title">
         <div class="flex flex-wrap items-start gap-3 p-4 pb-2">

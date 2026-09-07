@@ -3,7 +3,7 @@ export type RiskLevel = 'normal' | 'medium' | 'high' | 'critical'
 export type CurrentState = 'normal' | 'empty_now' | 'full_now' | 'unavailable'
 export type ServiceStatus = 'operational' | 'official_inactive' | 'suspected_unavailable'
 export type AlertStatus = 'open' | 'acknowledged' | 'resolved'
-export type HorizonKey = '30' | '60' | '120'
+export type HorizonKey = '30' | '60'
 export type BaselineCoverage = 'sufficient' | 'limited' | 'unmatched' | 'not_applicable'
 export type ForecastMethod = 'historical_replay' | 'historical_baseline_live_inventory' | 'inventory_only'
 

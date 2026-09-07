@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { buildDispatchRoutePlans } from '../shared/dispatch-route-planner.ts'
+import { DEFAULT_DISPATCH_ROUTE_POLICY, buildDispatchRoutePlans } from '../shared/dispatch-route-planner.ts'
 
 function forecast() {
   return {
@@ -53,7 +53,6 @@ function station({
       horizons: {
         30: { ...stationForecast },
         60: { ...stationForecast },
-        120: { ...stationForecast },
       },
     },
   }
@@ -74,6 +73,21 @@ function dispatch({ id, from, to, bikeCount = 4, priorityScore = 90, operation =
     requiresOperatorReview: true,
   }
 }
+
+test('defaults the vehicle to 14 bikes per trip, matching one small dispatch truck', () => {
+  const stations = [
+    station({ id: 'default-capacity-source', latitude: 25, availableBikes: 30, availableDocks: 10 }),
+    station({ id: 'default-capacity-target', latitude: 25.001, availableBikes: 0, availableDocks: 30 }),
+  ]
+  const dispatches = [dispatch({ id: 'fifteen-bikes', from: 'default-capacity-source', to: 'default-capacity-target', bikeCount: 15 })]
+
+  assert.equal(DEFAULT_DISPATCH_ROUTE_POLICY.vehicleCapacity, 14)
+
+  const result = buildDispatchRoutePlans(dispatches, stations)
+
+  assert.equal(result.routes.length, 0)
+  assert.deepEqual(result.unplannedDispatches.map(item => item.code), ['vehicle_capacity_exceeded'])
+})
 
 test('groups adjacent recommendations into one capacity-safe multi-stop heuristic route', () => {
   const stations = [

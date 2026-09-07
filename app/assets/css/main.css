@@ -50,6 +50,37 @@
   --map: #18181b;
 }
 
+/**
+ * Light theme overrides the same token set -- see `useTheme.ts` for how
+ * `data-theme` gets set on `<html>` and persisted. `--map` is deliberately
+ * repeated unchanged: the basemap stays light in both themes (see
+ * docs/02_研究與設計/map-library-selection.md), so it must not follow this
+ * override.
+ */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --canvas: #f4f4f5;
+  --surface: #ffffff;
+  --panel: #ffffff;
+  --panel-muted: #e4e4e7;
+  --ink: #18181b;
+  --muted: #52525b;
+  --line: #d4d4d8;
+  --line-strong: #a1a1aa;
+  --accent: #0f766e;
+  --accent-strong: #115e59;
+  --on-accent: #f0fdfa;
+  --danger: #b91c1c;
+  --danger-surface: #fee2e2;
+  --warning: #92400e;
+  --warning-surface: #fef3c7;
+  --positive: #047857;
+  --positive-surface: #d1fae5;
+  --info: #0369a1;
+  --info-surface: #e0f2fe;
+  --map: #18181b;
+}
+
 @layer base {
   html {
     @apply min-w-80 bg-canvas font-sans text-base text-ink antialiased;

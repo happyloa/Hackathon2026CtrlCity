@@ -135,24 +135,9 @@ function closePanel() {
 
 function onPanelKeydown(event: KeyboardEvent) {
   if (!props.station) return
-  if (event.key === 'Escape') {
-    event.preventDefault()
-    closePanel()
-    return
-  }
-  if (event.key !== 'Tab') return
-
-  const focusable = Array.from(panelRef.value?.querySelectorAll<HTMLElement>('button:not([disabled]), [href], input:not([disabled])') || [])
-  const first = focusable.at(0)
-  const last = focusable.at(-1)
-  if (!first || !last) return
-  if (event.shiftKey && (document.activeElement === first || document.activeElement === panelRef.value)) {
-    event.preventDefault()
-    last.focus()
-  } else if (!event.shiftKey && (document.activeElement === last || document.activeElement === panelRef.value)) {
-    event.preventDefault()
-    first.focus()
-  }
+  if (event.key !== 'Escape') return
+  event.preventDefault()
+  closePanel()
 }
 
 watch(() => props.station?.id, (stationId, previousId) => {
@@ -179,8 +164,8 @@ onBeforeUnmount(() => {
 <template>
   <Teleport to="body">
   <Transition name="detail-drawer">
-  <div v-if="station" class="fixed inset-0 z-50 flex min-h-0 items-end justify-end bg-black/50 p-3 sm:items-stretch sm:p-0" @mousedown.self="closePanel">
-  <aside ref="panelRef" class="station-detail max-h-full w-full overflow-y-auto rounded-xl border border-line bg-panel p-4 pb-6 text-ink shadow-2xl outline-none sm:h-svh sm:max-w-lg sm:rounded-none sm:border-y-0 sm:border-r-0 sm:p-5" role="dialog" aria-modal="true" aria-labelledby="station-detail-title" tabindex="-1">
+  <div v-if="station" class="pointer-events-none fixed inset-0 z-50 flex min-h-0 items-end justify-end p-3 sm:items-stretch sm:p-0">
+  <aside ref="panelRef" class="station-detail pointer-events-auto max-h-full w-full overflow-y-auto rounded-xl border border-line bg-panel p-4 pb-6 text-ink shadow-2xl outline-none sm:h-svh sm:max-w-lg sm:rounded-none sm:border-y-0 sm:border-r-0 sm:p-5" role="dialog" aria-modal="false" aria-labelledby="station-detail-title" tabindex="-1">
     <button type="button" class="mb-3 grid h-11 w-11 place-items-center rounded-md border border-line bg-panel-muted p-0 text-ink transition-colors hover:border-accent-strong hover:bg-accent-strong hover:text-on-accent" aria-label="關閉站點詳情" @click="closePanel"><Icon class="text-2xl" icon="solar:close-circle-outline" /></button>
     <div class="flex flex-wrap items-center justify-between gap-2 text-base font-bold text-muted"><span>{{ isLive ? '即時站況' : '歷史站況' }}</span><span :class="riskBadgeClass">{{ riskLabel }}</span></div>
     <h3 id="station-detail-title" class="mt-2 text-2xl font-bold tracking-tight text-ink">{{ stationName }}</h3>

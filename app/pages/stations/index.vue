@@ -86,36 +86,57 @@ watch(() => route.query.district, (district) => {
 </script>
 
 <template>
-  <div class="mx-auto w-full max-w-screen-2xl space-y-4 px-4 py-4 sm:px-6 lg:px-8 lg:py-6">
-    <WorkspaceContext mode="live" :district="selectedDistrict" :data-time="dashboard?.meta.asOf" :query="contextQuery" />
+  <div class="mx-auto w-full max-w-screen-3xl space-y-4 px-4 py-4 sm:px-6 lg:px-8 lg:py-6">
+    <WorkspaceContext mode="live" :district="selectedDistrict" :data-time="dashboard?.meta.asOf"
+      :query="contextQuery" />
 
     <section class="panel grid gap-4 p-4 sm:p-5 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,28rem)] xl:items-end">
       <div>
-        <p class="section-kicker"><Icon icon="solar:map-point-wave-outline" /> 即時站況</p>
+        <p class="section-kicker">
+          <Icon icon="solar:map-point-wave-outline" /> 即時站況
+        </p>
         <h2 class="mt-1 text-2xl font-bold">站點總覽</h2>
       </div>
-      <ModalPicker v-model="selectedDistrict" :label="selectionSource === 'location' ? '行政區（依位置）' : '行政區'" title="選擇行政區" :options="districtPickerOptions" />
+      <ModalPicker v-model="selectedDistrict" :label="selectionSource === 'location' ? '行政區（依位置）' : '行政區'" title="選擇行政區"
+        :options="districtPickerOptions" />
       <span class="sr-only" role="status" aria-live="polite">{{ locationMessage }}</span>
     </section>
 
     <section class="panel grid gap-3 p-4 sm:p-5">
-      <label class="flex min-h-11 items-center gap-2 rounded-lg border border-line-strong bg-panel-muted px-3 text-ink focus-within:border-accent">
+      <label
+        class="flex min-h-11 items-center gap-2 rounded-lg border border-line-strong bg-panel-muted px-3 text-ink focus-within:border-accent">
         <Icon class="shrink-0 text-xl text-accent" icon="solar:magnifer-outline" />
-        <input v-model="stationQuery" class="min-w-0 flex-1 border-0 bg-transparent text-base outline-none placeholder:text-muted" type="search" placeholder="搜尋站名或行政區" aria-label="搜尋站點" />
+        <input v-model="stationQuery"
+          class="min-w-0 flex-1 border-0 bg-transparent text-base outline-none placeholder:text-muted" type="search"
+          placeholder="搜尋站名或行政區" aria-label="搜尋站點" />
       </label>
       <div class="flex flex-wrap gap-2" role="group" aria-label="站點狀態篩選">
-        <button v-for="item in filterOptions" :key="item.value" type="button" class="min-h-11 rounded-lg border px-3 text-base font-bold transition-colors" :class="stationFilter === item.value ? 'border-accent bg-accent text-on-accent' : 'border-line bg-panel-muted text-muted hover:border-line-strong hover:text-ink'" :aria-pressed="stationFilter === item.value" @click="stationFilter = item.value">
+        <button v-for="item in filterOptions" :key="item.value" type="button"
+          class="min-h-11 rounded-lg border px-3 text-base font-bold transition-colors"
+          :class="stationFilter === item.value ? 'border-accent bg-accent text-on-accent' : 'border-line bg-panel-muted text-muted hover:border-line-strong hover:text-ink'"
+          :aria-pressed="stationFilter === item.value" @click="stationFilter = item.value">
           {{ item.label }} <span class="font-mono">{{ counts[item.value] }}</span>
         </button>
       </div>
     </section>
 
-    <div v-if="live.error.value && dashboard" class="live-inline-error" role="alert"><Icon icon="solar:danger-triangle-outline" />{{ live.error.value }}<PageRetryButton :busy="live.pending.value" @retry="live.refresh({ manual: true })" /></div>
-    <div v-if="live.pending.value && !dashboard" class="loading-board" role="status" aria-live="polite"><Icon icon="svg-spinners:3-dots-fade" />正在載入站點…</div>
-    <div v-else-if="live.error.value && !dashboard" class="loading-board error-board" role="alert"><Icon icon="solar:danger-triangle-outline" />{{ live.error.value }}<PageRetryButton :busy="live.pending.value" @retry="live.refresh({ manual: true })" /></div>
+    <div v-if="live.error.value && dashboard" class="live-inline-error" role="alert">
+      <Icon icon="solar:danger-triangle-outline" />{{ live.error.value }}
+      <PageRetryButton :busy="live.pending.value" @retry="live.refresh({ manual: true })" />
+    </div>
+    <div v-if="live.pending.value && !dashboard" class="loading-board" role="status" aria-live="polite">
+      <Icon icon="svg-spinners:3-dots-fade" />正在載入站點…
+    </div>
+    <div v-else-if="live.error.value && !dashboard" class="loading-board error-board" role="alert">
+      <Icon icon="solar:danger-triangle-outline" />{{ live.error.value }}
+      <PageRetryButton :busy="live.pending.value" @retry="live.refresh({ manual: true })" />
+    </div>
 
-    <StationOverviewList v-else-if="dashboard" :stations="filteredStations" :alerts="dashboard.alerts" :reset-key="`${selectedDistrict}|${stationFilter}|${stationQuery}`" @select="selectedStationId = $event" />
-    <StationDetailPanel :station="selectedStation" :stations="dashboard?.stations || []" :history="[]" horizon="60" data-mode="live" :context-query="contextQuery" @close="selectedStationId = ''" @select="selectedStationId = $event" />
+    <StationOverviewList v-else-if="dashboard" :stations="filteredStations" :alerts="dashboard.alerts"
+      :reset-key="`${selectedDistrict}|${stationFilter}|${stationQuery}`" @select="selectedStationId = $event" />
+    <StationDetailPanel :station="selectedStation" :stations="dashboard?.stations || []" :history="[]" horizon="60"
+      data-mode="live" :context-query="contextQuery" @close="selectedStationId = ''"
+      @select="selectedStationId = $event" />
 
     <DisclosurePanel class="panel" title="分數怎麼看" description="展開查看排序方式" icon="solar:info-circle-outline">
       <p class="m-0 p-4 text-base leading-7 text-muted">優先分只用來排序：當下空滿 50、60 分鐘風險 25、庫存缺口 20、基線品質 5；55 分以上先看。</p>

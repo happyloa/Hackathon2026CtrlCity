@@ -1,3 +1,5 @@
+import type { ServiceStatus } from '~/shared/ops'
+
 export interface GeographicPoint {
   id: string
   latitude: number | null
@@ -12,7 +14,7 @@ export interface StationInventory {
 
 export type StableInventoryTone = 'balanced' | 'bike-heavy' | 'dock-heavy'
 
-export interface RiskProximityCluster {
+export interface NeighbourGroup {
   id: string
   latitude: number
   longitude: number
@@ -45,17 +47,21 @@ function distanceMeters(left: { latitude: number; longitude: number }, right: { 
 }
 
 /**
- * Groups risk stations by a transitive, exact-distance neighbourhood. A
- * projected grid limits comparisons to nearby cells, keeping the work close
- * to O(n) for the roughly 1,600 stations shown on the map.
+ * Groups stations by a transitive, exact-distance neighbourhood -- stations
+ * whose service areas overlap enough that riders would walk to the other one
+ * (see "鄰近群" in CONTEXT.md). Callers decide which stations are eligible
+ * (e.g. excluding service-disrupted ones); this function only clusters
+ * whatever points it is given. A projected grid limits comparisons to nearby
+ * cells, keeping the work close to O(n) for the roughly 1,600 stations shown
+ * on the map.
  */
-export function clusterNearbyRiskStations(
+export function groupNearbyStations(
   input: readonly GeographicPoint[],
-  maximumDistanceMeters = 300,
-): RiskProximityCluster[] {
+  maximumDistanceMeters = 500,
+): NeighbourGroup[] {
   const maximumDistance = Number.isFinite(maximumDistanceMeters)
     ? Math.max(1, maximumDistanceMeters)
-    : 300
+    : 500
   const points = input
     .filter(validPoint)
     .sort((left, right) => left.id.localeCompare(right.id))
@@ -125,7 +131,7 @@ export function clusterNearbyRiskStations(
       const spread = Math.max(...group.map(point => distanceMeters(centre, point)))
       const memberIds = group.map(point => point.id).sort((left, right) => left.localeCompare(right))
       return {
-        id: `risk-neighbourhood:${memberIds.join('|')}`,
+        id: `neighbour-group:${memberIds.join('|')}`,
         latitude,
         longitude,
         radiusMeters: Math.max(80, Math.round(spread + 45)),
@@ -133,6 +139,27 @@ export function clusterNearbyRiskStations(
       }
     })
     .sort((left, right) => left.memberIds[0]!.localeCompare(right.memberIds[0]!))
+}
+
+export interface StationForGrouping extends GeographicPoint {
+  serviceStatus: ServiceStatus
+}
+
+/**
+ * The neighbour-group view over the map: every operational station is
+ * eligible (not just the ones currently flagged as at-risk), since the green
+ * base layer covers all of them and a dispatcher can click anywhere in it.
+ * Service-disrupted stations aren't offering service, so they're excluded
+ * the same way they're excluded from the green base layer.
+ */
+export function groupOperationalStations(
+  stations: readonly StationForGrouping[],
+  maximumDistanceMeters = 500,
+): NeighbourGroup[] {
+  return groupNearbyStations(
+    stations.filter(station => station.serviceStatus === 'operational'),
+    maximumDistanceMeters,
+  )
 }
 
 export function stableInventoryTone(station: StationInventory): StableInventoryTone {

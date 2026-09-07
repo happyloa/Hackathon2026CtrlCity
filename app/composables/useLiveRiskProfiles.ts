@@ -33,8 +33,8 @@ type LiveSnapshot = {
   docks: number
 }
 
-const HORIZONS: HorizonKey[] = ['30', '60', '120']
-const FALLBACK_THRESHOLDS: Record<HorizonKey, number> = { '30': .45, '60': .45, '120': .4 }
+const HORIZONS: HorizonKey[] = ['30', '60']
+const FALLBACK_THRESHOLDS: Record<HorizonKey, number> = { '30': .45, '60': .45 }
 const PRIMARY_HORIZON: HorizonKey = '60'
 const SUFFICIENT_BASELINE_MIN_SAMPLES = 6
 const HIGH_CONFIDENCE_MIN_SAMPLES = 12
@@ -288,7 +288,6 @@ function parseManifest(value: unknown): ProfileManifest | null {
       alertThresholds: {
         '30': clamp(asNumber(thresholds['30'], FALLBACK_THRESHOLDS['30'])),
         '60': clamp(asNumber(thresholds['60'], FALLBACK_THRESHOLDS['60'])),
-        '120': clamp(asNumber(thresholds['120'], FALLBACK_THRESHOLDS['120'])),
       },
     },
     prediction: parsePredictionMetadata(source.prediction, matchKeys.length),
@@ -428,7 +427,6 @@ export function useLiveRiskProfiles() {
         results.set(station.id, {
           '30': inventoryOnlyForecast(station, '30', '歷史資料暫時無法載入，目前只顯示即時庫存。', station.serviceStatus === 'operational' ? 'unmatched' : 'not_applicable', observedAt),
           '60': inventoryOnlyForecast(station, '60', '歷史資料暫時無法載入，目前只顯示即時庫存。', station.serviceStatus === 'operational' ? 'unmatched' : 'not_applicable', observedAt),
-          '120': inventoryOnlyForecast(station, '120', '歷史資料暫時無法載入，目前只顯示即時庫存。', station.serviceStatus === 'operational' ? 'unmatched' : 'not_applicable', observedAt),
         })
       }
     }

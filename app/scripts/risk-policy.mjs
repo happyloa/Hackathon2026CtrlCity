@@ -6,13 +6,12 @@ export const RISK_POLICY_VERSION = 'event-risk-policy-v1'
 export const ALERT_THRESHOLDS = Object.freeze({
   '30': 0.45,
   '60': 0.4,
-  '120': 0.4,
 })
 
 const MEDIUM_FACTOR = 0.65
 const CRITICAL_MARGIN = 0.2
 
-export const HORIZON_MINUTES = Object.freeze([30, 60, 120])
+export const HORIZON_MINUTES = Object.freeze([30, 60])
 
 function clamp(value, min = 0, max = 1) {
   return Math.min(max, Math.max(min, value))
