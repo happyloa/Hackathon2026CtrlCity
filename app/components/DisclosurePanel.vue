@@ -8,7 +8,6 @@ const props = withDefaults(defineProps<{
   defaultOpen?: boolean
 }>(), {
   description: '',
-  icon: 'solar:alt-arrow-down-outline',
   defaultOpen: false,
 })
 
@@ -26,7 +25,7 @@ const arrowClasses = {
 <template>
   <section class="overflow-hidden">
     <button class="flex min-h-11 w-full items-center gap-3 p-4 text-left text-base font-bold text-ink transition-colors hover:bg-panel-muted" :class="expanded ? disclosureClasses.open : disclosureClasses.closed" type="button" :aria-expanded="expanded" @click="expanded = !expanded">
-      <span class="flex min-w-0 flex-1 items-center gap-2"><Icon class="shrink-0 text-lg text-accent" :icon="icon" /> <span class="break-words">{{ title }}</span></span>
+      <span class="flex min-w-0 flex-1 items-center gap-2"><Icon v-if="icon" class="shrink-0 text-lg text-accent" :icon="icon" /> <span class="break-words">{{ title }}</span></span>
       <small v-if="description" class="hidden min-w-0 text-right text-base font-semibold text-muted sm:block">{{ description }}</small>
       <Icon class="shrink-0 text-lg text-accent transition-transform" :class="expanded ? arrowClasses.open : arrowClasses.closed" icon="solar:alt-arrow-down-outline" />
     </button>

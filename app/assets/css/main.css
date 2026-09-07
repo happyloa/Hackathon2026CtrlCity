@@ -237,3 +237,9 @@
     animation-duration: 0ms !important;
   }
 }
+
+.max-w-screen-3xl {
+  max-width: 2560px;
+  margin-left: auto;
+  margin-right: auto;
+}

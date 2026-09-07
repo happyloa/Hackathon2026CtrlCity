@@ -10,6 +10,15 @@ export interface NearbyReturnStation {
   predictedDocks: number
 }
 
+export interface NearbyBorrowStation {
+  stationId: string
+  name: string
+  district: string
+  distanceMeters: number
+  availableBikes: number
+  predictedBikes: number
+}
+
 function hasCoordinates(station: StationRisk): station is StationRisk & { latitude: number; longitude: number } {
   return typeof station.latitude === 'number'
     && Number.isFinite(station.latitude)
@@ -28,6 +37,58 @@ function distanceMetersBetween(left: StationRisk, right: StationRisk): number | 
 }
 
 /**
+ * Shared walk for both directions of "where else can this rider go" --
+ * returning a bike needs free docks, borrowing one needs available bikes,
+ * but the operational/distance/baseline/safety-stock gating is identical
+ * modulo which resource (docks vs. bikes) is being checked.
+ */
+function nearbyStationsWithResource(
+  target: StationRisk,
+  stations: readonly StationRisk[],
+  horizon: HorizonKey,
+  resource: 'docks' | 'bikes',
+  options: { radiusMeters?: number; limit?: number },
+) {
+  const radiusMeters = Math.max(100, options.radiusMeters ?? 600)
+  const limit = Math.max(1, options.limit ?? 3)
+  const isDocks = resource === 'docks'
+
+  return stations
+    .filter((station) => station.id !== target.id && station.serviceStatus === 'operational')
+    .flatMap((station) => {
+      const forecast = station.forecast.horizons[horizon]
+      if (forecast.baselineStatus !== 'matched') return []
+      const safetyAmount = safetyStockFor(station)
+      const availableNow = isDocks ? station.availableDocks : station.availableBikes
+      const predicted = isDocks ? forecast.predictedDocks : forecast.predictedBikes
+      const projected = Math.min(availableNow, predicted)
+      const blockedNow = isDocks ? station.currentState === 'full_now' : station.currentState === 'empty_now'
+      const risk = isDocks ? forecast.fullRisk : forecast.emptyRisk
+      const distanceMeters = distanceMetersBetween(target, station)
+      if (
+        distanceMeters === null
+        || distanceMeters > radiusMeters
+        || blockedNow
+        || risk >= forecast.alertThreshold
+        || projected < safetyAmount
+      ) return []
+
+      return [{
+        stationId: station.id,
+        name: displayStationName(station.name),
+        district: station.district,
+        distanceMeters: Math.round(distanceMeters / 10) * 10,
+        available: availableNow,
+        predicted,
+      }]
+    })
+    .sort((left, right) => left.distanceMeters - right.distanceMeters
+      || right.predicted - left.predicted
+      || left.stationId.localeCompare(right.stationId))
+    .slice(0, limit)
+}
+
+/**
  * Finds nearby stations where a rider can still return a bike without moving
  * the problem to another station. Distances are straight-line estimates.
  */
@@ -37,36 +98,20 @@ export function nearbyReturnStations(
   horizon: HorizonKey,
   options: { radiusMeters?: number; limit?: number } = {},
 ): NearbyReturnStation[] {
-  const radiusMeters = Math.max(100, options.radiusMeters ?? 600)
-  const limit = Math.max(1, options.limit ?? 3)
+  return nearbyStationsWithResource(target, stations, horizon, 'docks', options)
+    .map(({ available, predicted, ...rest }) => ({ ...rest, availableDocks: available, predictedDocks: predicted }))
+}
 
-  return stations
-    .filter((station) => station.id !== target.id && station.serviceStatus === 'operational')
-    .flatMap((station) => {
-      const forecast = station.forecast.horizons[horizon]
-      if (forecast.baselineStatus !== 'matched') return []
-      const safetyDocks = safetyStockFor(station)
-      const projectedDocks = Math.min(station.availableDocks, forecast.predictedDocks)
-      const distanceMeters = distanceMetersBetween(target, station)
-      if (
-        distanceMeters === null
-        || distanceMeters > radiusMeters
-        || station.currentState === 'full_now'
-        || forecast.fullRisk >= forecast.alertThreshold
-        || projectedDocks < safetyDocks
-      ) return []
-
-      return [{
-        stationId: station.id,
-        name: displayStationName(station.name),
-        district: station.district,
-        distanceMeters: Math.round(distanceMeters / 10) * 10,
-        availableDocks: station.availableDocks,
-        predictedDocks: forecast.predictedDocks,
-      }]
-    })
-    .sort((left, right) => left.distanceMeters - right.distanceMeters
-      || right.predictedDocks - left.predictedDocks
-      || left.stationId.localeCompare(right.stationId))
-    .slice(0, limit)
+/**
+ * Finds nearby stations where a rider can still borrow a bike, mirroring
+ * `nearbyReturnStations` for the empty/near-empty case.
+ */
+export function nearbyBorrowStations(
+  target: StationRisk,
+  stations: readonly StationRisk[],
+  horizon: HorizonKey,
+  options: { radiusMeters?: number; limit?: number } = {},
+): NearbyBorrowStation[] {
+  return nearbyStationsWithResource(target, stations, horizon, 'bikes', options)
+    .map(({ available, predicted, ...rest }) => ({ ...rest, availableBikes: available, predictedBikes: predicted }))
 }

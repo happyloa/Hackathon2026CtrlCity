@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
+import { Goal } from '@lucide/vue'
 import { buildDispatchRoutePlans, type DispatchRouteStop } from '~/shared/dispatch-route-planner'
 import { buildLiveOperationsForHorizon, type DispatchHorizon } from '~/shared/live-operations'
 import type { StationRisk } from '~/shared/ops'
@@ -88,7 +89,7 @@ onBeforeUnmount(() => { if (isObservingRoute.value) emit('observeRoute', null) }
           ? 'border-accent-strong bg-accent text-on-accent'
           : 'border-line bg-panel-muted text-muted hover:border-accent-strong'"
         @click="toggleObserveRoute">
-        <Icon class="text-lg" :icon="isObservingRoute ? 'solar:eye-bold' : 'solar:eye-outline'" /> 路線觀察
+        <Goal class="size-4" :stroke-width="2" /> 路線觀察
       </button>
     </div>
 

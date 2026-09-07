@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" fill="none">
+  <title>向右流動箭頭</title>
+  <style>
+    path { animation: pulse 1.8s ease-in-out infinite; opacity: .22; }
+    .middle { animation-delay: .2s; }
+    .right { animation-delay: .4s; }
+    @keyframes pulse { 0%, 65%, 100% { opacity: .22; } 30% { opacity: 1; } }
+    @media (prefers-reduced-motion: reduce) { path { animation: none; opacity: .85; } }
+  </style>
+  <g stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M10 10 24 24 10 38"/>
+    <path class="middle" d="M26 10 40 24 26 38"/>
+    <path class="right" d="M42 10 56 24 42 38"/>
+  </g>
+</svg>

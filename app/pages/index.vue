@@ -112,34 +112,37 @@ watch(() => route.query.station, (station) => {
 
     <section class="grid gap-4 rounded-xl border border-line bg-panel p-4 shadow-sm sm:p-5 lg:grid-cols-3">
       <div class="min-w-0 lg:col-span-2">
-        <p class="inline-flex items-center gap-2 text-base font-semibold tracking-wide text-accent"><span
-            class="size-2 rounded-full bg-positive" aria-hidden="true" /> 官方即時資料</p>
-        <!-- <h2 class="mt-2 text-2xl font-bold tracking-tight">未來 60 分鐘站況</h2> -->
-        <div class="flex min-w-0 flex-col gap-1">
-          <span class="text-base font-semibold text-muted">{{ baselineStatus }}</span>
-          <span class="inline-flex w-fit items-center gap-2 rounded-lg bg-surface px-3 py-1 text-base font-semibold text-muted">
-            <Icon class="text-lg text-accent" icon="solar:cpu-bolt-outline" /> 預測來源：{{ predictionSourceLabel }}
-          </span>
-          <span class="sr-only" role="status" aria-live="polite">{{ locationMessage }}</span>
+
+
+        <div class="flex justify-between">
+          <div class="flex min-w-0 flex-col gap-1">
+            <h2 class="tracking-wide text-xl font-semibold text-accent">官方即時資料</h2>
+            <span class="text-base font-semibold text-muted">{{ baselineStatus }}</span>
+            <!-- <span
+              class="inline-flex w-fit items-center gap-2 rounded-lg bg-surface px-3 py-1 text-base font-semibold text-muted">
+              預測來源：{{ predictionSourceLabel }}
+            </span> -->
+          </div>
           <button
-            class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-accent px-3 text-base font-semibold text-on-accent transition-colors hover:bg-accent-strong disabled:cursor-wait disabled:opacity-70"
+            class="group inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-accent px-3 text-base font-semibold text-accent transition-colors hover:bg-accent hover:text-on-accent disabled:cursor-wait disabled:opacity-70"
             type="button" :disabled="live.pending.value" @click="live.refresh({ manual: true })">
-            <Icon class="text-xl"
-              :icon="live.pending.value ? 'svg-spinners:3-dots-fade' : 'solar:refresh-circle-outline'" />
+            <Icon v-if="live.pending.value" class="text-xl" icon="svg-spinners:3-dots-fade" />
+            <span v-else class="inline-block size-5 shrink-0 bg-accent group-hover:bg-on-accent"
+              style="mask-image:url(/animations/right.svg);mask-size:contain;mask-repeat:no-repeat;mask-position:center;-webkit-mask-image:url(/animations/right.svg);-webkit-mask-size:contain;-webkit-mask-repeat:no-repeat;-webkit-mask-position:center;"
+              aria-hidden="true" />
             {{ live.pending.value ? '更新中' : '立即更新' }}
           </button>
         </div>
-        <ModalPicker v-model="selectedDistrict" :label="selectionSource === 'location' ? '行政區（依位置）' : '行政區'"
-          title="選擇行政區" :options="districtPickerOptions" />
 
-        <span class="sr-only" role="status" aria-live="polite">{{ locationMessage }}</span>
       </div>
       <div class="flex min-w-0 flex-col justify-center rounded-lg border border-line bg-surface p-4">
-        <span class="inline-flex items-center gap-2 text-base font-semibold text-muted">
-          <Icon class="text-xl text-accent" icon="solar:calendar-date-outline" /> 資料時間
-        </span>
-        <strong class="mt-2 text-lg leading-7">{{ asOfLabel }}</strong>
-        <span class="mt-1 text-base leading-6 text-muted">每 5 分鐘自動更新</span>
+        <FlipClock class="mb-2" />
+        <div class="flex justify-between align-bottom"> <strong class="mt-2 text-lg leading-7">{{ asOfLabel }}</strong>
+          <span class="inline-flex items-center gap-2 text-base font-semibold text-muted">
+            資料時間 (每 5 分鐘自動更新)
+          </span>
+        </div>
+
       </div>
     </section>
 
@@ -158,9 +161,11 @@ watch(() => route.query.station, (station) => {
       <section class="grid grid-cols-1 gap-4 xl:grid-cols-2 xl:items-start">
 
         <RiskMap :stations="dashboard.stations" :horizon="horizon" :selected-id="selectedStationId" data-mode="live"
-          :district="selectedDistrict" :profile-coverage="live.profileCoverage.value"
-          :profile-error="live.profileError.value" :route-stops="observedRouteStops"
-          @select="selectedStationId = $event" @retry-baseline="live.refresh({ manual: true })" />
+          v-model:district="selectedDistrict" :district-options="districtPickerOptions"
+          :district-selection-source="selectionSource" :district-location-message="locationMessage"
+          :profile-coverage="live.profileCoverage.value" :profile-error="live.profileError.value"
+          :route-stops="observedRouteStops" @select="selectedStationId = $event"
+          @retry-baseline="live.refresh({ manual: true })" />
         <TaskQueue :alerts="dashboard.alerts" :stations="dashboard.stations" :as-of="dashboard.meta.asOf"
           :context-query="contextQuery" @select="selectedStationId = $event"
           @observe-route="observedRouteStops = $event" />

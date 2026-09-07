@@ -33,10 +33,12 @@ const allStationsTarget = computed(() => ({ path: '/stations', query: props.cont
   <section class="panel overflow-hidden" aria-labelledby="task-queue-title">
     <header class="flex flex-col gap-3 border-b border-line p-4 sm:flex-row sm:items-start sm:justify-between">
       <div>
-        <p class="section-kicker text-base"><Icon icon="solar:routing-2-outline" /> 派遣摘要</p>
+        <h2 class="section-kicker text-base">派遣摘要</h2>
         <h2 id="task-queue-title" class="m-0 mt-1 text-xl font-bold tracking-tight text-ink">{{ headline }}</h2>
       </div>
-      <span class="self-start rounded-md border border-line bg-panel-muted px-2 py-1 text-base font-semibold text-muted">{{ inventoryAlerts.length }} 個風險站</span>
+      <span
+        class="self-start rounded-md border border-line bg-panel-muted px-2 py-1 text-base font-semibold text-muted">{{
+          inventoryAlerts.length }} 個風險站</span>
     </header>
 
     <div class="divide-y divide-line">
@@ -45,18 +47,23 @@ const allStationsTarget = computed(() => ({ path: '/stations', query: props.cont
 
       <section aria-labelledby="alert-step-title">
         <div class="flex flex-wrap items-start gap-3 p-4 pb-2">
-          <span class="grid size-8 shrink-0 place-items-center rounded-full bg-accent font-mono text-base font-bold text-on-accent">2</span>
+          <span
+            class="grid size-8 shrink-0 place-items-center rounded-full bg-accent font-mono text-base font-bold text-on-accent">2</span>
           <div class="min-w-0 flex-1">
             <strong id="alert-step-title" class="block text-base text-ink">站點狀態</strong>
             <small class="mt-1 block text-base leading-6 text-muted">風險站排在前面。</small>
           </div>
-          <NuxtLink :to="allStationsTarget" class="text-link ml-auto min-h-11 text-base">站點總覽 <Icon icon="solar:arrow-right-up-outline" /></NuxtLink>
+          <NuxtLink :to="allStationsTarget" class="text-link ml-auto min-h-11 text-base">站點總覽
+            <Icon icon="solar:arrow-right-up-outline" />
+          </NuxtLink>
         </div>
-        <AlertList embedded compact :max-items="1" :alerts="inventoryAlerts" :stations="stations" :context-query="contextQuery" @select="emit('select', $event)" />
+        <AlertList embedded compact :max-items="1" :alerts="inventoryAlerts" :stations="stations"
+          :context-query="contextQuery" @select="emit('select', $event)" />
       </section>
     </div>
 
-    <p v-if="serviceAlertCount" class="m-0 flex items-start gap-2 border-t border-line bg-panel-muted p-4 text-base font-semibold leading-6 text-muted">
+    <p v-if="serviceAlertCount"
+      class="m-0 flex items-start gap-2 border-t border-line bg-panel-muted p-4 text-base font-semibold leading-6 text-muted">
       <Icon class="mt-1 shrink-0 text-lg text-warning" icon="solar:shield-warning-outline" />
       <span>{{ serviceAlertCount }} 個服務異常站未排入路線。</span>
     </p>

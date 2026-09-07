@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
+import { MapPinSearch } from '@lucide/vue'
 import { stationSeverityFor, type SeverityLevel } from '~/shared/operational-policy.mjs'
 import { displayStationName, type DataMode, type HorizonKey, type PredictionCoverage, type StationRisk } from '~/shared/ops'
-import { groupOperationalStations } from '~/shared/risk-map-visuals'
 import type { DispatchRouteStop, DispatchRouteStopAction } from '~/shared/dispatch-route-planner'
 // font-gis's icon-font CSS mangles its `content: "\eb1d"` glyph codepoints
 // somewhere in Vite's dev-time CSS-to-JS transform (verified: the parsed
@@ -16,13 +16,17 @@ const props = defineProps<{
   selectedId?: string
   dataMode?: DataMode
   district?: string
+  /** Passing these renders the district picker above the search box (see index.vue). */
+  districtOptions?: { value: string, label: string }[]
+  districtSelectionSource?: string
+  districtLocationMessage?: string
   profileCoverage?: PredictionCoverage | null
   profileError?: string
   /** The currently "observed" dispatch route's stops, drawn as coloured pins on top of everything else. */
   routeStops?: DispatchRouteStop[] | null
 }>()
 
-const emit = defineEmits<{ select: [stationId: string], retryBaseline: [] }>()
+const emit = defineEmits<{ select: [stationId: string], retryBaseline: [], 'update:district': [district: string] }>()
 
 type LeafletModule = typeof import('leaflet')
 type LeafletMap = import('leaflet').Map
@@ -57,7 +61,7 @@ const headerLabel = computed(() => stationQuery.value
   ? '個搜尋結果'
   : showAllStations.value
     ? `個${props.district || '全市'}站點`
-    : '個需注意站點')
+    : '  個需注意站點')
 const scopeName = computed(() => props.district || '新北市')
 const stationScopeActionLabel = computed(() => showAllStations.value
   ? '只看需注意'
@@ -170,19 +174,14 @@ function isActionable(station: StationRisk) {
 
 // ── Neighbour-group expansion ────────────────────────────────────────────
 //
-// A neighbour group answers "this area is served by which stations", distinct
+// Clicking a blob answers "this area is served by which stations", distinct
 // from the colour blending above (see "鄰近群不是著色單位" in CONTEXT.md).
-// Clicking anywhere a station's blob reaches expands the full group that
-// station belongs to, not just the stations directly under the pointer, so a
-// click near one edge of a spread-out group still lists every member.
-const neighbourGroups = computed(() => groupOperationalStations(allMappedStations.value))
-const neighbourGroupByStationId = computed(() => {
-  const lookup = new globalThis.Map<string, string[]>()
-  for (const group of neighbourGroups.value) {
-    for (const memberId of group.memberIds) lookup.set(memberId, group.memberIds)
-  }
-  return lookup
-})
+// This is a direct, non-transitive radius query around the click's actual
+// geographic point -- every operational station within NEIGHBOUR_GROUP_RADIUS_METERS
+// of *that point*, not a chain of overlapping station-to-station neighbourhoods
+// (which, transitively, could sprawl to a hundred-plus stations across a dense
+// area and stop meaning "this area").
+const NEIGHBOUR_GROUP_RADIUS_METERS = 500
 
 const clickedGroupPoint = ref<{ x: number, y: number } | null>(null)
 const clickedGroupMemberIds = ref<globalThis.Set<string> | null>(null)
@@ -341,9 +340,18 @@ function redrawOverlay() {
   const map = leafletMap
   overlay.style.transition = 'none'
   overlay.style.transform = 'none'
-  // While a route is being observed, fade the severity blend so its colours
-  // don't fight the route line/pins drawn above it for contrast.
-  overlay.style.opacity = props.routeStops?.length ? '0.45' : '1'
+  // While a route is being observed, or a station is selected (its
+  // `MapPinSearch` pin drawn above the canvas), fade the severity blend so
+  // it doesn't fight what's drawn on top of it for contrast -- but station
+  // markers stay at full strength, since they're identity/location, not
+  // decorative colour. That rules out a single CSS `opacity` on the whole
+  // canvas (it would dim `paintMarker`'s pixels along with `paintBlob`'s);
+  // instead the fade is applied per-call, only to blob alpha, below. Reads
+  // `props.selectedId` rather than `selectedStationPoint` -- that ref is
+  // only assigned later in this same function, so reading it here would lag
+  // a frame behind the prop that actually just changed.
+  overlay.style.opacity = '1'
+  const blendFade = props.routeStops?.length || props.selectedId ? 0.45 : 1
   const size = map.getSize()
   const devicePixelRatio = Math.min(window.devicePixelRatio || 1, 2)
 
@@ -380,7 +388,7 @@ function redrawOverlay() {
   // dense-but-healthy district never reads as more severe than a sparse one.
   for (const entry of visible) {
     if (entry.severity === 'service_disruption') continue
-    paintBlob(ctx, entry.x, entry.y, radiusPixels, SEVERITY_RGB.normal, BASE_LAYER_PEAK_ALPHA)
+    paintBlob(ctx, entry.x, entry.y, radiusPixels, SEVERITY_RGB.normal, BASE_LAYER_PEAK_ALPHA * blendFade)
   }
 
   // Upper layers: grouped by severity, painted light-to-dark.
@@ -394,7 +402,7 @@ function redrawOverlay() {
   for (const severity of UPPER_LAYER_ORDER) {
     const list = grouped.get(severity)
     if (!list) continue
-    const peakAlpha = UPPER_LAYER_PEAK_ALPHA[severity]
+    const peakAlpha = UPPER_LAYER_PEAK_ALPHA[severity] * blendFade
     for (const point of list) paintBlob(ctx, point.x, point.y, radiusPixels, SEVERITY_RGB[severity], peakAlpha)
   }
 
@@ -510,22 +518,23 @@ function onMapClick(event: LeafletMouseEvent) {
   // Anything within the blend radius of a station's blob counts as "clicked
   // that blob", which is a much larger target than the precise dot above.
   // Service-disrupted stations aren't offering service, so a click on their
-  // grey blob shouldn't surface them as if they served the area (they are
-  // never grouped -- see groupOperationalStations).
+  // grey blob shouldn't open the area popup at all.
   const covering = lastRadiusPixels > 0
-    ? lastVisible.filter(entry => entry.severity !== 'service_disruption'
+    ? lastVisible.some(entry => entry.severity !== 'service_disruption'
       && Math.hypot(entry.x - point.x, entry.y - point.y) <= lastRadiusPixels)
-    : []
-  if (!covering.length) {
+    : false
+  if (!covering || !leafletMap) {
     closeClickedGroup()
     return
   }
 
+  const clickLatLng = leafletMap.containerPointToLatLng(point)
   const memberIds = new globalThis.Set<string>()
-  for (const entry of covering) {
-    const group = neighbourGroupByStationId.value.get(entry.station.id)
-    if (group) group.forEach(id => memberIds.add(id))
-    else memberIds.add(entry.station.id)
+  for (const station of allMappedStations.value) {
+    if (station.serviceStatus !== 'operational') continue
+    if (clickLatLng.distanceTo([station.latitude!, station.longitude!]) <= NEIGHBOUR_GROUP_RADIUS_METERS) {
+      memberIds.add(station.id)
+    }
   }
   clickedGroupMemberIds.value = memberIds
   clickedGroupPoint.value = { x: point.x, y: point.y }
@@ -625,20 +634,26 @@ onBeforeUnmount(() => {
   <section class="map-panel geographic-map-panel panel overflow-hidden">
     <div class="map-heading flex items-start justify-between gap-3 px-4 pb-3 pt-4">
       <div>
-        <p class="section-kicker">
-          <Icon :icon="isLive ? 'solar:bolt-circle-outline' : 'solar:map-point-wave-outline'" /> 站點地圖
+        <p class="section-kicker text-xl">
+          站點地圖
         </p>
         <h2 class="mt-1 text-xl font-bold text-ink">{{ isLive ? `${horizon} 分鐘站況` : `${horizon} 分鐘預測` }}</h2>
       </div>
       <div
         class="map-summary grid min-w-32 justify-items-end rounded-lg border border-line-strong bg-panel-muted px-2.5 py-2 font-bold leading-tight"
         :class="hasBaselineLoadError ? 'text-warning' : 'text-accent-strong'">
-        <strong>{{ headerCount }}</strong>
-        <span class="text-base text-ink">{{ headerLabel }}</span>
+        <strong>{{ headerCount }} <span class="ms-2 text-base text-ink">{{ headerLabel }}</span></strong>
+
         <small v-if="isLive" class="mt-1 text-base font-semibold text-muted">{{ hasBaselineLoadError ? '基線暫不可用' :
           (profileCoverage ? `已對照 ${profileCoverage.matchedStations}／${profileCoverage.liveStations}` : '正在載入基線')
           }}</small>
       </div>
+    </div>
+
+    <div v-if="districtOptions" class="px-3.5 pb-3">
+      <ModalPicker :model-value="district || ''" @update:model-value="emit('update:district', $event)"
+        :label="districtSelectionSource === 'location' ? '行政區（依位置）' : '行政區'" title="選擇行政區" :options="districtOptions" />
+      <span class="sr-only" role="status" aria-live="polite">{{ districtLocationMessage }}</span>
     </div>
 
     <div class="map-command-row flex items-center gap-2 px-3.5 pb-3" role="group" aria-label="地圖工具">
@@ -656,12 +671,12 @@ onBeforeUnmount(() => {
         </button>
       </div>
       <div class="map-actions flex items-center gap-2">
-        <button type="button"
+        <!-- <button type="button"
           class="inline-flex min-h-11 items-center gap-1.5 rounded-md border border-line-strong bg-panel px-2.5 py-1.5 text-base font-bold text-accent-strong transition-colors hover:border-accent-strong hover:bg-panel-muted"
           :aria-pressed="showAllStations" @click="toggleStationScope">
           <Icon class="text-lg" :icon="showAllStations ? 'solar:filter-outline' : 'solar:map-point-outline'" /> {{
             stationScopeActionLabel }}
-        </button>
+        </button> -->
         <button type="button"
           class="map-reset inline-flex min-h-11 items-center gap-1.5 rounded-md border border-accent-strong bg-accent-strong px-2.5 py-1.5 text-base font-bold text-on-accent transition-colors hover:border-accent hover:bg-accent"
           :aria-label="`重新對焦${district || '新北市全域'}`" :title="`重新對焦${district || '新北市全域'}`" @click="fitCurrentScope">
@@ -697,28 +712,29 @@ onBeforeUnmount(() => {
         <polyline :points="routeLinePoints" fill="none" stroke="#3b82f6" stroke-width="3" stroke-linecap="round"
           stroke-linejoin="round" />
       </svg>
-      <svg v-if="selectedStationPoint" class="map-selected-pin pointer-events-none absolute text-accent-strong"
-        :style="{ left: `${selectedStationPoint.x}px`, top: `${selectedStationPoint.y}px` }" width="40" height="40"
-        aria-hidden="true">
-        <use :href="`${fontGisSprite}#fg-poi-info-o`" />
-      </svg>
+      <MapPinSearch v-if="selectedStationPoint" class="map-selected-pin pointer-events-none absolute text-sky-500"
+        :style="{ left: `${selectedStationPoint.x}px`, top: `${selectedStationPoint.y}px` }" :size="40"
+        :stroke-width="2" aria-hidden="true" />
       <div v-for="marker in routeStopMarkers" :key="marker.stationId"
         class="map-route-stop-marker absolute cursor-pointer" :style="{ left: `${marker.x}px`, top: `${marker.y}px` }"
-        role="img" :aria-label="routeStopMarkerLabel(marker)"
-        @mouseenter="hoveredRouteStationId = marker.stationId" @mouseleave="hoveredRouteStationId = null"
-        @click.stop="emit('select', marker.stationId)">
+        role="img" :aria-label="routeStopMarkerLabel(marker)" @mouseenter="hoveredRouteStationId = marker.stationId"
+        @mouseleave="hoveredRouteStationId = null" @click.stop="emit('select', marker.stationId)">
         <svg class="map-route-stop-pin block" :class="ROUTE_STOP_TEXT_CLASS[marker.action]" width="32" height="32">
           <use :href="`${fontGisSprite}#fg-location-poi`" />
         </svg>
         <!-- Always visible, not just on hover: a station visited twice in one
              route (see routeStopMarkers) would otherwise show as a single pin
              with no sign that stop 3 and stop 6 are the same place. -->
-        <span class="map-route-stop-badge absolute rounded-full bg-[#111827] px-1 font-mono text-[11px] font-bold leading-[1.4] text-white">{{ marker.stops.map(stop => stop.sequence).join('・') }}</span>
+        <span
+          class="map-route-stop-badge absolute rounded-full bg-[#111827] px-1 font-mono text-[11px] font-bold leading-[1.4] text-white">{{
+            marker.stops.map(stop => stop.sequence).join('・')}}</span>
       </div>
       <div v-if="hoveredRouteStopMarker"
         class="map-route-stop-pill pointer-events-none absolute flex items-center gap-1.5 rounded-full border border-line-strong bg-panel px-3 py-1.5 text-base leading-none text-ink shadow-lg"
         :style="{ left: `${hoveredRouteStopMarker.x}px`, top: `${hoveredRouteStopMarker.y}px` }">
-        <span class="grid size-5 shrink-0 place-items-center rounded-full bg-accent font-mono text-[11px] font-bold text-on-accent">{{ hoveredRouteStopMarker.stops.map(stop => stop.sequence).join('・') }}</span>
+        <span
+          class="grid size-5 shrink-0 place-items-center rounded-full bg-accent font-mono text-[11px] font-bold text-on-accent">{{
+            hoveredRouteStopMarker.stops.map(stop => stop.sequence).join('・')}}</span>
         <strong class="truncate">{{ routeStopMarkerName(hoveredRouteStopMarker) }}</strong>
         <span class="whitespace-nowrap text-muted">
           <template v-if="routeStopMarkerBikes(hoveredRouteStopMarker, 'pickupBikes')">取 {{
@@ -781,12 +797,15 @@ onBeforeUnmount(() => {
           <Icon class="text-lg" icon="solar:refresh-circle-outline" /> 重新比對
         </button>
       </p>
-      <div v-if="routeStops && routeStops.length" class="flex flex-wrap gap-x-3 gap-y-1.5 text-base font-semibold text-muted" aria-label="路線觀察圖例">
+      <div v-if="routeStops && routeStops.length"
+        class="flex flex-wrap gap-x-3 gap-y-1.5 text-base font-semibold text-muted" aria-label="路線觀察圖例">
         <span class="inline-flex min-w-0 items-center gap-1.5 leading-snug">
-          <i class="h-2.5 w-2.5 shrink-0 rounded-full border border-line-strong" style="background-color: #3ecf8e" />取車：薄荷綠
+          <i class="h-2.5 w-2.5 shrink-0 rounded-full border border-line-strong"
+            style="background-color: #3ecf8e" />取車：薄荷綠
         </span>
         <span class="inline-flex min-w-0 items-center gap-1.5 leading-snug">
-          <i class="h-2.5 w-2.5 shrink-0 rounded-full border border-line-strong" style="background-color: #ff6f61" />卸車：珊瑚紅
+          <i class="h-2.5 w-2.5 shrink-0 rounded-full border border-line-strong"
+            style="background-color: #ff6f61" />卸車：珊瑚紅
         </span>
       </div>
       <div class="flex flex-wrap gap-x-3 gap-y-1.5 text-base font-semibold text-muted" aria-label="嚴重度圖例">

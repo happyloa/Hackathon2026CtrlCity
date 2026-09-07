@@ -33,7 +33,7 @@ lightning_logs/
 app/public/data/xgboost/model-*.json
 
 # Ad hoc analysis reports for local review; not build output, not final artifacts.
-# docs/_scratch/
+docs/_scratch/
 
 # Stitch 匯出的設計稿圖檔(約 19MB),只留本機:設計方向已在 grilling 定案，
 # 對它們的盤點分析 docs/_scratch/stitch/INVENTORY.md 有進版控，圖檔本身沒有。
@@ -43,3 +43,9 @@ docs/_scratch/**/*.png
 .claude/
 CLAUDE.md
 skills-lock.json
+
+# Ad hoc root-level Playwright install used for local manual testing; the
+# project's actual package manifest lives in app/package.json.
+/node_modules/
+/package.json
+/package-lock.json
