@@ -1,14 +1,8 @@
 <script setup lang="ts">
-import { Icon } from '@iconify/vue'
-import { MapPinSearch } from '@lucide/vue'
+import { Info, LocateFixed, MapPin, MapPinSearch, RefreshCw, Search, TriangleAlert, X } from '@lucide/vue'
 import { stationSeverityFor, type SeverityLevel } from '~/shared/operational-policy.mjs'
 import { displayStationName, type DataMode, type HorizonKey, type PredictionCoverage, type StationRisk } from '~/shared/ops'
 import type { DispatchRouteStop, DispatchRouteStopAction } from '~/shared/dispatch-route-planner'
-// font-gis's icon-font CSS mangles its `content: "\eb1d"` glyph codepoints
-// somewhere in Vite's dev-time CSS-to-JS transform (verified: the parsed
-// CSSOM rule ends up with an empty `content`), so the package is used via
-// its SVG sprite instead -- same icon, no CSS unicode-escape involved.
-import fontGisSprite from 'font-gis/dist/font-gis.svg?url'
 
 const props = defineProps<{
   stations: StationRisk[]
@@ -85,14 +79,10 @@ const selectedStationPoint = ref<{ x: number, y: number } | null>(null)
 const routeStopPoints = ref<{ x: number, y: number, stop: DispatchRouteStop }[]>([])
 const hoveredRouteStationId = ref<string | null>(null)
 
-// 薄荷綠 for pickup, 珊瑚紅 for dropoff -- matches RouteCard's pickup/dropoff
-// colouring so the map and the route summary agree on what each colour means.
-// "mixed" (a station serves both, whether in one visit or across two) gets
-// its own colour rather than silently reusing one of the two.
-const ROUTE_STOP_TEXT_CLASS: Record<DispatchRouteStopAction, string> = {
-  pickup: 'text-[#3ecf8e]',
-  dropoff: 'text-[#ff6f61]',
-  mixed: 'text-[#a78bfa]',
+const ROUTE_STOP_PIN_COLOR: Record<DispatchRouteStopAction, string> = {
+  pickup: '#7dd3fc',
+  dropoff: '#ff6f61',
+  mixed: '#ff6f61',
 }
 
 interface RouteStopMarker {
@@ -139,6 +129,16 @@ const hoveredRouteStopMarker = computed(() => hoveredRouteStationId.value
 
 function routeStopMarkerLabel(marker: RouteStopMarker) {
   return `路線第 ${marker.stops.map(stop => stop.sequence).join('、')} 站：${marker.stops[0]?.stationName ?? ''}`
+}
+
+function routeStopPinColor(marker: RouteStopMarker) {
+  return marker.stops.some(stop => stop.sequence === 1)
+    ? '#3ecf8e'
+    : ROUTE_STOP_PIN_COLOR[marker.action]
+}
+
+function routeStopSequenceLabel(marker: RouteStopMarker) {
+  return marker.stops.map(stop => String(stop.sequence)).join('·')
 }
 
 function routeStopMarkerName(marker: RouteStopMarker) {
@@ -632,22 +632,14 @@ onBeforeUnmount(() => {
 
 <template>
   <section class="map-panel geographic-map-panel panel overflow-hidden">
-    <div class="map-heading flex items-start justify-between gap-3 px-4 pb-3 pt-4">
+    <div class="map-heading map-heading-refined">
       <div>
-        <p class="section-kicker text-xl">
-          站點地圖
+        <p class="map-eyebrow">
+          <MapPin style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />站點監控
         </p>
-        <h2 class="mt-1 text-xl font-bold text-ink">{{ isLive ? `${horizon} 分鐘站況` : `${horizon} 分鐘預測` }}</h2>
+        <h2>{{ isLive ? '即時站況地圖' : `${horizon} 分鐘預測` }}</h2>
       </div>
-      <div
-        class="map-summary grid min-w-32 justify-items-end rounded-lg border border-line-strong bg-panel-muted px-2.5 py-2 font-bold leading-tight"
-        :class="hasBaselineLoadError ? 'text-warning' : 'text-accent-strong'">
-        <strong>{{ headerCount }} <span class="ms-2 text-base text-ink">{{ headerLabel }}</span></strong>
-
-        <small v-if="isLive" class="mt-1 text-base font-semibold text-muted">{{ hasBaselineLoadError ? '基線暫不可用' :
-          (profileCoverage ? `已對照 ${profileCoverage.matchedStations}／${profileCoverage.liveStations}` : '正在載入基線')
-          }}</small>
-      </div>
+      <span class="map-view-state">{{ routeStops?.length ? '路線觀察中' : '即時庫存分布' }}</span>
     </div>
 
     <div v-if="districtOptions" class="px-3.5 pb-3">
@@ -660,27 +652,23 @@ onBeforeUnmount(() => {
       <div
         class="map-search flex min-h-10 min-w-0 flex-1 basis-64 items-center gap-1.5 rounded-md border border-line-strong bg-panel px-2.5 text-ink"
         role="search">
-        <Icon class="shrink-0 text-xl text-accent-strong" icon="solar:magnifer-outline" />
+        <Search class="shrink-0 text-xl text-accent-strong" style="width: 1em; height: 1em" :stroke-width="2"
+          aria-hidden="true" />
         <input v-model="stationQuery"
           class="min-w-0 w-full bg-transparent py-1.5 text-base text-ink outline-none placeholder:text-muted"
           type="text" inputmode="search" enterkeyhint="search" placeholder="搜尋站名或行政區" aria-label="搜尋站名或行政區" />
         <button v-if="stationQuery"
           class="grid h-8 w-8 shrink-0 place-items-center rounded text-muted transition-colors hover:bg-accent-strong hover:text-on-accent"
           type="button" aria-label="清除站點搜尋" @click="stationQuery = ''">
-          <Icon class="text-xl" icon="solar:close-circle-outline" />
+          <X class="text-xl" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />
         </button>
       </div>
       <div class="map-actions flex items-center gap-2">
-        <!-- <button type="button"
-          class="inline-flex min-h-11 items-center gap-1.5 rounded-md border border-line-strong bg-panel px-2.5 py-1.5 text-base font-bold text-accent-strong transition-colors hover:border-accent-strong hover:bg-panel-muted"
-          :aria-pressed="showAllStations" @click="toggleStationScope">
-          <Icon class="text-lg" :icon="showAllStations ? 'solar:filter-outline' : 'solar:map-point-outline'" /> {{
-            stationScopeActionLabel }}
-        </button> -->
         <button type="button"
-          class="map-reset inline-flex min-h-11 items-center gap-1.5 rounded-md border border-accent-strong bg-accent-strong px-2.5 py-1.5 text-base font-bold text-on-accent transition-colors hover:border-accent hover:bg-accent"
+          class="map-reset inline-flex min-h-11 items-center gap-1.5 rounded-md border border-line-strong bg-panel px-2.5 py-1.5 text-base font-semibold text-muted transition-colors hover:border-accent hover:bg-accent"
           :aria-label="`重新對焦${district || '新北市全域'}`" :title="`重新對焦${district || '新北市全域'}`" @click="fitCurrentScope">
-          <Icon class="text-lg" icon="solar:map-arrow-left-outline" /> <span class="map-reset-label">重新對焦</span>
+          <LocateFixed class="text-lg" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" /> <span
+            class="map-reset-label">重新對焦</span>
         </button>
       </div>
     </div>
@@ -692,7 +680,7 @@ onBeforeUnmount(() => {
         class="flex min-h-13 items-center justify-between gap-2 rounded-md border border-line bg-panel px-2.5 py-2 text-left text-base text-ink transition-colors hover:border-accent-strong hover:bg-surface"
         type="button" @click="chooseSearchResult(station.id)">
         <span class="grid min-w-0 gap-0.5"><strong class="truncate">{{ displayStationName(station.name)
-            }}</strong><small class="text-base text-muted">{{ station.district || '新北市' }}</small></span>
+        }}</strong><small class="text-base text-muted">{{ station.district || '新北市' }}</small></span>
         <b class="shrink-0 whitespace-nowrap font-mono text-base text-accent-strong">{{ station.availableBikes }} 車／{{
           station.availableDocks }} 位</b>
       </button>
@@ -719,15 +707,14 @@ onBeforeUnmount(() => {
         class="map-route-stop-marker absolute cursor-pointer" :style="{ left: `${marker.x}px`, top: `${marker.y}px` }"
         role="img" :aria-label="routeStopMarkerLabel(marker)" @mouseenter="hoveredRouteStationId = marker.stationId"
         @mouseleave="hoveredRouteStationId = null" @click.stop="emit('select', marker.stationId)">
-        <svg class="map-route-stop-pin block" :class="ROUTE_STOP_TEXT_CLASS[marker.action]" width="32" height="32">
-          <use :href="`${fontGisSprite}#fg-location-poi`" />
-        </svg>
+        <MapPin class="map-route-stop-pin" :style="{ color: routeStopPinColor(marker) }" :size="42" :stroke-width="1.75"
+          aria-hidden="true" />
         <!-- Always visible, not just on hover: a station visited twice in one
              route (see routeStopMarkers) would otherwise show as a single pin
              with no sign that stop 3 and stop 6 are the same place. -->
-        <span
-          class="map-route-stop-badge absolute rounded-full bg-[#111827] px-1 font-mono text-[11px] font-bold leading-[1.4] text-white">{{
-            marker.stops.map(stop => stop.sequence).join('・')}}</span>
+        <span class="map-route-stop-number absolute grid place-items-center rounded-full font-mono font-bold text-black"
+          :style="{ backgroundColor: routeStopPinColor(marker) }">{{
+            routeStopSequenceLabel(marker) }}</span>
       </div>
       <div v-if="hoveredRouteStopMarker"
         class="map-route-stop-pill pointer-events-none absolute flex items-center gap-1.5 rounded-full border border-line-strong bg-panel px-3 py-1.5 text-base leading-none text-ink shadow-lg"
@@ -761,7 +748,7 @@ onBeforeUnmount(() => {
           <button type="button"
             class="grid h-6 w-6 shrink-0 place-items-center rounded text-muted transition-colors hover:bg-accent-strong hover:text-on-accent"
             aria-label="關閉鄰近群清單" @click="closeClickedGroup">
-            <Icon class="text-lg" icon="solar:close-circle-outline" />
+            <X class="text-lg" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />
           </button>
         </div>
         <ul class="grid max-h-56 gap-1 overflow-y-auto">
@@ -770,7 +757,7 @@ onBeforeUnmount(() => {
               class="flex w-full min-w-0 items-center justify-between gap-2 rounded-md px-1.5 py-1 text-left transition-colors hover:bg-panel-muted"
               @click="selectFromClickedGroup(station.id)">
               <span class="grid min-w-0 gap-0.5"><strong class="truncate">{{ displayStationName(station.name)
-                  }}</strong>
+              }}</strong>
                 <small class="text-muted">{{ station.district || '新北市' }}・{{ severityLabelFor(station) }}</small></span>
               <b class="shrink-0 whitespace-nowrap font-mono text-accent-strong">{{ station.availableBikes }} 車</b>
             </button>
@@ -782,19 +769,21 @@ onBeforeUnmount(() => {
         目前沒有可定位的站點資料。</p>
     </div>
     <div class="map-caption grid gap-2 px-4 pt-3">
+      <p class="map-visible-count">{{ headerCount }}{{ headerLabel }}<span>點選站點查看庫存與預測</span></p>
       <!-- <p class="inline-flex items-center gap-1.5 text-base font-semibold text-muted">
-        <Icon class="text-xl text-accent-strong" icon="solar:info-circle-outline" />
+        <Info class="text-xl text-accent-strong" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />
         綠底代表有服務涵蓋，顏色越深表示越需要處置；放大到街道層級會看到逐站標記，點選標記查看該站資料；點選色斑其餘範圍會展開該處鄰近群的站點清單
       </p> -->
       <p v-if="baselineNotice" class="flex flex-wrap items-start gap-1.5 text-base font-semibold"
         :class="hasBaselineLoadError ? 'text-warning' : 'text-muted'">
-        <Icon class="mt-0.5 shrink-0 text-xl" :class="hasBaselineLoadError ? 'text-warning' : 'text-accent-strong'"
-          :icon="hasBaselineLoadError ? 'solar:danger-triangle-outline' : 'solar:info-circle-outline'" />
+        <component class="mt-0.5 shrink-0 text-xl" :class="hasBaselineLoadError ? 'text-warning' : 'text-accent-strong'"
+          :is="hasBaselineLoadError ? TriangleAlert : Info" style="width: 1em; height: 1em" :stroke-width="2"
+          aria-hidden="true" />
         <span>{{ baselineNotice }}</span>
         <button v-if="hasBaselineLoadError" type="button"
           class="inline-flex min-h-8 shrink-0 items-center gap-1 rounded-md border border-line-strong bg-transparent px-2 py-1 text-base font-bold text-accent-strong transition-colors hover:border-accent-strong hover:bg-panel-muted hover:text-ink"
           @click="emit('retryBaseline')">
-          <Icon class="text-lg" icon="solar:refresh-circle-outline" /> 重新比對
+          <RefreshCw class="text-lg" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" /> 重新比對
         </button>
       </p>
       <div v-if="routeStops && routeStops.length"
@@ -875,14 +864,27 @@ onBeforeUnmount(() => {
 }
 
 .map-route-stop-marker {
+  width: 42px;
+  height: 42px;
   transform: translate(-50%, -96%);
   filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.6));
 }
 
-.map-route-stop-badge {
-  top: -4px;
-  right: -6px;
-  padding-inline: 0.25rem;
+.map-route-stop-pin {
+  display: block;
+  width: 38px;
+  height: 38px;
+  /* fill: color-mix(in srgb, currentColor 24%, white); */
+}
+
+.map-route-stop-number {
+  top: 7px;
+  left: calc(50% - 2px);
+  width: 16px;
+  height: 16px;
+  transform: translateX(-50%);
+  font-size: 10px;
+  line-height: 1;
   white-space: nowrap;
 }
 
@@ -972,6 +974,110 @@ onBeforeUnmount(() => {
   .map-search-results {
     margin-right: 0.625rem;
     margin-left: 0.625rem;
+  }
+}
+</style>
+
+<style scoped>
+.map-heading-refined {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 14px;
+}
+
+.map-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 5px;
+}
+
+.map-eyebrow svg {
+  color: var(--accent);
+  font-size: 16px;
+}
+
+.map-heading-refined h2 {
+  font-size: 19px;
+  font-weight: 650;
+  letter-spacing: -.025em;
+}
+
+.map-view-state {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.home-risk-map .map-height {
+  height: clamp(430px, 55vh, 620px);
+  min-height: 430px;
+}
+
+.home-risk-map .map-command-row {
+  flex-wrap: nowrap;
+  align-items: center;
+}
+
+.home-risk-map .map-search {
+  flex-basis: auto;
+}
+
+.home-risk-map .map-actions {
+  width: auto;
+  display: flex;
+}
+
+.home-risk-map .map-reset {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 10px;
+}
+
+.home-risk-map .map-reset:hover {
+  color: var(--ink);
+  border-color: var(--accent);
+  background: var(--panel-muted);
+}
+
+.map-visible-count {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+  font-size: 12px;
+  color: var(--muted);
+  padding-bottom: 4px;
+}
+
+.map-visible-count>span {
+  font-size: 12px;
+}
+
+.home-risk-map .map-caption [aria-label] {
+  font-size: 12px;
+  font-weight: 400;
+}
+
+@container (max-width: 480px) {
+  .map-heading-refined {
+    display: flex;
+    padding: 16px;
+  }
+
+  .map-heading-refined h2 {
+    font-size: 18px;
+  }
+
+  .home-risk-map .map-height {
+    min-height: 400px;
+    height: 400px;
   }
 }
 </style>

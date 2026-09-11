@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Icon } from '@iconify/vue'
+import { CircleHelp } from '@lucide/vue'
 import { stationPopularityFor } from '~/composables/useStationPopularity'
 import type { StationRisk } from '~/shared/ops'
 import { taipeiWeekday, type StationPopularityHour } from '~/shared/station-popularity'
@@ -99,8 +99,8 @@ watch([() => props.station.id, selectedWeekday], () => { void loadPopularity() }
   <DisclosurePanel class="mt-4 rounded-md border border-line" title="借還車熱門度">
     <div class="p-3">
       <div class="flex flex-wrap items-center justify-between gap-2">
-        <span class="group relative inline-flex" tabindex="0">
-          <Icon class="text-lg text-muted" icon="solar:question-circle-outline" aria-label="熱門度說明" />
+        <span class="group relative inline-flex" tabindex="0" aria-label="熱門度說明">
+          <CircleHelp class="text-lg text-muted" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />
           <span
             class="pointer-events-none absolute left-1/2 top-full z-10 mt-1 hidden w-64 -translate-x-1/2 rounded-md border border-line-strong bg-panel p-2 text-sm font-medium leading-5 text-muted shadow-lg group-hover:block group-focus:block">依歷史平均庫存比例呈現：可還位越多代表借車越熱門，可借車越多代表還車越熱門。平均值只採用常態分布
             μ±1σ 範圍內的中央約 68% 觀測。</span>

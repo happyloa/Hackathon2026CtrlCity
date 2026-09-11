@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { Icon } from '@iconify/vue'
-import { Bike, MapPin, MapPinned, Share } from '@lucide/vue'
+import { ArrowLeft, ArrowRight, Bike, ChartNoAxesColumn, CheckCheck, Info, MapPin, MapPinned, Share, X, Zap } from '@lucide/vue'
 import { nearbyBorrowStations, nearbyReturnStations } from '~/shared/nearby-stations'
 import { displayStationName, type DataMode, type HorizonKey, type StationHistoryPoint, type StationRisk } from '~/shared/ops'
 
@@ -11,6 +10,7 @@ const props = defineProps<{
   horizon: HorizonKey
   dataMode?: DataMode
   contextQuery?: Record<string, string>
+  docked?: boolean
 }>()
 
 const emit = defineEmits<{ close: []; select: [stationId: string] }>()
@@ -18,6 +18,25 @@ const emit = defineEmits<{ close: []; select: [stationId: string] }>()
 const panelRef = ref<HTMLElement | null>(null)
 let previousBodyOverflow = ''
 let returnFocusElement: HTMLElement | null = null
+let pageScrollLocked = false
+let viewportQuery: MediaQueryList | null = null
+const isWideViewport = ref(import.meta.client && window.matchMedia('(min-width: 1101px)').matches)
+const isDocked = computed(() => Boolean(props.docked) && isWideViewport.value)
+
+function syncViewport(event: MediaQueryListEvent) {
+  isWideViewport.value = event.matches
+}
+
+function setPageScrollLocked(locked: boolean) {
+  if (locked === pageScrollLocked) return
+  if (locked) {
+    previousBodyOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+  } else {
+    document.body.style.overflow = previousBodyOverflow
+  }
+  pageScrollLocked = locked
+}
 
 /**
  * The panel always reads the 30-minute horizon regardless of what the
@@ -179,39 +198,52 @@ function onPanelKeydown(event: KeyboardEvent) {
   closePanel()
 }
 
-watch(() => props.station?.id, (stationId, previousId) => {
+watch([() => props.station?.id, isDocked], ([stationId, docked], previousValues) => {
   if (!import.meta.client) return
+  const previousId = previousValues?.[0]
   if (stationId && !previousId) {
     returnFocusElement = document.activeElement instanceof HTMLElement ? document.activeElement : null
-    previousBodyOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
   }
-  if (stationId) void nextTick(() => panelRef.value?.focus())
+  setPageScrollLocked(Boolean(stationId) && !docked)
+  if (stationId) void nextTick(() => {
+    if (panelRef.value) {
+      if (stationId !== previousId) panelRef.value.scrollTop = 0
+      panelRef.value.focus({ preventScroll: !docked })
+    }
+  })
   if (!stationId && previousId) {
-    document.body.style.overflow = previousBodyOverflow
     void nextTick(() => returnFocusElement?.focus())
   }
-})
+}, { immediate: true })
 
-onMounted(() => document.addEventListener('keydown', onPanelKeydown))
+onMounted(() => {
+  viewportQuery = window.matchMedia('(min-width: 1101px)')
+  isWideViewport.value = viewportQuery.matches
+  viewportQuery.addEventListener('change', syncViewport)
+  document.addEventListener('keydown', onPanelKeydown)
+})
 onBeforeUnmount(() => {
+  viewportQuery?.removeEventListener('change', syncViewport)
   document.removeEventListener('keydown', onPanelKeydown)
-  if (import.meta.client) document.body.style.overflow = previousBodyOverflow
+  if (import.meta.client) setPageScrollLocked(false)
 })
 </script>
 
 <template>
-  <Teleport to="body">
+  <Teleport to="body" :disabled="isDocked">
     <Transition name="detail-drawer">
       <div v-if="station"
-        class="pointer-events-none fixed inset-0 z-50 flex min-h-0 items-end justify-end p-3 sm:items-stretch sm:p-0">
+        class="station-detail-layer pointer-events-none fixed inset-0 z-50 flex min-h-0 items-end justify-end p-3 sm:items-stretch sm:p-0"
+        :class="{ 'station-detail-layer--docked': isDocked, 'station-detail-layer--adaptive': docked }">
         <aside ref="panelRef"
           class="station-detail pointer-events-auto max-h-full w-full overflow-y-auto rounded-xl border border-line bg-panel p-4 pb-6 text-ink shadow-2xl outline-none sm:h-svh sm:max-w-lg sm:rounded-none sm:border-y-0 sm:border-r-0 sm:p-5"
           role="dialog" aria-modal="false" aria-labelledby="station-detail-title" tabindex="-1">
           <button type="button"
-            class="mb-3 grid h-11 w-11 place-items-center rounded-md border border-line bg-panel-muted p-0 text-ink transition-colors hover:border-accent-strong hover:bg-accent-strong hover:text-on-accent"
-            aria-label="關閉站點詳情" @click="closePanel">
-            <Icon class="text-2xl" icon="solar:close-circle-outline" />
+            class="mb-3 inline-flex h-11 min-w-11 items-center justify-center gap-2 rounded-md border border-line bg-panel-muted px-3 text-sm font-semibold text-ink transition-colors hover:border-accent-strong hover:bg-accent-strong hover:text-on-accent"
+            :aria-label="isDocked ? '返回搬運路線' : '關閉站點詳情'" @click="closePanel">
+            <ArrowLeft v-if="isDocked" style="width: 1em; height: 1em" class="text-xl" aria-hidden="true" />
+            <X v-else style="width: 1em; height: 1em" class="text-xl" aria-hidden="true" />
+            <span v-if="docked">{{ isDocked ? '返回搬運路線' : '關閉站點詳情' }}</span>
           </button>
           <div class="flex flex-wrap items-center justify-between gap-2 text-base font-bold text-muted"><span>{{ isLive
             ? '即時站況' : '歷史站況' }}</span><span :class="riskBadgeClass">{{ riskLabel }}</span></div>
@@ -282,7 +314,7 @@ onBeforeUnmount(() => {
 
           <div v-if="!baselineComparison" class="mt-4 grid gap-1 rounded-md border border-line bg-panel-muted p-3">
             <span class="inline-flex items-center gap-1.5 text-base font-extrabold text-accent-strong">
-              <Icon class="text-lg" :icon="isLive ? 'solar:bolt-circle-outline' : 'solar:chart-2-outline'" /> {{
+              <component :is="isLive ? Zap : ChartNoAxesColumn" style="width: 1em; height: 1em" class="text-lg" aria-hidden="true" /> {{
                 forecastHeadline }}
             </span>
             <strong class="text-lg text-ink">{{ forecastDescription }}</strong>
@@ -346,18 +378,18 @@ onBeforeUnmount(() => {
             <div class="grid gap-2 p-3">
               <span v-for="reason in forecast?.reasons" :key="reason"
                 class="flex items-start gap-1.5 text-base leading-6 text-muted">
-                <Icon class="mt-0.5 shrink-0 text-lg text-accent-strong" icon="solar:check-read-outline" /> {{ reason }}
+                <CheckCheck style="width: 1em; height: 1em" class="mt-0.5 shrink-0 text-lg text-accent-strong" aria-hidden="true" /> {{ reason }}
               </span>
               <span v-for="flag in station.qualityFlags" :key="flag"
                 class="flex items-start gap-1.5 text-base leading-6 text-warning">
-                <Icon class="mt-0.5 shrink-0 text-lg" icon="solar:info-circle-outline" /> {{ flag }}
+                <Info style="width: 1em; height: 1em" class="mt-0.5 shrink-0 text-lg" aria-hidden="true" /> {{ flag }}
               </span>
             </div>
           </DisclosurePanel>
           <NuxtLink v-if="!isLive" :to="detailTarget"
             class="mt-4 inline-flex items-center gap-1 text-base font-bold text-accent transition-colors hover:text-accent-strong">
             開啟完整站點視圖
-            <Icon class="text-lg" icon="solar:arrow-right-outline" />
+            <ArrowRight style="width: 1em; height: 1em" class="text-lg" aria-hidden="true" />
           </NuxtLink>
         </aside>
       </div>
@@ -366,6 +398,23 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+.station-detail-layer--docked {
+  position: relative;
+  inset: auto;
+  z-index: auto;
+  display: block;
+  padding: 0;
+}
+
+.station-detail-layer--docked .station-detail {
+  height: clamp(38rem, calc(100svh - 8rem), 52rem);
+  max-width: none;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: none;
+  overscroll-behavior: contain;
+}
+
 .detail-drawer-enter-active .station-detail,
 .detail-drawer-leave-active .station-detail {
   transition: transform 160ms ease;
@@ -376,11 +425,41 @@ onBeforeUnmount(() => {
   transform: translateX(100%);
 }
 
+.station-detail-layer--docked.detail-drawer-enter-from .station-detail,
+.station-detail-layer--docked.detail-drawer-leave-to .station-detail {
+  transform: none;
+}
+
+@media (max-width: 1100px) {
+  .station-detail-layer--adaptive {
+    align-items: end;
+    justify-content: center;
+    padding: 12px;
+  }
+  .station-detail-layer--adaptive .station-detail {
+    height: min(72svh, 720px);
+    max-width: 48rem;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    overscroll-behavior: contain;
+    padding-bottom: max(24px, env(safe-area-inset-bottom));
+  }
+  .station-detail-layer--adaptive.detail-drawer-enter-from .station-detail,
+  .station-detail-layer--adaptive.detail-drawer-leave-to .station-detail {
+    transform: translateY(100%);
+  }
+}
+
 @media (max-width: 639px) {
 
   .detail-drawer-enter-from .station-detail,
   .detail-drawer-leave-to .station-detail {
     transform: translateY(100%);
   }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .detail-drawer-enter-active .station-detail,
+  .detail-drawer-leave-active .station-detail { transition: none; }
 }
 </style>

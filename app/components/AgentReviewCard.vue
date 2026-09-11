@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Icon } from '@iconify/vue'
+import { FileText, LoaderCircle, MessageCircleMore, MessageSquareCheck, TriangleAlert } from '@lucide/vue'
 import type { BriefingFact, DashboardSummary, HorizonKey } from '~/shared/ops'
 
 const props = defineProps<{
@@ -129,17 +129,17 @@ onBeforeUnmount(() => {
   <section v-if="enabled" class="mb-4 rounded-lg border border-line border-l-4 border-l-accent bg-panel-muted p-4" aria-labelledby="agent-review-title">
     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <p class="section-kicker text-base"><Icon icon="solar:chat-round-dots-outline" /> AWS AgentCore</p>
+        <p class="section-kicker text-base"><MessageCircleMore style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" /> AWS AgentCore</p>
         <h2 id="agent-review-title" class="m-0 mt-1 text-lg font-bold text-ink">AI 站況摘要</h2>
       </div>
       <button type="button" class="inline-flex min-h-11 w-full shrink-0 items-center justify-center gap-2 rounded-md border border-accent bg-accent px-3 text-base font-bold text-on-accent transition-colors hover:bg-accent-strong sm:w-auto" :disabled="pending" @click="requestReview">
-        <Icon :icon="pending ? 'svg-spinners:3-dots-fade' : 'solar:chat-round-check-outline'" />
+        <component :is="pending ? LoaderCircle : MessageSquareCheck" :class="{ 'icon-spin': pending }" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />
         {{ pending ? '整理中' : (result ? '重新整理' : '產生摘要') }}
       </button>
     </div>
 
     <div role="status" aria-live="polite" :aria-busy="pending" :class="result || error ? resultClasses.visible : resultClasses.empty">
-      <p v-if="error" class="m-0 flex items-center gap-2 text-base font-semibold leading-6 text-danger"><Icon class="shrink-0 text-lg" icon="solar:danger-triangle-outline" />{{ error }}</p>
+      <p v-if="error" class="m-0 flex items-center gap-2 text-base font-semibold leading-6 text-danger"><TriangleAlert class="shrink-0 text-lg" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />{{ error }}</p>
       <template v-else-if="result">
         <h3 class="m-0 text-lg font-bold text-ink">{{ result.headline }}</h3>
         <p class="m-0 mt-2 text-base leading-6 text-muted">{{ result.narrative }}</p>
@@ -148,10 +148,16 @@ onBeforeUnmount(() => {
         </ul>
         <div v-if="result.citations.length" class="mt-3 flex flex-wrap gap-2">
           <span v-for="citation in result.citations" :key="`${citation.label}-${citation.source || ''}`" class="inline-flex items-center gap-1 rounded-md border border-line bg-panel px-2 py-1 text-base text-ink">
-            <Icon icon="solar:document-text-outline" />{{ citation.label }}<small v-if="citation.source">{{ citation.source }}</small>
+            <FileText style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />{{ citation.label }}<small v-if="citation.source">{{ citation.source }}</small>
           </span>
         </div>
       </template>
     </div>
   </section>
 </template>
+
+<style scoped>
+.icon-spin { animation: icon-spin 1s linear infinite; }
+@keyframes icon-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .icon-spin { animation: none; } }
+</style>

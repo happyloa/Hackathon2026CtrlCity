@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { Icon } from '@iconify/vue'
+import { Info, LoaderCircle, RefreshCw, Search, TriangleAlert, X } from '@lucide/vue'
 import { stationOverviewStatus, type StationOverviewStatus } from '~/shared/station-overview'
+import { summarizeStationDistricts } from '~/shared/district-summary'
 type StationFilter = 'all' | StationOverviewStatus
 
 const route = useRoute()
@@ -29,7 +30,11 @@ const filterOptions: Array<{ value: StationFilter; label: string }> = [
   { value: 'service', label: '服務異常' },
 ]
 
-useLivePolling(live.refresh, computed(() => true))
+// The shared layout owns live polling for every operations page.
+const districtSummaries = computed(() => summarizeStationDistricts(live.dashboard.value?.stations || [], live.dashboard.value?.alerts || []))
+const asOfLabel = computed(() => live.dashboard.value ? new Intl.DateTimeFormat('zh-TW', {
+  month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
+}).format(new Date(live.dashboard.value.meta.asOf)) : '尚未載入')
 
 const dashboard = computed(() => live.dashboardForDistrict(selectedDistrict.value))
 const districtPickerOptions = computed(() => [
@@ -73,6 +78,8 @@ const counts = computed(() => {
   }
 })
 
+function clearFilters() { stationQuery.value = ''; stationFilter.value = 'all'; selectedDistrict.value = '' }
+
 watch(selectedDistrict, (district) => {
   const current = typeof route.query.district === 'string' ? route.query.district : ''
   if (import.meta.client && district !== current) void router.replace({ query: district ? { district } : {} })
@@ -86,60 +93,38 @@ watch(() => route.query.district, (district) => {
 </script>
 
 <template>
-  <div class="mx-auto w-full max-w-screen-3xl space-y-4 px-4 py-4 sm:px-6 lg:px-8 lg:py-6">
-    <WorkspaceContext mode="live" :district="selectedDistrict" :data-time="dashboard?.meta.asOf"
-      :query="contextQuery" />
-
-    <section class="panel grid gap-4 p-4 sm:p-5 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,28rem)] xl:items-end">
-      <div>
-        <p class="section-kicker">
-          <Icon icon="solar:map-point-wave-outline" /> 即時站況
-        </p>
-        <h2 class="mt-1 text-2xl font-bold">站點總覽</h2>
-      </div>
-      <ModalPicker v-model="selectedDistrict" :label="selectionSource === 'location' ? '行政區（依位置）' : '行政區'" title="選擇行政區"
-        :options="districtPickerOptions" />
-      <span class="sr-only" role="status" aria-live="polite">{{ locationMessage }}</span>
-    </section>
-
-    <section class="panel grid gap-3 p-4 sm:p-5">
-      <label
-        class="flex min-h-11 items-center gap-2 rounded-lg border border-line-strong bg-panel-muted px-3 text-ink focus-within:border-accent">
-        <Icon class="shrink-0 text-xl text-accent" icon="solar:magnifer-outline" />
-        <input v-model="stationQuery"
-          class="min-w-0 flex-1 border-0 bg-transparent text-base outline-none placeholder:text-muted" type="search"
-          placeholder="搜尋站名或行政區" aria-label="搜尋站點" />
-      </label>
-      <div class="flex flex-wrap gap-2" role="group" aria-label="站點狀態篩選">
-        <button v-for="item in filterOptions" :key="item.value" type="button"
-          class="min-h-11 rounded-lg border px-3 text-base font-bold transition-colors"
-          :class="stationFilter === item.value ? 'border-accent bg-accent text-on-accent' : 'border-line bg-panel-muted text-muted hover:border-line-strong hover:text-ink'"
-          :aria-pressed="stationFilter === item.value" @click="stationFilter = item.value">
-          {{ item.label }} <span class="font-mono">{{ counts[item.value] }}</span>
-        </button>
-      </div>
-    </section>
-
-    <div v-if="live.error.value && dashboard" class="live-inline-error" role="alert">
-      <Icon icon="solar:danger-triangle-outline" />{{ live.error.value }}
-      <PageRetryButton :busy="live.pending.value" @retry="live.refresh({ manual: true })" />
-    </div>
-    <div v-if="live.pending.value && !dashboard" class="loading-board" role="status" aria-live="polite">
-      <Icon icon="svg-spinners:3-dots-fade" />正在載入站點…
-    </div>
-    <div v-else-if="live.error.value && !dashboard" class="loading-board error-board" role="alert">
-      <Icon icon="solar:danger-triangle-outline" />{{ live.error.value }}
-      <PageRetryButton :busy="live.pending.value" @retry="live.refresh({ manual: true })" />
-    </div>
-
-    <StationOverviewList v-else-if="dashboard" :stations="filteredStations" :alerts="dashboard.alerts"
-      :reset-key="`${selectedDistrict}|${stationFilter}|${stationQuery}`" @select="selectedStationId = $event" />
-    <StationDetailPanel :station="selectedStation" :stations="dashboard?.stations || []" :history="[]" horizon="60"
-      data-mode="live" :context-query="contextQuery" @close="selectedStationId = ''"
-      @select="selectedStationId = $event" />
-
-    <DisclosurePanel class="panel" title="分數怎麼看" description="展開查看排序方式" icon="solar:info-circle-outline">
-      <p class="m-0 p-4 text-base leading-7 text-muted">優先分只用來排序：當下空滿 50、60 分鐘風險 25、庫存缺口 20、基線品質 5；55 分以上先看。</p>
-    </DisclosurePanel>
+  <div class="stations-page">
+    <div class="stations-source"><p>從行政區掌握風險，再查看每一站的即時庫存。</p><div><span><i :class="{ stale: live.error.value }" />{{ live.error.value ? '更新暫時中斷' : '官方即時資料' }}<time>{{ asOfLabel }}</time></span><button type="button" :disabled="live.pending.value" @click="live.refresh({ manual: true })"><LoaderCircle v-if="live.pending.value" :size="15" class="stations-spin" aria-hidden="true" /><RefreshCw v-else :size="15" aria-hidden="true" />{{ live.pending.value ? '更新中' : '更新資料' }}</button></div></div>
+    <div v-if="live.error.value && dashboard" class="live-inline-error" role="alert"><TriangleAlert :size="18" aria-hidden="true" />{{ live.error.value }}<PageRetryButton :busy="live.pending.value" @retry="live.refresh({ manual: true })" /></div>
+    <div v-if="live.pending.value && !dashboard" class="loading-board" role="status" aria-live="polite"><LoaderCircle :size="22" class="stations-spin" aria-hidden="true" />正在載入站點與行政區匯總…</div>
+    <div v-else-if="live.error.value && !dashboard" class="loading-board error-board" role="alert"><TriangleAlert :size="22" aria-hidden="true" />{{ live.error.value }}<PageRetryButton :busy="live.pending.value" @retry="live.refresh({ manual: true })" /></div>
+    <template v-else-if="dashboard">
+      <DistrictOverview :summaries="districtSummaries" :selected-district="selectedDistrict" @select="selectedDistrict = $event" />
+      <section class="stations-filters" aria-label="站點篩選">
+        <div class="stations-search-row">
+          <label class="stations-search"><span>搜尋站點</span><div><Search :size="18" aria-hidden="true" /><input v-model="stationQuery" type="search" placeholder="搜尋站名或行政區" aria-label="搜尋站點" /></div></label>
+          <div class="stations-district"><ModalPicker v-model="selectedDistrict" :label="selectionSource === 'location' ? '行政區（依位置）' : '行政區'" title="選擇行政區" :options="districtPickerOptions" /></div>
+          <button v-if="selectedDistrict || stationFilter !== 'all' || stationQuery" class="stations-clear" type="button" @click="clearFilters"><X :size="15" aria-hidden="true" />清除篩選</button>
+        </div>
+        <div class="stations-filter-bottom"><div class="stations-status-filters" role="group" aria-label="站點狀態篩選"><button v-for="item in filterOptions" :key="item.value" type="button" :class="{ active: stationFilter === item.value }" :aria-pressed="stationFilter === item.value" @click="stationFilter = item.value">{{ item.label }}<b>{{ counts[item.value] }}</b></button></div><span>{{ selectedDistrict || '全市' }} · 含 60 分鐘預測</span></div>
+        <span class="sr-only" role="status" aria-live="polite">{{ locationMessage }}</span>
+      </section>
+      <DistrictStationList :stations="filteredStations" :alerts="dashboard.alerts" :reset-key="`${selectedDistrict}|${stationFilter}|${stationQuery}`" @select="selectedStationId = $event" />
+      <DisclosurePanel class="panel stations-method" title="匯總與分數怎麼看" description="查看統計範圍與計算方式" icon="solar:info-circle-outline">
+        <div><p><Info :size="16" aria-hidden="true" />區域摘要固定以全市資料計算；搜尋與狀態篩選只影響下方站點清單。</p><p>需關注站點包含目前或 60 分鐘內可能缺車／缺位的站點。地圖以這些站點占該區總站數的比例著色；服務異常與資料不足另行標示。</p><p>平均風險為有可用預測、且正常營運站點的 60 分鐘模型風險平均（0–100），沒有預測時顯示「—」。預測高風險站數沿用模型的高風險／極高風險分級。</p><p>站點優先分用來安排處理順序：當下空滿 50、60 分鐘風險 25、庫存缺口 20、基線品質 5；與模型風險分數不同。</p></div>
+      </DisclosurePanel>
+    </template>
+    <StationDetailPanel :station="selectedStation" :stations="dashboard?.stations || []" :history="[]" horizon="60" data-mode="live" :context-query="contextQuery" @close="selectedStationId = ''" @select="selectedStationId = $event" />
   </div>
 </template>
+
+<style scoped>
+.stations-page { width: 100%; max-width: 1760px; margin: auto; padding: 20px 32px 32px; display: grid; gap: 22px; }
+.stations-source, .stations-source > div, .stations-source > div > span, .stations-source button { display: flex; align-items: center; gap: 10px; }.stations-source { justify-content: space-between; flex-wrap: wrap; gap: 10px 20px; }.stations-source p { font-size: 13px; color: var(--muted); }.stations-source > div { gap: 16px; color: var(--muted); font-size: 12px; }.stations-source > div > span { flex-wrap: wrap; gap: 7px; }.stations-source i { display: inline-block; width: 6px; height: 6px; background: var(--accent); border-radius: 50%; }.stations-source i.stale { background: var(--warning); }.stations-source time { margin-left: 4px; font-variant-numeric: tabular-nums; }.stations-source button { min-height: 40px; padding: 7px 11px; border: 1px solid var(--line); background: var(--panel); border-radius: 6px; color: var(--ink); font-size: 12px; }
+.stations-filters { border: 1px solid var(--line); background: var(--panel); border-radius: 9px; padding: 16px; }.stations-search-row { display: flex; align-items: end; gap: 16px; }.stations-search { flex: 1; min-width: 0; }.stations-search > span { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }.stations-search > div { display: flex; align-items: center; gap: 8px; min-height: 44px; border: 1px solid var(--line-strong); border-radius: 6px; padding: 8px 12px; }.stations-search svg { color: var(--muted); flex-shrink: 0; }.stations-search input { min-width: 0; width: 100%; border: 0; outline: none; background: transparent; font-size: 14px; }.stations-search > div:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }.stations-district { width: 240px; }.stations-district :deep(> div > span) { font-size: 12px; font-weight: 400; }.stations-district :deep(button) { font-size: 14px; min-height: 44px; }.stations-clear { display: flex; align-items: center; gap: 5px; color: var(--accent); min-height: 44px; font-size: 12px; white-space: nowrap; }
+.stations-filter-bottom { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 14px; }.stations-filter-bottom > span { font-size: 11px; color: var(--muted); }.stations-status-filters { display: flex; flex-wrap: wrap; gap: 6px; }.stations-status-filters button { display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 38px; padding: 6px 11px; font-size: 12px; border: 1px solid var(--line); border-radius: 6px; color: var(--muted); }.stations-status-filters b { font-size: 11px; font-weight: 500; font-variant-numeric: tabular-nums; }.stations-status-filters button.active { color: var(--on-accent); background: var(--accent); border-color: var(--accent); }.stations-status-filters button:hover:not(.active) { border-color: var(--accent); color: var(--ink); }
+.stations-method :deep(> button) { font-size: 13px; font-weight: 550; }.stations-method :deep(> button small) { font-size: 12px; }.stations-method :deep(p) { display: flex; align-items: start; gap: 8px; font-size: 13px; color: var(--muted); line-height: 1.8; margin-bottom: 6px; }.stations-method :deep(p svg) { flex-shrink: 0; margin-top: 4px; }.stations-method :deep(.disclosure-enter-to), .stations-method :deep(> div) { padding: 16px; }.stations-spin { animation: stations-spin 1s linear infinite; }@keyframes stations-spin { to { transform: rotate(360deg); } }
+@media (max-width: 1000px) { .stations-page { padding: 20px; } }
+@media (max-width: 680px) { .stations-page { padding: 16px; gap: 18px; }.stations-source > div { width: 100%; justify-content: space-between; }.stations-source p { font-size: 12px; }.stations-search-row { flex-wrap: wrap; gap: 12px; }.stations-search { flex-basis: 100%; }.stations-district { flex: 1; min-width: 170px; }.stations-status-filters { width: 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }.stations-status-filters button { padding: 6px 7px; min-height: 42px; }.stations-filters { padding: 13px; } }
+@media (prefers-reduced-motion: reduce) { .stations-spin { animation: none; } }
+</style>
