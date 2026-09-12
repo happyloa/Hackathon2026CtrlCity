@@ -143,7 +143,7 @@ function windowLabel(item: OperationalAdjustment) {
 </script>
 
 <template>
-  <div class="mx-auto w-full max-w-screen-2xl space-y-4 px-4 py-4 sm:px-6 lg:px-8 lg:py-6">
+  <div class="mx-auto w-full max-w-screen-3xl space-y-4 px-4 py-4 sm:px-6 lg:px-8 lg:py-6">
 
     <section class="rounded-xl border border-line bg-panel p-4 sm:p-5">
       <h2 class="m-0 text-xl font-bold">{{ editingId ? '編輯排除窗' : '新增排除窗' }}</h2>
@@ -245,32 +245,49 @@ function windowLabel(item: OperationalAdjustment) {
 
       <p v-if="notice" class="mt-3 rounded-md border border-line bg-surface px-3 py-2 text-base">{{ notice }}</p>
 
-      <div v-if="adjustments.length" class="mt-4 grid gap-2">
-        <article v-for="item in adjustments" :key="item.id"
-          class="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-line bg-surface p-3">
-          <div class="min-w-0">
-            <strong class="block truncate text-base">{{ item.district }} {{ item.stationName }}</strong>
-            <span class="mt-0.5 block text-base text-muted">{{ windowLabel(item) }}</span>
-            <span v-if="item.reason" class="mt-0.5 block text-base text-muted">{{ item.reason }}</span>
-          </div>
-          <div class="flex shrink-0 flex-wrap gap-2">
-            <span v-if="item.endAt === null"
-              class="inline-flex min-h-9 items-center rounded-md border border-warning bg-warning-surface px-2 text-base font-bold text-warning">持續關閉</span>
-            <button v-if="item.endAt === null"
-              class="inline-flex min-h-9 items-center gap-1 rounded-md border border-line bg-panel px-2 text-base font-bold text-ink hover:border-accent-strong"
-              type="button" @click="endOpenWindow(item)">結束於現在</button>
-            <button
-              class="inline-flex min-h-9 items-center gap-1 rounded-md border border-line bg-panel px-2 text-base font-bold text-ink hover:border-accent-strong"
-              type="button" @click="edit(item)">
-              <Icon class="text-lg" icon="solar:pen-outline" /> 編輯
-            </button>
-            <button
-              class="inline-flex min-h-9 items-center gap-1 rounded-md border border-line bg-panel px-2 text-base font-bold text-danger hover:border-danger"
-              type="button" @click="remove(item.id)">
-              <Icon class="text-lg" icon="solar:trash-bin-trash-outline" /> 刪除
-            </button>
-          </div>
-        </article>
+      <div v-if="adjustments.length" class="mt-4 overflow-x-auto">
+        <table class="w-full min-w-208 border-collapse text-left text-base">
+          <thead>
+            <tr class="border-b border-line text-muted">
+              <th class="px-3 py-2 font-bold" scope="col">站點</th>
+              <th class="px-3 py-2 font-bold" scope="col">原因</th>
+              <th class="px-3 py-2 font-bold" scope="col">時間範圍</th>
+              <th class="px-3 py-2 font-bold" scope="col">狀態</th>
+              <th class="px-3 py-2 text-right font-bold" scope="col">操作</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-line">
+            <tr v-for="item in adjustments" :key="item.id">
+              <td class="px-3 py-3 align-top">
+                <strong class="block wrap-break-word">{{ item.district }} {{ item.stationName }}</strong>
+              </td>
+              <td class="px-3 py-3 align-top text-muted">{{ item.reason || '—' }}</td>
+              <td class="px-3 py-3 align-top text-muted">{{ windowLabel(item) }}</td>
+              <td class="px-3 py-3 align-top">
+                <span v-if="item.endAt === null"
+                  class="inline-flex min-h-9 items-center rounded-md border border-warning bg-warning-surface px-2 text-base font-bold text-warning">持續關閉</span>
+                <span v-else class="text-muted">已結束</span>
+              </td>
+              <td class="px-3 py-3 align-top">
+                <div class="flex flex-wrap justify-end gap-2">
+                  <button v-if="item.endAt === null"
+                    class="inline-flex min-h-9 items-center gap-1 rounded-md border border-line bg-panel px-2 text-base font-bold text-ink hover:border-accent-strong"
+                    type="button" @click="endOpenWindow(item)">結束於現在</button>
+                  <button
+                    class="inline-flex min-h-9 items-center gap-1 rounded-md border border-line bg-panel px-2 text-base font-bold text-ink hover:border-accent-strong"
+                    type="button" @click="edit(item)">
+                    <Icon class="text-lg" icon="solar:pen-outline" /> 編輯
+                  </button>
+                  <button
+                    class="inline-flex min-h-9 items-center gap-1 rounded-md border border-line bg-panel px-2 text-base font-bold text-danger hover:border-danger"
+                    type="button" @click="remove(item.id)">
+                    <Icon class="text-lg" icon="solar:trash-bin-trash-outline" /> 刪除
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
 
       <p v-else class="mt-4 text-base text-muted">尚未登錄任何排除窗。</p>

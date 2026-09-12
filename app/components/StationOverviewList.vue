@@ -48,7 +48,20 @@ function rowClasses(station: StationRisk) {
   if (status === 'service') return 'border-l-line-strong bg-panel-muted'
   if (status === 'unknown') return 'border-l-warning bg-warning-surface'
   if (status === 'stable') return 'border-l-positive bg-positive-surface'
-  return status === 'empty' ? 'border-l-danger bg-danger-surface' : 'border-l-info bg-info-surface'
+  return status === 'empty' ? 'border-l-danger' : 'border-l-info'
+}
+
+/**
+ * Empty/full rows read a priority score (0-100, see `scoreAlertPriority`), so
+ * their fill is a horizontal bar sized to that score instead of a flat block
+ * -- a 95-point station and a 73-point station shouldn't look equally severe.
+ */
+function rowStyle(station: StationRisk) {
+  const status = statusFor(station)
+  if (status !== 'empty' && status !== 'full') return {}
+  const pct = Math.max(0, Math.min(100, alertLookup.value.get(station.id)?.priorityScore ?? 0))
+  const surface = status === 'empty' ? 'var(--danger-surface)' : 'var(--info-surface)'
+  return { background: `linear-gradient(to right, ${surface} 0%, ${surface} ${pct}%, transparent ${pct}%)` }
 }
 
 function statusIcon(station: StationRisk) {
@@ -73,7 +86,7 @@ function statusIcon(station: StationRisk) {
     </header>
 
     <div v-if="visibleStations.length" class="divide-y divide-line">
-      <article v-for="station in visibleStations" :key="station.id" class="grid grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-3 border-l-4 px-4 py-3 sm:grid-cols-[2.5rem_minmax(0,1fr)_auto]" :class="rowClasses(station)">
+      <article v-for="station in visibleStations" :key="station.id" class="grid grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-3 border-l-4 px-4 py-3 sm:grid-cols-[2.5rem_minmax(0,1fr)_auto]" :class="rowClasses(station)" :style="rowStyle(station)">
         <span class="grid size-10 shrink-0 place-items-center rounded-full border bg-panel text-lg" :class="statusClasses(station)">
           <Icon :icon="statusIcon(station)" />
         </span>

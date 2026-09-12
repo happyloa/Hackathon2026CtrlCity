@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 64" fill="none">
+  <title>卸車：向下流動箭頭</title>
+  <style>
+    path { animation: pulse 1.8s ease-in-out infinite; opacity: .22; }
+    .middle { animation-delay: .2s; }
+    .bottom { animation-delay: .4s; }
+    @keyframes pulse { 0%, 65%, 100% { opacity: .22; } 30% { opacity: 1; } }
+    @media (prefers-reduced-motion: reduce) { path { animation: none; opacity: .85; } }
+  </style>
+  <g stroke="#fda4af" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M10 10 24 24 38 10"/>
+    <path class="middle" d="M10 26 24 40 38 26"/>
+    <path class="bottom" d="M10 42 24 56 38 42"/>
+  </g>
+</svg>

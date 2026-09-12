@@ -47,7 +47,7 @@ function station({ id, district, latitude, longitude }) {
     currentState: 'normal',
     serviceStatus: 'operational',
     qualityFlags: [],
-    forecast: { horizons: { 30: { ...forecast }, 60: { ...forecast }, 120: { ...forecast } } },
+    forecast: { horizons: { 30: { ...forecast }, 60: { ...forecast } } },
   }
 }
 

@@ -1,6 +1,7 @@
 import {
   displayStationName,
   type Alert,
+  type CurrentState,
   type DispatchRecommendation,
   type Forecast,
   type HorizonKey,
@@ -9,6 +10,7 @@ import {
 import {
   DEFAULT_LIVE_OPERATION_POLICY as SHARED_DEFAULT_LIVE_OPERATION_POLICY,
   alertDataQuality as sharedAlertDataQuality,
+  refillAmountFor as sharedRefillAmountFor,
   safetyStockFor as sharedSafetyStockFor,
   scoreAlertPriority as sharedScoreAlertPriority,
 } from './operational-policy.mjs'
@@ -260,7 +262,7 @@ function actionableAlert(
 
   riskScore = clamp(riskScore, 0, 1)
   const inventory = Math.max(0, finiteNumber(predictedInventory(station, condition, forecast)))
-  const gap = Math.max(0, Math.ceil(safetyStock - inventory))
+  const gap = sharedRefillAmountFor(station, inventory, policy)
   const emptyCondition = condition === 'empty_now' || condition === 'empty_forecast'
   const inventoryLabel = emptyCondition ? '可借車' : '可還位'
   const timingLabel = currentFailure ? '目前' : `${policy.horizon} 分鐘預測`
@@ -559,4 +561,63 @@ export function buildLiveOperations(
     alerts: alertCandidates.map(candidate => candidate.alert),
     dispatches,
   }
+}
+
+/** Prediction horizons for the dispatch route summary: "now" plus every forecast horizon. */
+export type DispatchHorizon = 'now' | HorizonKey
+
+const CUMULATIVE_HORIZON_STEPS: readonly HorizonKey[] = ['30', '60']
+
+function forcedCurrentStateFor(condition: Alert['condition']): CurrentState | null {
+  if (condition === 'empty_forecast') return 'empty_now'
+  if (condition === 'full_forecast') return 'full_now'
+  return null
+}
+
+/**
+ * Widens `buildLiveOperations` into the three cumulative dispatch-route tabs
+ * ("now" / "30" / "60") without changing that function's signature. Each step
+ * re-runs the single-horizon planner from scratch (so route capacity is
+ * always respected), but a station that already qualified at a shorter
+ * horizon is pinned to its failing current-state before the next, longer
+ * call -- otherwise a recovering forecast could silently drop it, breaking
+ * the "60 always covers 30" guarantee.
+ */
+export function buildLiveOperationsForHorizon(
+  stations: readonly StationRisk[],
+  observedAt: string,
+  horizon: DispatchHorizon,
+  options: Partial<LiveOperationPolicy> = {},
+): LiveOperationPlan {
+  if (horizon === 'now') {
+    const plan = buildLiveOperations(stations, observedAt, { ...options, horizon: '30' })
+    const currentAlertIds = new Set(
+      plan.alerts
+        .filter(alert => alert.condition === 'empty_now' || alert.condition === 'full_now')
+        .map(alert => alert.id),
+    )
+    return {
+      alerts: plan.alerts.filter(alert => currentAlertIds.has(alert.id) || alert.condition === 'unavailable'),
+      dispatches: plan.dispatches.filter(dispatch => dispatch.alertId !== null && currentAlertIds.has(dispatch.alertId)),
+    }
+  }
+
+  let carriedStations = stations
+  for (const step of CUMULATIVE_HORIZON_STEPS) {
+    const plan = buildLiveOperations(carriedStations, observedAt, { ...options, horizon: step })
+    if (step === horizon) return plan
+
+    const forcedStateByStationId = new Map(plan.alerts.flatMap((alert) => {
+      if (!alert.dispatchEligible) return []
+      const forcedState = forcedCurrentStateFor(alert.condition)
+      return forcedState ? [[alert.stationId, forcedState] as const] : []
+    }))
+    carriedStations = carriedStations.map(station => (
+      station.currentState === 'normal' && forcedStateByStationId.has(station.id)
+        ? { ...station, currentState: forcedStateByStationId.get(station.id)! }
+        : station
+    ))
+  }
+
+  return buildLiveOperations(carriedStations, observedAt, { ...options, horizon: '60' })
 }

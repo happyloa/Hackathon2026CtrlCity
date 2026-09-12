@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Icon } from '@iconify/vue'
+import { CheckCircle2, ChevronDown, Search, X } from '@lucide/vue'
 import type { ComponentPublicInstance } from 'vue'
 
 type PickerOption = {
@@ -154,7 +154,7 @@ onBeforeUnmount(() => {
       @click="open"
     >
       <span class="min-w-0 truncate">{{ selectedLabel }}</span>
-      <Icon class="shrink-0 text-xl text-accent-strong" icon="solar:alt-arrow-down-outline" />
+      <ChevronDown class="shrink-0 text-xl text-accent-strong" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />
     </button>
 
     <Teleport to="body">
@@ -167,12 +167,12 @@ onBeforeUnmount(() => {
               <h2 :id="dialogTitleId" class="m-0 text-xl font-bold leading-tight text-ink sm:text-2xl">{{ dialogTitle }}</h2>
             </div>
             <button class="grid h-11 w-11 shrink-0 place-items-center rounded-md border border-line bg-panel-muted p-0 text-ink transition-colors hover:border-accent-strong hover:bg-accent-strong hover:text-on-accent" type="button" aria-label="關閉選單" @click="close()">
-              <Icon class="text-2xl" icon="solar:close-circle-outline" />
+              <X class="text-2xl" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />
             </button>
           </header>
 
           <label v-if="options.length > 8" class="mx-3 mt-3 flex min-h-11 items-center gap-2 rounded-md border border-line-strong bg-surface px-3 text-muted focus-within:border-accent-strong sm:mx-4 sm:mt-4">
-            <Icon class="shrink-0 text-xl text-accent-strong" icon="solar:magnifer-outline" />
+            <Search class="shrink-0 text-xl text-accent-strong" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />
             <span class="sr-only">搜尋{{ label }}</span>
             <input ref="searchRef" v-model="searchQuery" class="min-w-0 w-full bg-transparent py-2 text-base text-ink outline-none placeholder:text-muted" type="search" :placeholder="`搜尋${label}`" autocomplete="off" />
           </label>
@@ -195,7 +195,7 @@ onBeforeUnmount(() => {
               @keydown="onOptionKeydown($event, index)"
             >
               <span>{{ option.label }}</span>
-              <Icon v-if="option.value === modelValue" class="shrink-0 text-xl text-current" icon="solar:check-circle-outline" />
+              <CheckCircle2 v-if="option.value === modelValue" class="shrink-0 text-xl text-current" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />
             </button>
             <p v-if="!visibleOptions.length" class="m-3 text-center text-base text-muted">找不到符合的選項。</p>
           </div>

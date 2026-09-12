@@ -1,17 +1,18 @@
 <script setup lang="ts">
-import { Icon } from '@iconify/vue'
-import { buildDispatchRoutePlans } from '~/shared/dispatch-route-planner'
-import { buildLiveOperations } from '~/shared/live-operations'
+import { ArrowRight, Bike, Info, LoaderCircle, RefreshCw, Route as RouteIcon, TriangleAlert } from '@lucide/vue'
+import { buildDispatchRoutePlans, type DispatchRouteStop } from '~/shared/dispatch-route-planner'
+import { buildLiveOperations, buildLiveOperationsForHorizon } from '~/shared/live-operations'
 import { overrideStationsWithXgboost } from '~/shared/xgboost-overrides'
 import { briefingFacts, summarize } from '~/composables/useLiveDashboard'
+import { usePredictionMode } from '~/composables/usePredictionMode'
 import type { HorizonKey, StationRisk } from '~/shared/ops'
 
 const route = useRoute()
 const router = useRouter()
 const selectedStationId = ref(typeof route.query.station === 'string' ? route.query.station : '')
+const observedRouteStops = ref<DispatchRouteStop[] | null>(null)
 const horizon: HorizonKey = '60'
-const predictionMode = useState<'baseline' | 'xgboost'>('prediction-mode', () => 'baseline')
-const xgboost = useXgboostPredictions()
+const { mode: predictionMode, xgboost } = usePredictionMode()
 const live = useLiveDashboard()
 const {
   selectedDistrict,
@@ -64,19 +65,6 @@ const asOfLabel = computed(() => {
     month: 'long', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false,
   }).format(new Date(date))
 })
-const inventoryAlertCount = computed(() => dashboard.value?.alerts.filter(alert => alert.condition !== 'unavailable').length || 0)
-const routePlanCount = computed(() => dashboard.value
-  ? buildDispatchRoutePlans(dashboard.value.dispatches, dashboard.value.stations).routes.length
-  : 0)
-const metricCards = computed(() => {
-  const summary = dashboard.value?.summary
-  if (!summary) return []
-  return [
-    { label: '規劃路線', value: routePlanCount.value, caption: `整合 ${summary.recommendedMoves} 筆搬運需求`, icon: 'solar:routing-2-outline', tone: 'positive' as const },
-    { label: '需注意站點', value: inventoryAlertCount.value, caption: `${summary.highRiskNext60m} 個未來高風險`, icon: 'solar:danger-triangle-outline', tone: 'warning' as const },
-    { label: '目前空站／滿站', value: `${summary.emptyNow}／${summary.fullNow}`, caption: '官方即時站況', icon: 'solar:wheel-angle-outline', tone: 'critical' as const },
-  ]
-})
 const baselineStatus = computed(() => {
   if (live.profileError.value) return '目前只看即時庫存'
   const coverage = live.profileCoverage.value
@@ -84,6 +72,15 @@ const baselineStatus = computed(() => {
   if (!coverage.matchedStations) return '目前只看即時庫存'
   return `基線已對照 ${coverage.matchedStations}／${coverage.liveStations} 站`
 })
+
+/**
+ * Read-only: switching the source is an analyst action on /admin/roi, not a
+ * homepage control -- the dispatcher only needs to know which one is live so
+ * they can explain why a station got flagged.
+ */
+const predictionSourceLabel = computed(() => predictionMode.value === 'xgboost'
+  ? 'XGBoost（含鄰站特徵）快照'
+  : '規則基線')
 
 watch(selectedDistrict, (district) => {
   if (!import.meta.client) return
@@ -100,77 +97,145 @@ watch(dashboard, (value) => {
   if (selectedStationId.value && !value?.stations.some(station => station.id === selectedStationId.value)) selectedStationId.value = ''
 })
 
-// The floating warning cart (in the layout) deep-links here via ?station=,
-// which needs picking up even when index.vue is already mounted (Nuxt reuses
-// the page component across an in-app navigateTo to the same route).
+// `?station=` is a deep-linkable URL contract, which needs picking up even
+// when index.vue is already mounted (Nuxt reuses the page component across
+// an in-app navigateTo to the same route).
 watch(() => route.query.station, (station) => {
   if (typeof station === 'string' && station) selectedStationId.value = station
 })
+
+const currentPlanning = computed(() => {
+  if (!dashboard.value) return { routes: [] }
+  const operations = buildLiveOperationsForHorizon(dashboard.value.stations, dashboard.value.meta.asOf, 'now')
+  return buildDispatchRoutePlans(operations.dispatches, dashboard.value.stations)
+})
+const currentTransferCount = computed(() => currentPlanning.value.routes.reduce((sum, item) => sum + item.totalTransferBikes, 0))
+const hasForecast = computed(() => dashboard.value?.stations.some(station => station.serviceStatus === 'operational' && station.forecast.horizons['60'].baselineStatus === 'matched') ?? false)
+const dataStatus = computed(() => live.error.value ? '資料更新中斷' : live.pending.value ? '正在同步' : dashboard.value ? '官方即時站況' : '等待資料')
+
+function focusDispatchQueue(event: MouseEvent) {
+  event.preventDefault()
+  selectedStationId.value = ''
+  void nextTick(() => document.getElementById('dispatch-queue')?.scrollIntoView({ block: 'start' }))
+}
+
 </script>
 
 <template>
-  <div class="mx-auto w-full max-w-screen-2xl space-y-4 px-4 py-4 sm:px-6 lg:px-8 lg:py-6">
-    <section class="grid gap-4 rounded-xl border border-line bg-panel p-4 shadow-sm sm:p-5 lg:grid-cols-3">
-      <div class="min-w-0 lg:col-span-2">
-        <p class="inline-flex items-center gap-2 text-base font-semibold tracking-wide text-accent"><span class="size-2 rounded-full bg-positive" aria-hidden="true" /> 官方即時資料</p>
-        <h2 class="mt-2 text-2xl font-bold tracking-tight">未來 60 分鐘站況</h2>
+  <div class="operations-home">
+    <section class="overview-metrics" aria-label="營運摘要">
+      <a href="#dispatch-queue" class="overview-metric metric-routes" @click="focusDispatchQueue">
+        <div class="metric-label"><span>目前可行路線</span><RouteIcon style="width: 1em; height: 1em" aria-hidden="true" /></div>
+        <div class="metric-value">{{ dashboard ? currentPlanning.routes.length : '—' }}<span>條</span></div>
+        <div class="metric-bottom"><span>{{ dashboard ? `建議搬運 ${currentTransferCount} 台` : '正在建立建議' }}</span><ArrowRight style="width: 1em; height: 1em" aria-hidden="true" /></div>
+      </a>
+      <div class="overview-metric metric-risk">
+        <div class="metric-label"><span>60 分鐘高風險</span><TriangleAlert style="width: 1em; height: 1em" aria-hidden="true" /></div>
+        <div class="metric-value">{{ hasForecast ? dashboard?.summary.highRiskNext60m : '—' }}<span>站</span></div>
+        <div class="metric-bottom"><span>{{ hasForecast ? '已對照站點的預測風險' : '預測暫不可用' }}</span><span class="metric-tag">預測</span></div>
       </div>
-      <div class="flex min-w-0 flex-col justify-center rounded-lg border border-line bg-surface p-4">
-        <span class="inline-flex items-center gap-2 text-base font-semibold text-muted"><Icon class="text-xl text-accent" icon="solar:calendar-date-outline" /> 資料時間</span>
-        <strong class="mt-2 text-lg leading-7">{{ asOfLabel }}</strong>
-        <span class="mt-1 text-base leading-6 text-muted">每 5 分鐘自動更新</span>
+      <div class="overview-metric metric-inventory">
+        <div class="metric-label"><span>目前空站／滿站</span><Bike style="width: 1em; height: 1em" aria-hidden="true" /></div>
+        <div class="metric-value inventory-value"><span class="empty-count">{{ dashboard?.summary.emptyNow ?? '—' }}</span><i>/</i>{{ dashboard?.summary.fullNow ?? '—' }}<span>站</span></div>
+        <div class="metric-bottom"><span>無車可借／無位可還</span><span class="metric-tag">即時</span></div>
       </div>
     </section>
 
-    <section v-if="dashboard || live.dashboard.value" class="panel grid gap-4 p-4 sm:grid-cols-2 sm:p-5">
-      <ModalPicker v-model="selectedDistrict" :label="selectionSource === 'location' ? '行政區（依位置）' : '行政區'" title="選擇行政區" :options="districtPickerOptions" />
-      <div class="flex min-w-0 flex-col gap-1">
-        <span class="text-base font-semibold text-muted">{{ baselineStatus }}</span>
-        <button class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-accent px-3 text-base font-semibold text-on-accent transition-colors hover:bg-accent-strong disabled:cursor-wait disabled:opacity-70" type="button" :disabled="live.pending.value" @click="live.refresh({ manual: true })">
-          <Icon class="text-xl" :icon="live.pending.value ? 'svg-spinners:3-dots-fade' : 'solar:refresh-circle-outline'" />
-          {{ live.pending.value ? '更新中' : '立即更新' }}
-        </button>
+    <WarningPanel v-if="dashboard" :stations="dashboard.stations" :as-of="dashboard.meta.asOf"
+      :summary="dashboard.summary" @select="selectedStationId = $event" />
+
+    <section class="workspace-toolbar" aria-label="工作區範圍與資料狀態">
+      <div class="workspace-district">
+        <ModalPicker v-model="selectedDistrict" :label="selectionSource === 'location' ? '行政區（依位置）' : '行政區'"
+          title="選擇行政區" :options="districtPickerOptions" />
+        <span class="sr-only" role="status" aria-live="polite">{{ locationMessage }}</span>
       </div>
-      <span class="sr-only" role="status" aria-live="polite">{{ locationMessage }}</span>
+      <div class="source-meta">
+        <div class="source-title"><span class="source-dot" :class="{ 'source-dot--warning': live.error.value || !dashboard }" />{{ dataStatus }}<span class="source-time">{{ asOfLabel }}</span></div>
+        <p><span>全市{{ baselineStatus }}</span><span class="meta-divider">·</span><span>每 5 分鐘檢查更新</span></p>
+      </div>
+      <button class="ops-button button-quiet refresh-data" type="button" :disabled="live.pending.value" @click="live.refresh({ manual: true })">
+        <LoaderCircle v-if="live.pending.value" style="width: 1em; height: 1em" aria-hidden="true" class="animate-spin motion-reduce:animate-none" />
+        <RefreshCw v-else style="width: 1em; height: 1em" aria-hidden="true" />{{ live.pending.value ? '更新中' : '更新資料' }}
+      </button>
     </section>
 
-    <section v-if="dashboard" class="grid grid-cols-1 gap-3 md:grid-cols-3" aria-label="營運摘要">
-      <MetricCard v-for="card in metricCards" :key="card.label" v-bind="card" />
-    </section>
-
-    <div v-if="live.pending.value && !dashboard" class="loading-board" role="status" aria-live="polite"><Icon icon="svg-spinners:3-dots-fade" />正在取得官方即時資料…</div>
-    <div v-else-if="live.error.value && !dashboard" class="loading-board error-board" role="alert"><Icon icon="solar:danger-triangle-outline" />官方即時資料暫時無法取得，請稍後再試。</div>
+    <div v-if="live.pending.value && !dashboard" class="loading-board" role="status" aria-live="polite" aria-busy="true">
+      <LoaderCircle style="width: 1em; height: 1em" aria-hidden="true" class="animate-spin motion-reduce:animate-none" />正在取得官方即時資料…
+    </div>
+    <div v-else-if="live.error.value && !dashboard" class="loading-board error-board" role="alert">
+      <TriangleAlert style="width: 1em; height: 1em" aria-hidden="true" />官方即時資料暫時無法取得。
+      <PageRetryButton :busy="live.pending.value" @retry="live.refresh({ manual: true })" />
+    </div>
 
     <template v-else-if="dashboard">
-      <p v-if="live.error.value" class="live-inline-error text-base" role="alert"><Icon icon="solar:danger-triangle-outline" /> {{ live.error.value }}</p>
-      <section class="grid grid-cols-1 gap-4 xl:grid-cols-2 xl:items-start">
-        <TaskQueue :alerts="dashboard.alerts" :dispatches="dashboard.dispatches" :stations="dashboard.stations" :context-query="contextQuery" @select="selectedStationId = $event" />
-        <RiskMap
-          :stations="dashboard.stations"
-          :horizon="horizon"
-          :selected-id="selectedStationId"
-          data-mode="live"
-          :district="selectedDistrict"
-          :profile-coverage="live.profileCoverage.value"
-          :profile-error="live.profileError.value"
-          @select="selectedStationId = $event"
-          @retry-baseline="live.refresh({ manual: true })"
-        />
+      <p v-if="live.error.value" class="live-inline-error" role="alert"><TriangleAlert style="width: 1em; height: 1em" aria-hidden="true" />{{ live.error.value }} 目前顯示上一筆成功載入的資料。</p>
+      <section class="operations-workspace" aria-label="路線與站點工作區">
+        <RiskMap class="home-risk-map" :stations="dashboard.stations" :horizon="horizon" :selected-id="selectedStationId" data-mode="live"
+          :district="selectedDistrict" :profile-coverage="live.profileCoverage.value" :profile-error="live.profileError.value"
+          :route-stops="observedRouteStops" @select="selectedStationId = $event" @retry-baseline="live.refresh({ manual: true })" />
+        <div class="operations-side-panel" :class="{ 'has-selected-station': selectedStation }">
+          <TaskQueue id="dispatch-queue" :alerts="dashboard.alerts" :stations="dashboard.stations" :as-of="dashboard.meta.asOf"
+            :context-query="contextQuery" @select="selectedStationId = $event" @observe-route="observedRouteStops = $event" />
+          <StationDetailPanel :station="selectedStation" :stations="dashboard.stations" :history="[]" :horizon="horizon"
+            docked data-mode="live" :context-query="contextQuery" @close="selectedStationId = ''" @select="selectedStationId = $event" />
+        </div>
       </section>
 
-      <StationDetailPanel :station="selectedStation" :stations="dashboard.stations" :history="[]" :horizon="horizon" data-mode="live" :context-query="contextQuery" @close="selectedStationId = ''" @select="selectedStationId = $event" />
-
-      <AgentReviewCard :as-of="dashboard.meta.asOf" horizon="60" :district="selectedDistrict" :facts="dashboard.briefingFacts" :summary="dashboard.summary" />
-
-      <DisclosurePanel class="panel mt-4" title="資料與模型" icon="solar:chart-square-outline">
-        <div class="space-y-3 p-4 sm:p-5">
-          <OperationalEvidence :as-of="dashboard.meta.asOf" data-mode="live" />
-          <section class="flex items-start gap-2 rounded-lg bg-surface p-3 text-base leading-6 text-muted">
-            <Icon class="mt-1 shrink-0 text-xl text-accent" icon="solar:info-circle-outline" />
-            <span>以即時庫存和同時段歷史資料估算 60 分鐘站況。</span>
-          </section>
-        </div>
-      </DisclosurePanel>
+      <footer class="home-footnote"><span><Info style="width: 1em; height: 1em" aria-hidden="true" />僅提供分析與路線建議</span><span>預測來源：{{ predictionSourceLabel }}</span></footer>
+      <AgentReviewCard :as-of="dashboard.meta.asOf" horizon="60" :district="selectedDistrict"
+        :facts="dashboard.briefingFacts" :summary="dashboard.summary" />
     </template>
   </div>
 </template>
+
+<style>
+.operations-home { max-width: 1760px; margin: 0 auto; padding: 20px 32px 28px; display: grid; gap: 16px; }
+.overview-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.overview-metric { padding: 16px 20px 13px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); min-width: 0; position: relative; overflow: hidden; }
+.overview-metric::before { content: ''; position: absolute; left: 0; top: 20px; bottom: 20px; width: 3px; background: var(--metric-color); border-radius: 0 3px 3px 0; }
+.metric-routes { --metric-color: var(--accent); background: color-mix(in srgb, var(--accent) 5%, var(--panel)); text-decoration: none; transition: border-color .15s; }
+.metric-routes:hover { border-color: var(--accent); }
+.metric-risk { --metric-color: var(--warning); }
+.metric-inventory { --metric-color: var(--danger); }
+.metric-label, .metric-bottom { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.metric-label { font-size: 15px; font-weight: 600; color: var(--muted); }
+.metric-label svg { color: var(--metric-color); font-size: 23px; }
+.metric-value { display: flex; align-items: baseline; gap: 10px; margin: 10px 0 10px; font-size: clamp(32px, 3.2vw, 42px); font-weight: 650; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -.045em; }
+.metric-value > span:not(.empty-count) { color: var(--muted); font-size: 14px; font-weight: 500; letter-spacing: 0; }
+.metric-routes .metric-value { color: var(--accent); }
+.inventory-value i { font-size: 28px; font-style: normal; color: var(--line-strong); font-weight: 400; }
+.metric-bottom { font-size: 13px; line-height: 1.5; color: var(--muted); }
+.metric-bottom > svg { font-size: 19px; color: var(--accent); }
+.metric-tag { padding: 1px 6px; border: 1px solid var(--line); border-radius: 4px; font-size: 12px; white-space: nowrap; }
+.workspace-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 18px; padding: 2px 0; }
+.workspace-district { width: 205px; flex-shrink: 0; }
+.workspace-district > div > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
+.workspace-district > div { gap: 0; }
+.source-meta { flex: 1; min-width: 200px; }
+.source-title { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; }
+.source-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+.source-dot--warning { background: var(--warning); }
+.source-time { color: var(--muted); font-weight: 400; margin-left: 4px; }
+.source-meta p { display: flex; flex-wrap: wrap; gap: 8px; color: var(--muted); font-size: 13px; margin: 5px 0 0 15px; }
+.meta-divider { color: var(--line-strong); }
+.ops-button { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; gap: 8px; padding: 10px 15px; border: 1px solid transparent; border-radius: 7px; font-size: 14px; font-weight: 650; line-height: 1.4; text-decoration: none; transition: background .15s, border-color .15s; }
+.ops-button svg { font-size: 19px; flex-shrink: 0; }
+.button-primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.button-primary:hover { background: var(--accent-strong); border-color: var(--accent-strong); }
+.button-secondary { border-color: var(--line-strong); background: var(--panel); color: var(--ink); }
+.button-secondary:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 6%, var(--panel)); }
+.button-quiet { border-color: var(--line); color: var(--muted); background: var(--panel); }
+.button-quiet:hover { border-color: var(--line-strong); color: var(--ink); }
+.operations-workspace { display: grid; grid-template-columns: minmax(0, 1.18fr) minmax(360px, .82fr); gap: 20px; align-items: start; }
+.operations-workspace > * { min-width: 0; }
+@media (min-width: 1101px) { .operations-side-panel.has-selected-station > #dispatch-queue { display: none; } }
+#dispatch-queue { scroll-margin-top: 24px; }
+.home-footnote { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 0 2px; color: var(--muted); font-size: 12px; }
+.home-footnote span { display: inline-flex; align-items: center; gap: 6px; }
+.home-footnote svg { font-size: 15px; }
+@media (max-width: 1279px) { .operations-home { padding: 18px 22px 24px; } .operations-workspace { grid-template-columns: minmax(0, 1.1fr) minmax(320px, .9fr); gap: 16px; } }
+@media (max-width: 1100px) { .operations-workspace { grid-template-columns: 1fr; } .overview-metrics { gap: 12px; } }
+@media (max-width: 640px) { .operations-home { padding: 16px; gap: 16px; } .overview-metrics { grid-template-columns: 1fr 1fr; gap: 10px; } .metric-routes { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px; } .metric-routes .metric-label { justify-content: start; } .metric-routes .metric-value { grid-column: 2; grid-row: 1 / 3; margin: 0; } .metric-routes .metric-bottom { grid-column: 1; } .metric-routes .metric-bottom svg { display: none; } .overview-metric { padding: 16px; } .metric-label { font-size: 14px; gap: 6px; } .metric-label svg { font-size: 19px; } .metric-bottom { font-size: 12px; } .metric-tag { display: none; } .metric-value { margin-top: 14px; font-size: 34px; } .workspace-toolbar { gap: 12px; } .workspace-district { width: auto; flex: 1; } .source-meta { flex-basis: 100%; order: 3; } .source-time { margin-left: 0; } .source-title { font-size: 13px; } .source-meta p { font-size: 12px; } .refresh-data { align-self: end; } }
+@media (prefers-reduced-motion: reduce) { .operations-home *, .operations-home *::before { scroll-behavior: auto !important; transition: none !important; animation: none !important; } }
+</style>

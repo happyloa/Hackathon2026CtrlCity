@@ -15,7 +15,7 @@ const evaluation = JSON.parse(await readFile(evaluationUrl, 'utf8'))
 
 test('shared event-risk policy is frozen to the chronological validation selection', () => {
   assert.equal(RISK_POLICY_VERSION, 'event-risk-policy-v1')
-  for (const horizon of ['30', '60', '120']) {
+  for (const horizon of ['30', '60']) {
     const selected = evaluation.thresholdSelection.selected[horizon].threshold
     assert.equal(ALERT_THRESHOLDS[horizon], selected)
     assert.equal(alertThresholdFor(horizon), selected)
@@ -30,7 +30,6 @@ test('risk levels use the shared threshold while current inventory failures rema
   assert.equal(riskLevelFor(threshold60 - .001, '60'), 'medium')
   assert.equal(riskLevelFor(threshold60, '60'), 'high')
   assert.equal(riskLevelFor(Math.min(1, threshold60 + .2), '60'), 'critical')
-  assert.equal(riskLevelFor(ALERT_THRESHOLDS['120'], '120'), 'high')
   assert.equal(alertSeverityFor(.2, '60'), 'normal')
   assert.equal(alertSeverityFor(.2, '60', { currentFailure: true }), 'critical')
 })

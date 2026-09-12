@@ -133,7 +133,7 @@ function fallbackForecast(station: LiveStation, horizon: HorizonKey, observedAt:
     riskScore: 0,
     level: 'normal',
     confidence: 'low',
-    alertThreshold: horizon === '120' ? .4 : .45,
+    alertThreshold: .45,
     baselineStatus: station.serviceStatus === 'operational' ? 'unmatched' : 'not_applicable',
     baselineCoverage: station.serviceStatus === 'operational' ? 'unmatched' : 'not_applicable',
     method: 'inventory_only',
@@ -188,7 +188,6 @@ function createLiveDashboard(
     const forecasts = forecastByStation.get(station.id) || {
       '30': fallbackForecast(station, '30', response.meta.asOf),
       '60': fallbackForecast(station, '60', response.meta.asOf),
-      '120': fallbackForecast(station, '120', response.meta.asOf),
     }
     return {
       id: station.id,

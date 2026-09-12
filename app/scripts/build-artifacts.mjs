@@ -2,7 +2,7 @@ import { createReadStream } from 'node:fs'
 import { mkdir, open, readFile, readdir, rename, stat, writeFile } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import { dirname, extname, join, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
 import { parse } from 'csv-parse'
 import iconv from 'iconv-lite'
@@ -240,9 +240,8 @@ function safeDistrict(district) {
   return district || '未標示行政區'
 }
 
-function detectCriticality(station) {
+export function detectCriticality(station) {
   const horizon = station.forecast.horizons['60']
-  if (station.serviceStatus !== 'operational') return 'critical'
   const risk = Math.max(horizon.emptyRisk, horizon.fullRisk)
   return alertSeverityFor(risk, '60', {
     currentFailure: station.currentState === 'empty' || station.currentState === 'full',
@@ -1118,7 +1117,9 @@ async function main() {
   console.log(`Default replay: ${defaultScenario.at}; scenarios: ${scenarios.map((scenario) => `${scenario.label}@${scenario.at}`).join(', ')}`)
 }
 
-main().catch((error) => {
-  console.error(error)
-  process.exitCode = 1
-})
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((error) => {
+    console.error(error)
+    process.exitCode = 1
+  })
+}

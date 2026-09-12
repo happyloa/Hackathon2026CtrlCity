@@ -3,6 +3,7 @@ import test from 'node:test'
 
 import {
   buildLiveOperations,
+  buildLiveOperationsForHorizon,
   safetyStockFor,
   scoreAlertPriority,
 } from '../shared/live-operations.ts'
@@ -70,7 +71,6 @@ function station({
       horizons: {
         30: { ...stationForecast },
         60: { ...stationForecast },
-        120: { ...stationForecast },
       },
     },
   }
@@ -537,4 +537,105 @@ test('never recommends moving more than the one bike or dock available above saf
   assert.equal(removal.bikeCount, 1)
   assert.equal(delivery.operation, 'deliver_bikes')
   assert.equal(delivery.bikeCount, 1)
+})
+
+test('"now" only surfaces stations already empty or full, leaving forecast-only risk for the wider horizons', () => {
+  const currentlyEmpty = station({
+    id: 'currently-empty',
+    availableBikes: 0,
+    availableDocks: 20,
+    currentState: 'empty_now',
+  })
+  const forecastOnly = station({
+    id: 'forecast-only',
+    availableBikes: 5,
+    availableDocks: 15,
+    latitude: 25.001,
+    stationForecast: forecast({ predictedBikes: 0, predictedDocks: 20, emptyRisk: 0.9, level: 'critical' }),
+  })
+  const source = station({
+    id: 'ample-source',
+    totalDocks: 40,
+    availableBikes: 35,
+    availableDocks: 5,
+    latitude: 25.002,
+  })
+
+  const now = buildLiveOperationsForHorizon([currentlyEmpty, forecastOnly, source], OBSERVED_AT, 'now')
+
+  assert.deepEqual(now.dispatches.map(dispatch => dispatch.toStationId), [currentlyEmpty.id])
+  assert.ok(
+    !now.alerts.some(alert => alert.stationId === forecastOnly.id),
+    '"now" must not surface a station that has not failed yet, only predicted to',
+  )
+})
+
+test('"30" widens "now" to also cover stations forecast to fail within 30 minutes', () => {
+  const currentlyEmpty = station({
+    id: 'currently-empty-30',
+    availableBikes: 0,
+    availableDocks: 20,
+    currentState: 'empty_now',
+  })
+  const forecastOnly = station({
+    id: 'forecast-only-30',
+    availableBikes: 5,
+    availableDocks: 15,
+    latitude: 25.001,
+    stationForecast: forecast({ predictedBikes: 0, predictedDocks: 20, emptyRisk: 0.9, level: 'critical' }),
+  })
+  const source = station({
+    id: 'ample-source-30',
+    totalDocks: 40,
+    availableBikes: 35,
+    availableDocks: 5,
+    latitude: 25.002,
+  })
+  const stations = [currentlyEmpty, forecastOnly, source]
+
+  const now = buildLiveOperationsForHorizon(stations, OBSERVED_AT, 'now')
+  const thirty = buildLiveOperationsForHorizon(stations, OBSERVED_AT, '30')
+
+  const nowStationIds = new Set(now.dispatches.map(dispatch => dispatch.toStationId))
+  const thirtyStationIds = new Set(thirty.dispatches.map(dispatch => dispatch.toStationId))
+  assert.ok([...nowStationIds].every(id => thirtyStationIds.has(id)), '30-minute view must retain every "now" station')
+  assert.ok(thirtyStationIds.has(forecastOnly.id), '30-minute view must add the forecast-only station')
+})
+
+test('"60" keeps every station already picked up at "30", even if that station\'s own 60-minute forecast has recovered', () => {
+  const recovering = {
+    id: 'recovering-at-60',
+    name: 'recovering-at-60',
+    city: '新北市',
+    district: '板橋區',
+    latitude: 25.001,
+    longitude: 121.5,
+    totalDocks: 20,
+    availableBikes: 1,
+    availableDocks: 19,
+    capacityGap: 0,
+    currentState: 'normal',
+    serviceStatus: 'operational',
+    qualityFlags: [],
+    forecast: {
+      horizons: {
+        30: forecast({ predictedBikes: 0, predictedDocks: 20, emptyRisk: 0.9, level: 'critical' }),
+        60: forecast({ predictedBikes: 15, predictedDocks: 5, emptyRisk: 0.05, level: 'normal' }),
+      },
+    },
+  }
+  const source = station({
+    id: 'source-for-recovering',
+    totalDocks: 20,
+    availableBikes: 15,
+    availableDocks: 5,
+    latitude: 25,
+  })
+  const stations = [recovering, source]
+
+  const naiveSixtyOnly = buildLiveOperations(stations, OBSERVED_AT, { horizon: '60' })
+  assert.equal(naiveSixtyOnly.dispatches.length, 0, 'a bare 60-minute call would miss the recovering station')
+
+  const sixty = buildLiveOperationsForHorizon(stations, OBSERVED_AT, '60')
+  assert.deepEqual(sixty.dispatches.map(dispatch => dispatch.toStationId), [recovering.id])
 })

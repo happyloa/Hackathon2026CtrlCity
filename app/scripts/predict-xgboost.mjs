@@ -21,7 +21,7 @@
 // Usage:
 //   npm run predict:xgboost
 
-import { readFile, writeFile, mkdir, rename } from 'node:fs/promises'
+import { access, readFile, writeFile, mkdir, rename } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -39,6 +39,31 @@ const LOW_RATIO = 0.1
 const LOW_FLOOR = 2
 const BASELINE_F1_XGBOOST_THRESHOLD = 0.60 // matches the validated hybrid deployment cutoff
 const EARTH_RADIUS_METERS = 6_371_000
+
+async function requireExportedModels() {
+  const missing = []
+  for (const horizon of HORIZONS) {
+    const path = resolve(XGBOOST_DIR, `model-${horizon}.json`)
+    try {
+      await access(path)
+    } catch {
+      missing.push(path)
+    }
+  }
+
+  if (missing.length) {
+    throw new Error([
+      'Missing exported XGBoost model artifacts:',
+      ...missing.map((path) => `  - ${path}`),
+      '',
+      'Restore ml/output/model_30.json and model_60.json from the machine or artifact store that trained them, then run:',
+      '  python ml/src/export_model_for_web.py',
+      '  cd app && npm run predict:xgboost',
+      '',
+      `The existing static snapshot is still available at ${OUTPUT_FILE}; this command is only needed to refresh it.`,
+    ].join('\n'))
+  }
+}
 
 function normalizeStationName(value) {
   return value
@@ -135,6 +160,7 @@ function lowBikesThreshold(totalDocks) {
 
 async function main() {
   console.log('Loading routing (baseline F1<=60%), station registry, and exported models...')
+  await requireExportedModels()
   const roi = await loadJson(ROI_FILE)
   const risk = await loadJson(RISK_FILE)
   const stationCategories = await loadJson(resolve(XGBOOST_DIR, 'station-categories.json'))

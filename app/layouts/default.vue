@@ -1,64 +1,45 @@
 <script setup lang="ts">
-import { Icon } from "@iconify/vue";
-import { overrideStationsWithXgboost } from "~/shared/xgboost-overrides";
+import { ChevronRight, CircleChevronLeft, CircleChevronRight, LayoutDashboard, MapPin, Moon, Route, Sun } from "@lucide/vue";
 
 const route = useRoute();
+const sidebarCollapsed = ref(false);
 
-const predictionMode = useState<"baseline" | "xgboost">(
-  "prediction-mode",
-  () => "baseline",
+onMounted(() => {
+  sidebarCollapsed.value = localStorage.getItem("ctrlcity-sidebar-collapsed") === "true";
+});
+
+watch(sidebarCollapsed, (collapsed) => {
+  if (import.meta.client) localStorage.setItem("ctrlcity-sidebar-collapsed", String(collapsed));
+});
+
+const { theme, toggle: toggleTheme } = useTheme();
+const themeToggle = computed(() =>
+  theme.value === "dark"
+    ? { label: "淺色模式", ariaLabel: "切換為淺色主題", icon: Sun }
+    : { label: "深色模式", ariaLabel: "切換為深色主題", icon: Moon },
 );
-const xgboost = useXgboostPredictions();
+
 const live = useLiveDashboard();
 useLivePolling(live.refresh, computed(() => true));
 
-watch(
-  predictionMode,
-  (mode) => {
-    if (mode === "xgboost") void xgboost.load();
-  },
-  { immediate: true },
-);
-
-/** Site-wide (not scoped to any one district), so the floating warning carts
- * stay accurate no matter which page is open. */
-const warningStations = computed(() => {
-  const stations = live.dashboard.value?.stations;
-  const asOf = live.dashboard.value?.meta.asOf;
-  if (!stations || !asOf) return [];
-  if (predictionMode.value === "baseline" || !xgboost.payload.value) return stations;
-  return overrideStationsWithXgboost(
-    stations,
-    xgboost.payload.value.stations,
-    asOf,
-    xgboost.payload.value.generatedAt,
-  );
-});
-
-/**
- * The warning cart lists stations across every district (it reads the
- * unscoped `live.dashboard`), but the homepage's own `dashboard` is filtered
- * to whichever district is selected there -- and clears `selectedStationId`
- * the moment it points at a station outside that filter. So a station from
- * a different district than the one currently selected on `/` would silently
- * get deselected right after navigating. Dropping `district` here (instead
- * of preserving it via `navigationQuery`) resets the homepage to "all
- * districts" so the picked station is always present in its dashboard.
- */
-function goToStation(stationId: string) {
-  void navigateTo({ path: "/", query: { station: stationId } });
-}
-
 const navigation = [
-  { to: "/", label: "營運總覽", icon: "solar:radar-2-outline" },
-  { to: "/stations", label: "站點總覽", icon: "solar:map-point-wave-outline" },
-  { to: "/dispatch", label: "調度規劃", icon: "solar:routing-2-outline" },
-  { to: "/roi", label: "營運ROI", icon: "solar:chart-square-outline" },
-  { to: "/adjustments", label: "營運調整", icon: "solar:calendar-mark-outline" },
+  { to: "/", label: "營運總覽", icon: LayoutDashboard },
+  { to: "/stations", label: "站點總覽", icon: MapPin },
+  { to: "/dispatch", label: "調度規劃", icon: Route },
 ];
 
+/** Admin pages (`/admin/*`) are reached by direct URL, not the sidebar, so
+ * they need their header label listed separately from `navigation`. */
+const adminLabels: Record<string, string> = {
+  "/admin/roi": "營運ROI",
+  "/admin/adjustments": "營運調整",
+};
+
 const activeLabel = computed(
-  () => navigation.find((item) => item.to === route.path)?.label || "站點資訊",
+  () =>
+    navigation.find((item) => item.to === route.path)?.label ||
+    adminLabels[route.path] ||
+    "站點資訊",
 );
 const navigationQuery = computed(() =>
   Object.fromEntries(
@@ -77,130 +58,433 @@ const navigationTarget = (path: string) => ({
 </script>
 
 <template>
-  <div class="min-h-svh bg-canvas text-ink">
-    <aside
-      class="border-b border-line bg-panel lg:fixed lg:inset-y-0 lg:left-0 lg:flex lg:w-64 lg:flex-col lg:border-r lg:border-b-0"
-    >
-      <div
-        class="flex items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:block lg:px-5 lg:py-6"
-      >
-        <NuxtLink
-          :to="navigationTarget('/')"
-          class="inline-flex min-w-0 items-center gap-3 no-underline"
-          aria-label="前往營運總覽"
-        >
-          <span
-            class="grid size-10 shrink-0 place-items-center rounded-lg border border-line bg-surface text-xl text-accent"
-            ><Icon icon="solar:wheel-angle-outline"
-          /></span>
-          <span class="min-w-0">
-            <strong class="block truncate text-lg leading-6"
-              >新北市 YouBike</strong
-            >
-            <span class="block text-base leading-6 text-muted">營運工作台</span>
-          </span>
-        </NuxtLink>
-      </div>
-
-      <nav
-        class="flex gap-2 overflow-x-auto px-4 pb-3 sm:px-6 lg:mt-2 lg:flex-col lg:px-4 lg:pb-0"
-        aria-label="主要導覽"
-      >
-        <NuxtLink
-          v-for="item in navigation"
-          :key="item.to"
-          :to="navigationTarget(item.to)"
-          class="inline-flex min-h-11 shrink-0 items-center gap-3 rounded-lg border border-transparent px-3 py-2 text-base font-semibold no-underline transition-colors"
-          :class="
-            route.path === item.to
-              ? 'border-accent bg-accent text-on-accent shadow-sm'
-              : 'text-muted hover:border-line hover:bg-surface hover:text-ink'
-          "
-          :aria-label="item.label"
-          :aria-current="route.path === item.to ? 'page' : undefined"
-          :title="item.label"
-        >
-          <Icon class="shrink-0 text-xl" :icon="item.icon" />
-          <span>{{ item.label }}</span>
+  <div class="ctrlcity-shell" :class="{ 'sidebar-is-collapsed': sidebarCollapsed }">
+    <aside class="ctrlcity-sidebar">
+      <NuxtLink :to="navigationTarget('/')" class="ctrlcity-brand" aria-label="前往營運總覽">
+        <img class="ctrlcity-logo" src="/Logo-t.png" alt="CtrlCity" />
+      </NuxtLink>
+      <span class="nav-caption">營運工作台</span>
+      <nav aria-label="主要導覽" class="ctrlcity-navigation">
+        <NuxtLink v-for="item in navigation" :key="item.to" :to="navigationTarget(item.to)"
+          :class="{ 'is-active': route.path === item.to }" :aria-current="route.path === item.to ? 'page' : undefined">
+          <component :is="item.icon" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" /><span>{{
+            item.label }}</span>
+          <ChevronRight class="nav-arrow" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />
         </NuxtLink>
       </nav>
-
-      <div class="hidden lg:block lg:flex-1" />
-      <div class="hidden border-t border-line px-5 py-5 lg:block">
-        <div class="flex items-start gap-3">
-          <span
-            class="mt-2 size-2 shrink-0 rounded-full bg-positive"
-            aria-hidden="true"
-          />
-          <div>
-            <span class="block text-base text-muted">資料狀態</span>
-            <strong class="mt-1 block text-base leading-6">官方即時站況</strong>
-          </div>
-        </div>
-        <p class="mt-4 text-base leading-6 text-muted">
-          僅提供分析與路線建議。
-        </p>
+      <div class="sidebar-footer">
+        <MapPin style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />
+        <div><strong>新北市服務範圍</strong><small>公共自行車營運支援</small></div>
       </div>
+      <button type="button" class="sidebar-toggle" :aria-label="sidebarCollapsed ? '展開側欄' : '收合側欄'"
+        :title="sidebarCollapsed ? '展開側欄' : '收合側欄'" :aria-expanded="!sidebarCollapsed"
+        @click="sidebarCollapsed = !sidebarCollapsed">
+        <component :is="sidebarCollapsed ? CircleChevronRight : CircleChevronLeft" :size="14" :stroke-width="1.6"
+          aria-hidden="true" />
+      </button>
     </aside>
-
-    <main class="min-w-0 lg:ml-64">
-      <header class="border-b border-line bg-canvas">
-        <div
-          class="mx-auto flex w-full max-w-screen-2xl flex-col gap-3 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8 lg:py-5"
-        >
-          <div class="min-w-0">
-            <p
-              class="inline-flex items-center gap-2 text-base font-semibold tracking-wide text-accent"
-            >
-              新北市公共自行車
-            </p>
-            <h1 class="mt-1 text-2xl font-bold tracking-tight">
-              {{ activeLabel }}
-            </h1>
-          </div>
-          <div class="flex flex-wrap items-center gap-2">
-            <div
-              class="inline-flex min-h-11 items-center rounded-lg border border-line bg-surface p-1 text-base font-bold"
-              role="group"
-              aria-label="預測模型"
-            >
-              <button
-                type="button"
-                class="min-h-9 rounded-md px-3 transition-colors"
-                :class="predictionMode === 'baseline' ? 'bg-accent text-on-accent' : 'text-muted hover:text-ink'"
-                @click="predictionMode = 'baseline'"
-              >Baseline</button>
-              <button
-                type="button"
-                class="min-h-9 rounded-md px-3 transition-colors"
-                :class="predictionMode === 'xgboost' ? 'bg-accent text-on-accent' : 'text-muted hover:text-ink'"
-                @click="predictionMode = 'xgboost'"
-              >XGBoost</button>
-            </div>
-            <span
-              class="inline-flex min-h-11 items-center gap-2 rounded-lg bg-surface px-3 text-base font-semibold text-muted"
-              ><Icon
-                class="text-xl text-accent"
-                icon="solar:map-point-outline"
-              />
-              新北市</span
-            >
-          </div>
+    <main class="ctrlcity-main">
+      <header class="ctrlcity-header">
+        <div class="header-heading">
+          <p>新北市公共自行車</p>
+          <h1>{{ activeLabel }}<span v-if="route.path === '/'" class="header-badge">即時監控</span></h1>
         </div>
-        <p
-          v-if="predictionMode === 'xgboost'"
-          class="mx-auto w-full max-w-screen-2xl px-4 pb-3 text-base text-muted sm:px-6 lg:px-8"
-        >
-          <template v-if="xgboost.error.value">{{ xgboost.error.value }}</template>
-          <template v-else-if="xgboost.pending.value">正在載入 XGBoost 推論結果…</template>
-          <template v-else-if="xgboost.payload.value">
-            XGBoost 快照產出於 {{ new Date(xgboost.payload.value.generatedAt).toLocaleString('zh-TW', { hour12: false }) }}，
-            只涵蓋規則基線 F1≤60% 的站（{{ xgboost.payload.value.method.routing }}），其餘站仍用規則基線。
-          </template>
-        </p>
+        <button type="button" class="header-theme" :aria-label="themeToggle.ariaLabel" :title="themeToggle.ariaLabel"
+          @click="toggleTheme">
+          <component :is="themeToggle.icon" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />
+          <span>{{ themeToggle.label }}</span>
+        </button>
       </header>
       <slot />
     </main>
-    <WarningCarts :stations="warningStations" @select="goToStation" />
   </div>
 </template>
+
+<style scoped>
+.ctrlcity-shell {
+  min-height: 100svh;
+  background: var(--canvas);
+  color: var(--ink);
+}
+
+.ctrlcity-sidebar {
+  width: 208px;
+  position: fixed;
+  inset: 0 auto 0 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--line);
+  background: var(--panel);
+  z-index: 10;
+  transition: width 240ms ease;
+}
+
+.ctrlcity-brand {
+  display: flex;
+  justify-content: center;
+  margin: 24px 22px 36px;
+  text-decoration: none;
+}
+
+.ctrlcity-logo {
+  display: block;
+  width: 118px;
+  height: auto;
+}
+
+.nav-caption {
+  margin: 0 24px 12px;
+  font-size: 12px;
+  color: var(--muted);
+  letter-spacing: .12em;
+}
+
+.ctrlcity-navigation {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 12px;
+}
+
+.ctrlcity-navigation a {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 13px 12px;
+  color: var(--muted);
+  border-radius: 7px;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 550;
+  border: 1px solid transparent;
+  transition: background .15s;
+}
+
+.ctrlcity-navigation a>svg {
+  font-size: 20px;
+}
+
+.ctrlcity-navigation a.is-active {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--panel));
+  border-color: color-mix(in srgb, var(--accent) 20%, var(--panel));
+}
+
+.ctrlcity-navigation a:hover {
+  background: var(--panel-muted);
+  color: var(--ink);
+}
+
+.ctrlcity-navigation .nav-arrow {
+  margin-left: auto;
+  font-size: 15px;
+  opacity: 0;
+}
+
+.ctrlcity-navigation a.is-active .nav-arrow {
+  opacity: 1;
+}
+
+.sidebar-footer {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  margin: auto 20px 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+
+.sidebar-footer>svg {
+  font-size: 21px;
+  color: var(--accent);
+}
+
+.sidebar-footer strong {
+  font-size: 12px;
+  font-weight: 550;
+}
+
+.sidebar-footer small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 3px;
+}
+
+.sidebar-toggle {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  right: -9px;
+  display: grid;
+  width: 16px;
+  height: 16px;
+  place-items: center;
+  overflow: hidden;
+  transform: translateY(-50%);
+  border: 1px solid color-mix(in srgb, var(--accent) 65%, #dbeafe);
+  border-radius: 50%;
+  color: #eafffb;
+  background: linear-gradient(135deg, #183a3a 0%, #8fffea 36%, #315d62 52%, #d8fff8 68%, #102929 100%);
+  background-size: 260% 260%;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--panel) 88%, transparent), 0 3px 14px rgb(0 0 0 / 45%);
+  animation: sidebar-liquid-metal 2s ease-in-out infinite;
+  cursor: pointer;
+}
+
+.sidebar-toggle::before {
+  position: absolute;
+  content: '';
+  inset: -45%;
+  background: linear-gradient(110deg, transparent 35%, rgb(255 255 255 / 70%) 48%, transparent 61%);
+  transform: translateX(-60%) rotate(12deg);
+  animation: sidebar-metal-glint 2s ease-in-out infinite;
+}
+
+.sidebar-toggle svg {
+  position: relative;
+  z-index: 1;
+  filter: drop-shadow(0 1px 2px rgb(0 0 0 / 45%));
+}
+
+.sidebar-toggle:hover {
+  color: #fff;
+  border-color: #fff;
+}
+
+.sidebar-is-collapsed .ctrlcity-sidebar {
+  width: 76px;
+}
+
+.sidebar-is-collapsed .ctrlcity-brand {
+  margin-inline: 10px;
+}
+
+.sidebar-is-collapsed .ctrlcity-logo {
+  width: 52px;
+}
+
+.sidebar-is-collapsed .nav-caption,
+.sidebar-is-collapsed .ctrlcity-navigation a>span,
+.sidebar-is-collapsed .nav-arrow,
+.sidebar-is-collapsed .sidebar-footer>div {
+  display: none;
+}
+
+.sidebar-is-collapsed .ctrlcity-navigation {
+  padding-inline: 10px;
+}
+
+.sidebar-is-collapsed .ctrlcity-navigation a {
+  justify-content: center;
+  padding-inline: 0;
+}
+
+.sidebar-is-collapsed .sidebar-footer {
+  justify-content: center;
+  margin-inline: 12px;
+}
+
+.ctrlcity-main {
+  min-width: 0;
+  margin-left: 208px;
+  transition: margin-left 240ms ease;
+}
+
+.sidebar-is-collapsed .ctrlcity-main {
+  margin-left: 76px;
+}
+
+.ctrlcity-header {
+  max-width: 1760px;
+  margin: auto;
+  padding: 20px 32px;
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--line);
+}
+
+.header-heading p {
+  font-size: 12px;
+  letter-spacing: .12em;
+  color: var(--muted);
+  margin-bottom: 7px;
+}
+
+.header-heading h1 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  font-size: 28px;
+  line-height: 1.3;
+  font-weight: 650;
+  letter-spacing: -.035em;
+}
+
+.header-badge {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: .03em;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--canvas));
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--canvas));
+  border-radius: 5px;
+  padding: 4px 7px;
+}
+
+.header-theme {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.header-theme:hover {
+  color: var(--ink);
+  border-color: var(--line-strong);
+}
+
+.header-theme svg {
+  font-size: 19px;
+}
+
+@keyframes sidebar-liquid-metal {
+
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes sidebar-metal-glint {
+
+  0%,
+  20% {
+    transform: translateX(-70%) rotate(12deg);
+    opacity: 0;
+  }
+
+  45% {
+    opacity: 1;
+  }
+
+  70%,
+  100% {
+    transform: translateX(70%) rotate(12deg);
+    opacity: 0;
+  }
+}
+
+@media (max-width: 1279px) {
+  .ctrlcity-header {
+    padding: 20px 22px;
+  }
+}
+
+@media (max-width: 900px) {
+
+  .ctrlcity-sidebar,
+  .sidebar-is-collapsed .ctrlcity-sidebar {
+    position: static;
+    width: 100%;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .ctrlcity-brand,
+  .sidebar-is-collapsed .ctrlcity-brand {
+    justify-content: flex-start;
+    margin: 12px 20px;
+  }
+
+  .ctrlcity-logo,
+  .sidebar-is-collapsed .ctrlcity-logo {
+    width: 76px;
+  }
+
+  .ctrlcity-main,
+  .sidebar-is-collapsed .ctrlcity-main {
+    margin-left: 0;
+  }
+
+  .nav-caption,
+  .sidebar-footer,
+  .sidebar-toggle {
+    display: none;
+  }
+
+  .ctrlcity-navigation,
+  .sidebar-is-collapsed .ctrlcity-navigation {
+    flex-direction: row;
+    padding: 0 12px 10px;
+    gap: 5px;
+    overflow-x: auto;
+  }
+
+  .ctrlcity-navigation a,
+  .sidebar-is-collapsed .ctrlcity-navigation a {
+    justify-content: flex-start;
+    padding: 10px 12px;
+    flex-shrink: 0;
+    font-size: 14px;
+  }
+
+  .sidebar-is-collapsed .ctrlcity-navigation a>span {
+    display: inline;
+  }
+
+  .ctrlcity-navigation .nav-arrow {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .ctrlcity-header {
+    padding: 20px 16px;
+    gap: 10px;
+  }
+
+  .header-heading h1 {
+    font-size: 24px;
+    gap: 8px;
+  }
+
+  .header-theme span {
+    display: none;
+  }
+
+  .header-theme {
+    width: 44px;
+    justify-content: center;
+  }
+
+  .header-badge {
+    font-size: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  .ctrlcity-sidebar,
+  .ctrlcity-main {
+    transition: none;
+  }
+
+  .sidebar-toggle,
+  .sidebar-toggle::before {
+    animation: none;
+  }
+}
+</style>

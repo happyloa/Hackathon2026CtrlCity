@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
 import { SLOT_OPTIONS, WEEKDAY_OPTIONS, useOperationalRoi } from '~/composables/useOperationalRoi'
+import { usePredictionMode } from '~/composables/usePredictionMode'
 import type { RoiMapPoint } from '~/components/RoiMap.client.vue'
 import forecastEvaluation from '~/data/forecast-evaluation.json'
 import modelEvaluation from '~/data/model-evaluation.json'
@@ -8,6 +9,7 @@ import stationRiskEvaluation from '~/data/station-risk-evaluation.json'
 
 const route = useRoute()
 const router = useRouter()
+const { mode: predictionMode, xgboost } = usePredictionMode()
 const {
   meta,
   weekdayNames,
@@ -219,6 +221,43 @@ watch([selectedDistrict, selectedWeekday, selectedSlot, selectedStationId], () =
 
 <template>
   <div class="mx-auto w-full max-w-screen-2xl space-y-4 px-4 py-4 sm:px-6 lg:px-8 lg:py-6">
+    <!-- Prediction source switcher: this choice drives which forecast the homepage's
+         alerts and dispatch routes are built from (see usePredictionMode). -->
+    <section class="rounded-xl border border-line bg-panel p-4 sm:p-5">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="min-w-0">
+          <h2 class="m-0 text-xl font-bold">預測來源</h2>
+          <p class="mt-1 text-base leading-6 text-muted">切換後，首頁的示警與派遣路徑會改用所選來源的預測結果。</p>
+        </div>
+        <div
+          class="inline-flex min-h-11 items-center rounded-lg border border-line bg-surface p-1 text-base font-bold"
+          role="group"
+          aria-label="預測來源"
+        >
+          <button
+            type="button"
+            class="min-h-9 rounded-md px-3 transition-colors"
+            :class="predictionMode === 'baseline' ? 'bg-accent text-on-accent' : 'text-muted hover:text-ink'"
+            @click="predictionMode = 'baseline'"
+          >規則基線</button>
+          <button
+            type="button"
+            class="min-h-9 rounded-md px-3 transition-colors"
+            :class="predictionMode === 'xgboost' ? 'bg-accent text-on-accent' : 'text-muted hover:text-ink'"
+            @click="predictionMode = 'xgboost'"
+          >XGBoost</button>
+        </div>
+      </div>
+      <p v-if="predictionMode === 'xgboost'" class="mt-3 mb-0 text-base text-muted">
+        <template v-if="xgboost.error.value">{{ xgboost.error.value }}</template>
+        <template v-else-if="xgboost.pending.value">正在載入 XGBoost 推論結果…</template>
+        <template v-else-if="xgboost.payload.value">
+          XGBoost 快照產出於 {{ new Date(xgboost.payload.value.generatedAt).toLocaleString('zh-TW', { hour12: false }) }}，
+          只涵蓋規則基線 F1≤60% 的站（{{ xgboost.payload.value.method.routing }}），其餘站仍用規則基線。
+        </template>
+      </p>
+    </section>
+
     <!-- F1 Dashboard -->
     <section class="rounded-xl border border-line bg-panel p-4 sm:p-5">
       <div class="min-w-0">

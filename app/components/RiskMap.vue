@@ -1,12 +1,8 @@
 <script setup lang="ts">
-import { Icon } from '@iconify/vue'
-import { safetyStockFor } from '~/shared/live-operations'
+import { Info, LocateFixed, MapPin, MapPinSearch, RefreshCw, Search, TriangleAlert, X } from '@lucide/vue'
+import { stationSeverityFor, type SeverityLevel } from '~/shared/operational-policy.mjs'
 import { displayStationName, type DataMode, type HorizonKey, type PredictionCoverage, type StationRisk } from '~/shared/ops'
-import {
-  clusterNearbyRiskStations,
-  stableInventoryTone,
-  type StableInventoryTone,
-} from '~/shared/risk-map-visuals'
+import type { DispatchRouteStop, DispatchRouteStopAction } from '~/shared/dispatch-route-planner'
 
 const props = defineProps<{
   stations: StationRisk[]
@@ -14,17 +10,21 @@ const props = defineProps<{
   selectedId?: string
   dataMode?: DataMode
   district?: string
+  /** Passing these renders the district picker above the search box (see index.vue). */
+  districtOptions?: { value: string, label: string }[]
+  districtSelectionSource?: string
+  districtLocationMessage?: string
   profileCoverage?: PredictionCoverage | null
   profileError?: string
+  /** The currently "observed" dispatch route's stops, drawn as coloured pins on top of everything else. */
+  routeStops?: DispatchRouteStop[] | null
 }>()
 
-const emit = defineEmits<{ select: [stationId: string], retryBaseline: [] }>()
+const emit = defineEmits<{ select: [stationId: string], retryBaseline: [], 'update:district': [district: string] }>()
 
 type LeafletModule = typeof import('leaflet')
 type LeafletMap = import('leaflet').Map
-type LeafletLayerGroup = import('leaflet').LayerGroup
-type LeafletCircleMarker = import('leaflet').CircleMarker
-type LeafletRenderer = import('leaflet').Renderer
+type LeafletMouseEvent = import('leaflet').LeafletMouseEvent
 
 const mapElement = ref<HTMLElement | null>(null)
 const isLive = computed(() => props.dataMode === 'live')
@@ -55,7 +55,7 @@ const headerLabel = computed(() => stationQuery.value
   ? '個搜尋結果'
   : showAllStations.value
     ? `個${props.district || '全市'}站點`
-    : '個需注意站點')
+    : '  個需注意站點')
 const scopeName = computed(() => props.district || '新北市')
 const stationScopeActionLabel = computed(() => showAllStations.value
   ? '只看需注意'
@@ -70,208 +70,382 @@ const baselineNotice = computed(() => {
 
 let leaflet: LeafletModule | null = null
 let leafletMap: LeafletMap | null = null
-let hotspotLayer: LeafletLayerGroup | null = null
-let markerLayer: LeafletLayerGroup | null = null
-let hotspotRenderer: LeafletRenderer | null = null
-let canvasRenderer: LeafletRenderer | null = null
+let overlay: HTMLCanvasElement | null = null
 let resizeObserver: ResizeObserver | null = null
-const markerById = new globalThis.Map<string, LeafletCircleMarker>()
-const htmlEntities: Record<string, string> = {
-  '&': '&amp;',
-  '<': '&lt;',
-  '>': '&gt;',
-  "'": '&#039;',
-  '"': '&quot;',
+let redrawFrame = 0
+const hoveredStationId = ref<string | null>(null)
+const hoverPoint = ref<{ x: number, y: number } | null>(null)
+const selectedStationPoint = ref<{ x: number, y: number } | null>(null)
+const routeStopPoints = ref<{ x: number, y: number, stop: DispatchRouteStop }[]>([])
+const hoveredRouteStationId = ref<string | null>(null)
+
+const ROUTE_STOP_PIN_COLOR: Record<DispatchRouteStopAction, string> = {
+  pickup: '#7dd3fc',
+  dropoff: '#ff6f61',
+  mixed: '#ff6f61',
 }
 
-type MarkerTone = 'stable' | 'empty-risk' | 'full-risk' | 'service-review' | 'inventory-only'
+interface RouteStopMarker {
+  stationId: string
+  x: number
+  y: number
+  action: DispatchRouteStopAction
+  stops: DispatchRouteStop[]
+}
 
-const STABLE_MARKER_COLORS: Record<StableInventoryTone, string> = {
-  balanced: '#8a5a09',
-  'bike-heavy': '#23B8F7',
-  'dock-heavy': '#DB987B',
-  // 'dock-heavy': '#1787a0',
+/**
+ * The heuristic planner inserts one dispatch at a time and never reorders
+ * stops already placed, so it can send the vehicle back to a station it
+ * already visited (see dispatch-route-planner.ts's docstring) -- typically
+ * because the bikes being dropped off there weren't picked up yet at the
+ * time of the earlier visit. Two stop entries at the same coordinate would
+ * otherwise render as two pins stacked exactly on top of each other, which
+ * reads as one stop and hides that a second trip is happening; grouping by
+ * station and labelling every sequence number together keeps that visible.
+ */
+const routeStopMarkers = computed(() => {
+  const byStation = new globalThis.Map<string, RouteStopMarker>()
+  for (const entry of routeStopPoints.value) {
+    const existing = byStation.get(entry.stop.stationId)
+    if (existing) {
+      existing.stops.push(entry.stop)
+      if (existing.action !== entry.stop.action) existing.action = 'mixed'
+    } else {
+      byStation.set(entry.stop.stationId, {
+        stationId: entry.stop.stationId,
+        x: entry.x,
+        y: entry.y,
+        action: entry.stop.action,
+        stops: [entry.stop],
+      })
+    }
+  }
+  return [...byStation.values()]
+})
+
+const hoveredRouteStopMarker = computed(() => hoveredRouteStationId.value
+  ? routeStopMarkers.value.find(marker => marker.stationId === hoveredRouteStationId.value) ?? null
+  : null)
+
+function routeStopMarkerLabel(marker: RouteStopMarker) {
+  return `路線第 ${marker.stops.map(stop => stop.sequence).join('、')} 站：${marker.stops[0]?.stationName ?? ''}`
 }
-const MARKER_COLORS: Record<Exclude<MarkerTone, 'stable'>, string> = {
-  'empty-risk': '#a93a34',
-  'full-risk': '#1216FF',
-  'service-review': '#65706b',
-  'inventory-only': '#8a5a09',
+
+function routeStopPinColor(marker: RouteStopMarker) {
+  return marker.stops.some(stop => stop.sequence === 1)
+    ? '#3ecf8e'
+    : ROUTE_STOP_PIN_COLOR[marker.action]
 }
-const HOTSPOT_FILL = '#ec4899'
-const HOTSPOT_STROKE = '#f472b6'
+
+function routeStopSequenceLabel(marker: RouteStopMarker) {
+  return marker.stops.map(stop => String(stop.sequence)).join('·')
+}
+
+function routeStopMarkerName(marker: RouteStopMarker) {
+  return marker.stops[0]?.stationName ?? ''
+}
+
+function routeStopMarkerBikes(marker: RouteStopMarker, field: 'pickupBikes' | 'dropoffBikes') {
+  return marker.stops.reduce((total, stop) => total + stop[field], 0)
+}
+
+// Stops are already in visiting order (see buildDispatchRoutePlans), so a
+// polyline through them in the same order is the actual driving path -- if
+// the route revisits a station later on, the line will too, on purpose.
+const routeLinePoints = computed(() => routeStopPoints.value.map(entry => `${entry.x},${entry.y}`).join(' '))
 
 function forecastFor(station: StationRisk) {
   return station.forecast.horizons[props.horizon]
 }
 
-function markerTone(station: StationRisk): MarkerTone {
-  if (station.serviceStatus !== 'operational') return 'service-review'
-  if (station.currentState === 'empty_now') return 'empty-risk'
-  if (station.currentState === 'full_now') return 'full-risk'
-
-  const forecast = forecastFor(station)
-  if (isLive.value && forecast.baselineStatus !== 'matched' && !showAllStations.value) return 'inventory-only'
-  if (forecast.emptyRisk >= forecast.alertThreshold && forecast.emptyRisk >= forecast.fullRisk) return 'empty-risk'
-  if (forecast.fullRisk >= forecast.alertThreshold) return 'full-risk'
-  return 'stable'
+/**
+ * The map's severity colour never depends on the forecast horizon -- it is
+ * judged purely by current available bikes/docks, same as everywhere else
+ * severity is decided (shared/operational-policy). The `horizon` prop only
+ * affects the baseline-coverage caption above the map.
+ */
+function severityFor(station: StationRisk) {
+  return stationSeverityFor(station)
 }
 
 function isActionable(station: StationRisk) {
-  const tone = markerTone(station)
-  return tone === 'empty-risk' || tone === 'full-risk' || tone === 'service-review'
+  return severityFor(station) !== 'normal'
 }
 
-function isInventoryRisk(station: StationRisk) {
-  const tone = markerTone(station)
-  return tone === 'empty-risk' || tone === 'full-risk'
+// ── Neighbour-group expansion ────────────────────────────────────────────
+//
+// Clicking a blob answers "this area is served by which stations", distinct
+// from the colour blending above (see "鄰近群不是著色單位" in CONTEXT.md).
+// This is a direct, non-transitive radius query around the click's actual
+// geographic point -- every operational station within NEIGHBOUR_GROUP_RADIUS_METERS
+// of *that point*, not a chain of overlapping station-to-station neighbourhoods
+// (which, transitively, could sprawl to a hundred-plus stations across a dense
+// area and stop meaning "this area").
+const NEIGHBOUR_GROUP_RADIUS_METERS = 500
+
+const clickedGroupPoint = ref<{ x: number, y: number } | null>(null)
+const clickedGroupMemberIds = ref<globalThis.Set<string> | null>(null)
+const clickedGroupStations = computed(() => {
+  const members = clickedGroupMemberIds.value
+  if (!members) return []
+  return allMappedStations.value.filter(station => members.has(station.id))
+})
+
+function closeClickedGroup() {
+  clickedGroupPoint.value = null
+  clickedGroupMemberIds.value = null
 }
 
-const riskProximityClusters = computed(() => clusterNearbyRiskStations(
-  mappedStations.value.filter(isInventoryRisk),
-))
-const riskClusterSizeByStationId = computed(() => new Map(riskProximityClusters.value.flatMap(
-  cluster => cluster.memberIds.map(stationId => [stationId, cluster.memberIds.length] as const),
-)))
-const hasVisibleStableStations = computed(() => mappedStations.value.some(station => markerTone(station) === 'stable'))
-const hasVisibleInventoryOnlyStations = computed(() => mappedStations.value.some(station => markerTone(station) === 'inventory-only'))
-
-function markerColor(station: StationRisk) {
-  const tone = markerTone(station)
-  return tone === 'stable'
-    ? STABLE_MARKER_COLORS[stableInventoryTone(station)]
-    : MARKER_COLORS[tone]
+function selectFromClickedGroup(stationId: string) {
+  emit('select', stationId)
+  closeClickedGroup()
 }
 
-function stableInventoryStatus(station: StationRisk) {
-  const tone = stableInventoryTone(station)
-  const capacity = Math.max(1, station.totalDocks)
-  if (tone === 'bike-heavy') return `穩定・可借約 ${Math.round(Math.min(1, station.availableBikes / capacity) * 100)}%`
-  if (tone === 'dock-heavy') return `穩定・可還約 ${Math.round(Math.min(1, station.availableDocks / capacity) * 100)}%`
-  return '穩定・供需均衡'
+// ── Soft-blend overlay ───────────────────────────────────────────────────
+//
+// Stations are painted individually onto a canvas overlaid on the Leaflet
+// map; the "neighbourhood" a dispatcher reads is whatever emerges from the
+// overlap of those soft-edged blobs, not a precomputed shape (see the
+// "鄰近群不是著色單位" entry in CONTEXT.md). Leaflet itself only supplies the
+// basemap tiles and screen-coordinate conversion.
+//
+// Parameters below come from the throwaway prototype at commit 6e52619,
+// validated against the full 1,526-station dataset -- see
+// .scratch/dispatch-homepage-redesign/issues/02-map-soft-blend-rendering.md.
+
+const BLEND_RADIUS_METERS = 500
+const BASE_LAYER_PEAK_ALPHA = 0.10
+
+// ── Station markers ──────────────────────────────────────────────────────
+//
+// The blend layer answers "which area is struggling"; it was never meant to
+// answer "which dot is which station" (see "站點標記" in CONTEXT.md, and
+// docs/adr/0001-station-markers-above-zoom-threshold.md for why this exists
+// alongside the blend instead of replacing it). Below a district-level zoom
+// the ~1,600 stations would still overlap into unreadable clutter -- the same
+// density problem the blend was built to avoid -- so markers only appear once
+// zoomed in far enough to see them apart. Tune the threshold by changing
+// MARKER_MIN_ZOOM.
+const MARKER_MIN_ZOOM = 13
+const MARKER_RADIUS_PIXELS = 6
+
+type Severity = SeverityLevel
+
+const SEVERITY_RGB: Record<Severity, [number, number, number]> = {
+  service_disruption: [156, 163, 175],
+  full: [34, 211, 238],
+  empty: [239, 68, 68],
+  near_empty: [249, 115, 22],
+  low: [234, 179, 8],
+  normal: [34, 197, 94],
 }
 
-function markerStatus(station: StationRisk) {
-  const tone = markerTone(station)
-  if (tone === 'service-review') {
-    return station.serviceStatus === 'official_inactive'
-      ? '官方停用・不排路線'
-      : '服務異常・不排路線'
-  }
-  if (tone === 'inventory-only') return '沒有歷史基線・只看即時庫存'
-  if (station.currentState === 'empty_now') return '目前無車可借'
-  if (station.currentState === 'full_now') return '目前無位可還'
-  if (tone === 'empty-risk') return isLive.value ? '60 分鐘缺車風險' : '預測缺車風險'
-  if (tone === 'full-risk') return isLive.value ? '60 分鐘缺位風險' : '預測缺位風險'
-  return stableInventoryStatus(station)
+// Light-to-dark paint order: later entries cover earlier ones, so empty
+// (red) is always drawn last and never gets buried under a lighter colour.
+const UPPER_LAYER_ORDER: Exclude<Severity, 'normal'>[] = ['service_disruption', 'low', 'full', 'near_empty', 'empty']
+const UPPER_LAYER_PEAK_ALPHA: Record<Exclude<Severity, 'normal'>, number> = {
+  service_disruption: 0.22,
+  low: 0.20,
+  full: 0.36,
+  near_empty: 0.36,
+  empty: 0.36,
 }
 
-function interventionGap(station: StationRisk) {
-  const forecast = forecastFor(station)
-  const buffer = safetyStockFor(station)
-  const tone = markerTone(station)
-  if (tone === 'empty-risk') return Math.max(1, buffer - Math.min(station.availableBikes, forecast.predictedBikes))
-  if (tone === 'full-risk') return Math.max(1, buffer - Math.min(station.availableDocks, forecast.predictedDocks))
-  return tone === 'service-review' ? 2 : 0
+const SEVERITY_LEGEND: { severity: Severity, label: string }[] = [
+  { severity: 'service_disruption', label: '服務異常' },
+  { severity: 'full', label: '滿柱・可還車位 0' },
+  { severity: 'empty', label: '完全缺車・可借車數 0' },
+  { severity: 'near_empty', label: '近端缺車・可借車數 < 2' },
+  { severity: 'low', label: '偏低・低於總車格一半' },
+  { severity: 'normal', label: '正常' },
+]
+
+function metersPerPixel(latitude: number, zoom: number) {
+  return (156543.03392 * Math.cos(latitude * Math.PI / 180)) / 2 ** zoom
 }
 
-function escapeHtml(value: string) {
-  return value.replace(/[&<>'"]/g, character => htmlEntities[character] || character)
+/** A soft-edged circle: full colour at the centre, fading to transparent at the radius. */
+function paintBlob(ctx: CanvasRenderingContext2D, x: number, y: number, radius: number, rgb: [number, number, number], peakAlpha: number) {
+  const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius)
+  const [red, green, blue] = rgb
+  gradient.addColorStop(0, `rgba(${red},${green},${blue},${peakAlpha})`)
+  gradient.addColorStop(0.55, `rgba(${red},${green},${blue},${peakAlpha * 0.5})`)
+  gradient.addColorStop(1, `rgba(${red},${green},${blue},0)`)
+  ctx.fillStyle = gradient
+  ctx.beginPath()
+  ctx.arc(x, y, radius, 0, Math.PI * 2)
+  ctx.fill()
 }
 
-function tooltipContent(station: StationRisk) {
-  const forecast = forecastFor(station)
-  const tone = markerTone(station)
-  const inventory = `可借 ${station.availableBikes}・可還 ${station.availableDocks}`
-  const direction = station.currentState === 'empty_now'
-    ? '官方即時：目前無車可借'
-    : station.currentState === 'full_now'
-      ? '官方即時：目前無位可還'
-      : tone === 'empty-risk'
-        ? `${props.horizon} 分鐘缺車風險 ${Math.round(forecast.emptyRisk * 100)}／100`
-        : tone === 'full-risk'
-          ? `${props.horizon} 分鐘缺位風險 ${Math.round(forecast.fullRisk * 100)}／100`
-          : markerStatus(station)
-  const context = forecast.baselineStatus === 'matched' || station.currentState !== 'normal'
-    ? direction
-    : markerStatus(station)
-  const clusterSize = riskClusterSizeByStationId.value.get(station.id) || 0
-  const clusterContext = clusterSize > 1
-    ? `<span>300 公尺鄰近群組・共 ${clusterSize} 站</span>`
-    : ''
-  return `<strong>${escapeHtml(displayStationName(station.name))}</strong><span>${escapeHtml(station.district || '新北市')}・${inventory}</span><span>${escapeHtml(context)}</span>${clusterContext}`
+/** A small solid dot marking one station's exact location, coloured by severity. */
+function paintMarker(ctx: CanvasRenderingContext2D, x: number, y: number, rgb: [number, number, number]) {
+  const [red, green, blue] = rgb
+  ctx.beginPath()
+  ctx.arc(x, y, MARKER_RADIUS_PIXELS, 0, Math.PI * 2)
+  ctx.fillStyle = `rgba(${red},${green},${blue},0.5)`
+  ctx.fill()
+  ctx.lineWidth = 2.5
+  ctx.strokeStyle = `rgb(${red},${green},${blue})`
+  ctx.stroke()
 }
 
-function markerOptions(station: StationRisk) {
-  const selected = station.id === props.selectedId
-  const gap = interventionGap(station)
-  return {
-    radius: Math.max(4.5, 5 + Math.min(7, Math.sqrt(gap) * 1.7)) + (selected ? 2 : 0),
-    color: selected ? '#f4f4f5' : '#242428',
-    weight: selected ? 3 : 1.25,
-    fillColor: markerColor(station),
-    fillOpacity: selected ? 1 : .92,
-  }
-}
+// The last frame's projected stations, reused for hover/click hit-testing so
+// pointer handlers don't reproject the whole visible set on every mousemove.
+let lastVisible: { station: StationRisk, severity: Severity, x: number, y: number }[] = []
+let lastRadiusPixels = 0
+const HIT_TEST_TOLERANCE_PIXELS = 14
 
-function renderRiskHotspots() {
-  if (!leaflet || !leafletMap || !hotspotLayer || !hotspotRenderer) return
-  hotspotLayer.clearLayers()
-  for (const cluster of riskProximityClusters.value) {
-    leaflet.circle([cluster.latitude, cluster.longitude], {
-      renderer: hotspotRenderer,
-      pane: 'risk-hotspots',
-      radius: cluster.radiusMeters,
-      color: HOTSPOT_STROKE,
-      weight: 1.25,
-      opacity: .46,
-      fillColor: HOTSPOT_FILL,
-      fillOpacity: .24,
-      interactive: false,
-      bubblingMouseEvents: false,
-    }).addTo(hotspotLayer)
-  }
-}
-
-function renderMarkers() {
-  if (!leaflet || !leafletMap || !markerLayer || !canvasRenderer) return
-  renderRiskHotspots()
-
-  const visibleIds = new Set<string>()
-  for (const station of mappedStations.value) {
-    if (station.latitude === null || station.longitude === null) continue
-    visibleIds.add(station.id)
-
-    const existing = markerById.get(station.id)
-    if (existing) {
-      existing.setLatLng([station.latitude, station.longitude])
-      existing.setRadius(markerOptions(station).radius)
-      existing.setStyle(markerOptions(station))
-      existing.setTooltipContent(tooltipContent(station))
-      continue
+function stationAt(point: { x: number, y: number }) {
+  let nearest: (typeof lastVisible)[number] | null = null
+  let nearestDistance = HIT_TEST_TOLERANCE_PIXELS
+  for (const entry of lastVisible) {
+    const distance = Math.hypot(entry.x - point.x, entry.y - point.y)
+    if (distance <= nearestDistance) {
+      nearestDistance = distance
+      nearest = entry
     }
+  }
+  return nearest
+}
 
-    const marker = leaflet.circleMarker([station.latitude, station.longitude], {
-      ...markerOptions(station),
-      renderer: canvasRenderer,
-      bubblingMouseEvents: false,
-    })
-    marker.bindTooltip(tooltipContent(station), {
-      direction: 'top',
-      offset: [0, -4],
-      opacity: 1,
-      sticky: true,
-    })
-    marker.on('click', () => emit('select', station.id))
-    marker.addTo(markerLayer)
-    markerById.set(station.id, marker)
+/**
+ * Leaflet zooms by CSS-transforming its own tile/marker panes smoothly over
+ * ~250ms, then snapping everything to exact pixel positions once the
+ * animation settles (`zoomend`). Our canvas is redrawn only on that final
+ * snap, computed at the target zoom -- so without this handler it would
+ * jump to the new (correct) content immediately, then sit still while the
+ * basemap keeps visibly animating underneath it, reading as a static mask
+ * stuck on top for the remaining ~250ms. This mirrors the same "CSS
+ * transform the raster during the animation, redraw crisply once it ends"
+ * pattern Leaflet's own image/tile layers use, computed here with only
+ * public Map APIs (`project`/`getSize`/`getZoomScale`) since the canvas
+ * stays outside Leaflet's own panes -- it draws in container-point space,
+ * not layer-point space, so it can be redrawn correctly on every pan frame
+ * without needing pane-relative positioning.
+ */
+function onZoomAnim(event: import('leaflet').ZoomAnimEvent) {
+  if (!leafletMap || !overlay) return
+  const map = leafletMap
+  const topLeftLatLng = map.containerPointToLatLng([0, 0])
+  const scale = map.getZoomScale(event.zoom, map.getZoom())
+  const targetCenterPixel = map.project(event.center, event.zoom)
+  const referencePointPixel = map.project(topLeftLatLng, event.zoom)
+  const newTopLeft = referencePointPixel.subtract(targetCenterPixel).add(map.getSize().divideBy(2))
+  overlay.style.transition = 'transform 0.25s cubic-bezier(0,0,0.25,1)'
+  overlay.style.transform = `translate3d(${newTopLeft.x}px, ${newTopLeft.y}px, 0) scale(${scale})`
+}
+
+function redrawOverlay() {
+  if (!leafletMap || !overlay) return
+  const map = leafletMap
+  overlay.style.transition = 'none'
+  overlay.style.transform = 'none'
+  // While a route is being observed, or a station is selected (its
+  // `MapPinSearch` pin drawn above the canvas), fade the severity blend so
+  // it doesn't fight what's drawn on top of it for contrast -- but station
+  // markers stay at full strength, since they're identity/location, not
+  // decorative colour. That rules out a single CSS `opacity` on the whole
+  // canvas (it would dim `paintMarker`'s pixels along with `paintBlob`'s);
+  // instead the fade is applied per-call, only to blob alpha, below. Reads
+  // `props.selectedId` rather than `selectedStationPoint` -- that ref is
+  // only assigned later in this same function, so reading it here would lag
+  // a frame behind the prop that actually just changed.
+  overlay.style.opacity = '1'
+  const blendFade = props.routeStops?.length || props.selectedId ? 0.45 : 1
+  const size = map.getSize()
+  const devicePixelRatio = Math.min(window.devicePixelRatio || 1, 2)
+
+  if (overlay.width !== size.x * devicePixelRatio || overlay.height !== size.y * devicePixelRatio) {
+    overlay.width = size.x * devicePixelRatio
+    overlay.height = size.y * devicePixelRatio
+    overlay.style.width = `${size.x}px`
+    overlay.style.height = `${size.y}px`
   }
 
-  for (const [stationId, marker] of markerById) {
-    if (visibleIds.has(stationId)) continue
-    markerLayer.removeLayer(marker)
-    markerById.delete(stationId)
+  const ctx = overlay.getContext('2d')
+  if (!ctx) return
+  ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0)
+  ctx.clearRect(0, 0, size.x, size.y)
+
+  const radiusPixels = BLEND_RADIUS_METERS / metersPerPixel(map.getCenter().lat, map.getZoom())
+  lastRadiusPixels = radiusPixels
+  if (radiusPixels < 1) return
+
+  // Only project stations near the viewport (padded by one radius) -- with
+  // 1,526 stations, projecting the whole dataset every frame is wasted work.
+  const pad = radiusPixels + 4
+  const visible: { station: StationRisk, severity: Severity, x: number, y: number }[] = []
+  for (const station of allMappedStations.value) {
+    const point = map.latLngToContainerPoint([station.latitude as number, station.longitude as number])
+    if (point.x < -pad || point.y < -pad || point.x > size.x + pad || point.y > size.y + pad) continue
+    visible.push({ station, severity: severityFor(station), x: point.x, y: point.y })
   }
+  lastVisible = visible
+
+  ctx.globalCompositeOperation = 'source-over'
+
+  // Base layer: every operational station gets exactly one green blob, so a
+  // dense-but-healthy district never reads as more severe than a sparse one.
+  for (const entry of visible) {
+    if (entry.severity === 'service_disruption') continue
+    paintBlob(ctx, entry.x, entry.y, radiusPixels, SEVERITY_RGB.normal, BASE_LAYER_PEAK_ALPHA * blendFade)
+  }
+
+  // Upper layers: grouped by severity, painted light-to-dark.
+  const grouped = new globalThis.Map<Exclude<Severity, 'normal'>, { x: number, y: number }[]>()
+  for (const entry of visible) {
+    if (entry.severity === 'normal') continue
+    const list = grouped.get(entry.severity) ?? []
+    list.push({ x: entry.x, y: entry.y })
+    grouped.set(entry.severity, list)
+  }
+  for (const severity of UPPER_LAYER_ORDER) {
+    const list = grouped.get(severity)
+    if (!list) continue
+    const peakAlpha = UPPER_LAYER_PEAK_ALPHA[severity] * blendFade
+    for (const point of list) paintBlob(ctx, point.x, point.y, radiusPixels, SEVERITY_RGB[severity], peakAlpha)
+  }
+
+  // Station markers: only once zoomed in past MARKER_MIN_ZOOM, drawn on top
+  // of every blend layer so they stay visible regardless of what's underneath.
+  if (map.getZoom() >= MARKER_MIN_ZOOM) {
+    for (const entry of visible) paintMarker(ctx, entry.x, entry.y, SEVERITY_RGB[entry.severity])
+  }
+
+  // The selected-station indicator is a DOM pin (see the template), not a
+  // canvas shape, so it can use a real icon; this just tracks where it goes.
+  const selected = props.selectedId ? visible.find(entry => entry.station.id === props.selectedId) : undefined
+  selectedStationPoint.value = selected ? { x: selected.x, y: selected.y } : null
+
+  // The observed route's stops are DOM pins too (see the template), computed
+  // independently of the padded `visible` list above so a stop just off-screen
+  // still gets a real (if unseen) position rather than being dropped.
+  routeStopPoints.value = (props.routeStops ?? []).flatMap((stop) => {
+    const station = props.stations.find(candidate => candidate.id === stop.stationId)
+    if (!station || station.latitude === null || station.longitude === null) return []
+    const point = map.latLngToContainerPoint([station.latitude, station.longitude])
+    return [{ x: point.x, y: point.y, stop }]
+  })
+}
+
+// Leaflet's `_move()` -- called synchronously right when a zoom animation
+// starts, already carrying the *target* zoom/center -- fires plain 'move'
+// and 'zoom' events immediately, a full ~250ms before the animation Leaflet
+// itself is running actually finishes. Letting those trigger a hard redraw
+// snapped the overlay to the target content one frame in, undoing
+// `onZoomAnim`'s transform after a single frame -- a visible flash of
+// content in the wrong (untransformed-then-briefly-transformed) place.
+// Suppressing redraws between 'zoomstart' and 'zoomend' leaves `onZoomAnim`
+// as the only thing moving the overlay during the animation.
+let isZoomAnimating = false
+
+function scheduleRedraw() {
+  if (isZoomAnimating) return
+  if (redrawFrame) cancelAnimationFrame(redrawFrame)
+  redrawFrame = requestAnimationFrame(() => {
+    redrawFrame = 0
+    redrawOverlay()
+  })
 }
 
 function fitCurrentScope() {
@@ -285,7 +459,7 @@ function fitCurrentScope() {
   leafletMap.fitBounds(leaflet.latLngBounds(points), {
     animate: !reduceMotion,
     duration: reduceMotion ? 0 : .35,
-    maxZoom: props.district ? 14 : 13,
+    maxZoom: props.district ? 13 : 12,
     padding: [28, 28],
   })
 }
@@ -297,6 +471,73 @@ function toggleStationScope() {
 function chooseSearchResult(stationId: string) {
   emit('select', stationId)
   stationQuery.value = ''
+}
+
+const hoveredStation = computed(() => hoveredStationId.value
+  ? allMappedStations.value.find(station => station.id === hoveredStationId.value) ?? null
+  : null)
+function severityLabelFor(station: StationRisk) {
+  return SEVERITY_LEGEND.find(entry => entry.severity === severityFor(station))?.label ?? ''
+}
+const hoveredSeverityLabel = computed(() => hoveredStation.value ? severityLabelFor(hoveredStation.value) : '')
+
+// The overlay canvas is `pointer-events: none` so panning/zooming keeps
+// hitting Leaflet's own layers underneath; hover and click are handled here
+// off Leaflet's own mouse events instead, hit-tested against the blend
+// layer's last-painted station positions.
+function onMapPointerMove(event: LeafletMouseEvent) {
+  const hit = stationAt(event.containerPoint)
+  hoveredStationId.value = hit?.station.id ?? null
+  hoverPoint.value = hit ? { x: event.containerPoint.x, y: event.containerPoint.y } : null
+  if (mapElement.value) mapElement.value.style.cursor = hit ? 'pointer' : ''
+}
+
+function onMapPointerLeave() {
+  hoveredStationId.value = null
+  hoverPoint.value = null
+}
+
+function onMapClick(event: LeafletMouseEvent) {
+  const point = event.containerPoint
+  // Below MARKER_MIN_ZOOM there's no visible marker to click precisely on --
+  // the blob radius and the hover hit-tolerance are close in size at that
+  // zoom, so treating every click as "the precise station" would make the
+  // neighbour-group popup below unreachable. Only trust a precise hit once
+  // the marker it's supposed to represent actually exists on screen.
+  const showingMarkers = Boolean(leafletMap && leafletMap.getZoom() >= MARKER_MIN_ZOOM)
+  const hit = showingMarkers ? stationAt(point) : null
+  if (hit) {
+    // A precise hit is the station marker itself -- that's an unambiguous
+    // "I want this one station", so it wins outright instead of also opening
+    // the broader neighbour-group popup underneath it.
+    emit('select', hit.station.id)
+    closeClickedGroup()
+    return
+  }
+
+  // Anything within the blend radius of a station's blob counts as "clicked
+  // that blob", which is a much larger target than the precise dot above.
+  // Service-disrupted stations aren't offering service, so a click on their
+  // grey blob shouldn't open the area popup at all.
+  const covering = lastRadiusPixels > 0
+    ? lastVisible.some(entry => entry.severity !== 'service_disruption'
+      && Math.hypot(entry.x - point.x, entry.y - point.y) <= lastRadiusPixels)
+    : false
+  if (!covering || !leafletMap) {
+    closeClickedGroup()
+    return
+  }
+
+  const clickLatLng = leafletMap.containerPointToLatLng(point)
+  const memberIds = new globalThis.Set<string>()
+  for (const station of allMappedStations.value) {
+    if (station.serviceStatus !== 'operational') continue
+    if (clickLatLng.distanceTo([station.latitude!, station.longitude!]) <= NEIGHBOUR_GROUP_RADIUS_METERS) {
+      memberIds.add(station.id)
+    }
+  }
+  clickedGroupMemberIds.value = memberIds
+  clickedGroupPoint.value = { x: point.x, y: point.y }
 }
 
 function focusSelectedStation() {
@@ -313,111 +554,121 @@ async function initialiseMap() {
   leafletMap = leaflet.map(mapElement.value, {
     attributionControl: false,
     preferCanvas: true,
-    scrollWheelZoom: false,
+    scrollWheelZoom: true,
     zoomControl: true,
-    minZoom: 9,
-    maxZoom: 19,
+    minZoom: 11,
+    maxZoom: 18,
   })
   leaflet.control.attribution({ position: 'bottomright', prefix: false }).addTo(leafletMap)
   leaflet.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
+    maxZoom: 18,
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors',
   }).addTo(leafletMap)
-  const hotspotPane = leafletMap.createPane('risk-hotspots')
-  hotspotPane.style.zIndex = '350'
-  hotspotPane.style.pointerEvents = 'none'
-  hotspotRenderer = leaflet.canvas({ pane: 'risk-hotspots', padding: .5 })
-  canvasRenderer = leaflet.canvas({ padding: .5 })
-  hotspotLayer = leaflet.layerGroup().addTo(leafletMap)
-  markerLayer = leaflet.layerGroup().addTo(leafletMap)
+
+  overlay = document.createElement('canvas')
+  overlay.style.position = 'absolute'
+  overlay.style.inset = '0'
+  overlay.style.pointerEvents = 'none'
+  overlay.style.zIndex = '450'
+  mapElement.value.appendChild(overlay)
+  leafletMap.on('move zoom resize moveend', scheduleRedraw)
+  leafletMap.on('zoomanim', onZoomAnim)
+  leafletMap.on('zoomstart', () => { isZoomAnimating = true })
+  leafletMap.on('zoomend', () => {
+    isZoomAnimating = false
+    scheduleRedraw()
+  })
+  leafletMap.on('mousemove', onMapPointerMove)
+  leafletMap.on('mouseout', onMapPointerLeave)
+  leafletMap.on('click', onMapClick)
+  leafletMap.on('movestart zoomstart', closeClickedGroup)
+
   fitCurrentScope()
-  renderMarkers()
+  scheduleRedraw()
   // A station picked before this component ever mounted (e.g. the warning
   // cart's ?station= deep link from another page) sets `selectedId` at
   // creation time, so the `watch(selectedId, ...)` below never fires for it
   // -- watchers only react to *changes*, not the starting value.
   focusSelectedStation()
 
-  resizeObserver = new ResizeObserver(() => leafletMap?.invalidateSize({ pan: false }))
+  resizeObserver = new ResizeObserver(() => {
+    leafletMap?.invalidateSize({ pan: false })
+    scheduleRedraw()
+  })
   resizeObserver.observe(mapElement.value)
 }
 
-const stationSignature = computed(() => `${hasBaselineLoadError.value}|${mappedStations.value
-  .map((station) => {
-    const forecast = forecastFor(station)
-    return `${station.id}:${station.latitude}:${station.longitude}:${station.totalDocks}:${station.availableBikes}:${station.availableDocks}:${station.currentState}:${station.serviceStatus}:${forecast.emptyRisk}:${forecast.fullRisk}:${forecast.predictedBikes}:${forecast.predictedDocks}:${forecast.baselineStatus}`
-  })
+const stationSignature = computed(() => `${hasBaselineLoadError.value}|${props.selectedId}|${allMappedStations.value
+  .map(station => `${station.id}:${station.latitude}:${station.longitude}:${station.totalDocks}:${station.availableBikes}:${station.availableDocks}:${station.serviceStatus}`)
   .join('|')}`)
 
-watch(stationSignature, () => renderMarkers())
+watch(stationSignature, () => scheduleRedraw())
+watch(() => props.routeStops, () => scheduleRedraw())
 watch(() => props.selectedId, () => {
   if (props.selectedId) stationQuery.value = ''
-  renderMarkers()
   focusSelectedStation()
 })
 watch(() => props.district, async () => {
   stationQuery.value = ''
+  closeClickedGroup()
   await nextTick()
   fitCurrentScope()
 })
-watch([() => props.dataMode, () => props.horizon], () => renderMarkers())
 
 onMounted(() => { void initialiseMap() })
 onBeforeUnmount(() => {
   resizeObserver?.disconnect()
-  markerById.clear()
+  if (redrawFrame) cancelAnimationFrame(redrawFrame)
   leafletMap?.remove()
   leafletMap = null
-  hotspotLayer = null
-  hotspotRenderer = null
+  overlay = null
+  lastVisible = []
+  selectedStationPoint.value = null
+  routeStopPoints.value = []
+  hoveredRouteStationId.value = null
+  closeClickedGroup()
 })
 </script>
 
 <template>
   <section class="map-panel geographic-map-panel panel overflow-hidden">
-    <div class="map-heading flex items-start justify-between gap-3 px-4 pb-3 pt-4">
+    <div class="map-heading map-heading-refined">
       <div>
-        <p class="section-kicker">
-          <Icon :icon="isLive ? 'solar:bolt-circle-outline' : 'solar:map-point-wave-outline'" /> 站點地圖
+        <p class="map-eyebrow">
+          <MapPin style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />站點監控
         </p>
-        <h2 class="mt-1 text-xl font-bold text-ink">{{ isLive ? `${horizon} 分鐘站況` : `${horizon} 分鐘預測` }}</h2>
+        <h2>{{ isLive ? '即時站況地圖' : `${horizon} 分鐘預測` }}</h2>
       </div>
-      <div
-        class="map-summary grid min-w-32 justify-items-end rounded-lg border border-line-strong bg-panel-muted px-2.5 py-2 font-bold leading-tight"
-        :class="hasBaselineLoadError ? 'text-warning' : 'text-accent-strong'">
-        <strong>{{ headerCount }}</strong>
-        <span class="text-base text-ink">{{ headerLabel }}</span>
-        <small v-if="isLive" class="mt-1 text-base font-semibold text-muted">{{ hasBaselineLoadError ? '基線暫不可用' :
-          (profileCoverage ? `已對照 ${profileCoverage.matchedStations}／${profileCoverage.liveStations}` : '正在載入基線')
-        }}</small>
-      </div>
+      <span class="map-view-state">{{ routeStops?.length ? '路線觀察中' : '即時庫存分布' }}</span>
+    </div>
+
+    <div v-if="districtOptions" class="px-3.5 pb-3">
+      <ModalPicker :model-value="district || ''" @update:model-value="emit('update:district', $event)"
+        :label="districtSelectionSource === 'location' ? '行政區（依位置）' : '行政區'" title="選擇行政區" :options="districtOptions" />
+      <span class="sr-only" role="status" aria-live="polite">{{ districtLocationMessage }}</span>
     </div>
 
     <div class="map-command-row flex items-center gap-2 px-3.5 pb-3" role="group" aria-label="地圖工具">
       <div
         class="map-search flex min-h-10 min-w-0 flex-1 basis-64 items-center gap-1.5 rounded-md border border-line-strong bg-panel px-2.5 text-ink"
         role="search">
-        <Icon class="shrink-0 text-xl text-accent-strong" icon="solar:magnifer-outline" />
+        <Search class="shrink-0 text-xl text-accent-strong" style="width: 1em; height: 1em" :stroke-width="2"
+          aria-hidden="true" />
         <input v-model="stationQuery"
           class="min-w-0 w-full bg-transparent py-1.5 text-base text-ink outline-none placeholder:text-muted"
           type="text" inputmode="search" enterkeyhint="search" placeholder="搜尋站名或行政區" aria-label="搜尋站名或行政區" />
         <button v-if="stationQuery"
           class="grid h-8 w-8 shrink-0 place-items-center rounded text-muted transition-colors hover:bg-accent-strong hover:text-on-accent"
           type="button" aria-label="清除站點搜尋" @click="stationQuery = ''">
-          <Icon class="text-xl" icon="solar:close-circle-outline" />
+          <X class="text-xl" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />
         </button>
       </div>
       <div class="map-actions flex items-center gap-2">
         <button type="button"
-          class="inline-flex min-h-11 items-center gap-1.5 rounded-md border border-line-strong bg-panel px-2.5 py-1.5 text-base font-bold text-accent-strong transition-colors hover:border-accent-strong hover:bg-panel-muted"
-          :aria-pressed="showAllStations" @click="toggleStationScope">
-          <Icon class="text-lg" :icon="showAllStations ? 'solar:filter-outline' : 'solar:map-point-outline'" /> {{
-            stationScopeActionLabel }}
-        </button>
-        <button type="button"
-          class="map-reset inline-flex min-h-11 items-center gap-1.5 rounded-md border border-accent-strong bg-accent-strong px-2.5 py-1.5 text-base font-bold text-on-accent transition-colors hover:border-accent hover:bg-accent"
+          class="map-reset inline-flex min-h-11 items-center gap-1.5 rounded-md border border-line-strong bg-panel px-2.5 py-1.5 text-base font-semibold text-muted transition-colors hover:border-accent hover:bg-accent"
           :aria-label="`重新對焦${district || '新北市全域'}`" :title="`重新對焦${district || '新北市全域'}`" @click="fitCurrentScope">
-          <Icon class="text-lg" icon="solar:map-arrow-left-outline" /> <span class="map-reset-label">重新對焦</span>
+          <LocateFixed class="text-lg" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" /> <span
+            class="map-reset-label">重新對焦</span>
         </button>
       </div>
     </div>
@@ -440,56 +691,118 @@ onBeforeUnmount(() => {
     </div>
 
     <div
-      class="geographic-map map-height relative z-0 isolate mx-3.5 min-h-112 overflow-hidden rounded-lg border border-line bg-map"
+      class="geographic-map map-height relative z-0 isolate mx-3.5 min-h-240 overflow-hidden rounded-lg border border-line bg-map"
       role="region" :aria-label="mapAriaLabel">
-      <div ref="mapElement" class="map-canvas map-height min-h-112 w-full" />
-      <p v-if="!mappedStations.length"
+      <div ref="mapElement" class="map-canvas map-height min-h-240 w-full" />
+
+      <svg v-if="routeStopPoints.length > 1" class="map-route-line pointer-events-none absolute inset-0 h-full w-full"
+        aria-hidden="true">
+        <polyline :points="routeLinePoints" fill="none" stroke="#3b82f6" stroke-width="3" stroke-linecap="round"
+          stroke-linejoin="round" />
+      </svg>
+      <MapPinSearch v-if="selectedStationPoint" class="map-selected-pin pointer-events-none absolute text-sky-500"
+        :style="{ left: `${selectedStationPoint.x}px`, top: `${selectedStationPoint.y}px` }" :size="40"
+        :stroke-width="2" aria-hidden="true" />
+      <div v-for="marker in routeStopMarkers" :key="marker.stationId"
+        class="map-route-stop-marker absolute cursor-pointer" :style="{ left: `${marker.x}px`, top: `${marker.y}px` }"
+        role="img" :aria-label="routeStopMarkerLabel(marker)" @mouseenter="hoveredRouteStationId = marker.stationId"
+        @mouseleave="hoveredRouteStationId = null" @click.stop="emit('select', marker.stationId)">
+        <MapPin class="map-route-stop-pin" :style="{ color: routeStopPinColor(marker) }" :size="42" :stroke-width="1.75"
+          aria-hidden="true" />
+        <!-- Always visible, not just on hover: a station visited twice in one
+             route (see routeStopMarkers) would otherwise show as a single pin
+             with no sign that stop 3 and stop 6 are the same place. -->
+        <span class="map-route-stop-number absolute grid place-items-center rounded-full font-mono font-bold text-black"
+          :style="{ backgroundColor: routeStopPinColor(marker) }">{{
+            routeStopSequenceLabel(marker) }}</span>
+      </div>
+      <div v-if="hoveredRouteStopMarker"
+        class="map-route-stop-pill pointer-events-none absolute flex items-center gap-1.5 rounded-full border border-line-strong bg-panel px-3 py-1.5 text-base leading-none text-ink shadow-lg"
+        :style="{ left: `${hoveredRouteStopMarker.x}px`, top: `${hoveredRouteStopMarker.y}px` }">
+        <span
+          class="grid size-5 shrink-0 place-items-center rounded-full bg-accent font-mono text-[11px] font-bold text-on-accent">{{
+            hoveredRouteStopMarker.stops.map(stop => stop.sequence).join('・')}}</span>
+        <strong class="truncate">{{ routeStopMarkerName(hoveredRouteStopMarker) }}</strong>
+        <span class="whitespace-nowrap text-muted">
+          <template v-if="routeStopMarkerBikes(hoveredRouteStopMarker, 'pickupBikes')">取 {{
+            routeStopMarkerBikes(hoveredRouteStopMarker, 'pickupBikes') }} 台</template>
+          <template
+            v-if="routeStopMarkerBikes(hoveredRouteStopMarker, 'pickupBikes') && routeStopMarkerBikes(hoveredRouteStopMarker, 'dropoffBikes')">／</template>
+          <template v-if="routeStopMarkerBikes(hoveredRouteStopMarker, 'dropoffBikes')">卸 {{
+            routeStopMarkerBikes(hoveredRouteStopMarker, 'dropoffBikes') }} 台</template>
+        </span>
+      </div>
+      <div v-if="hoveredStation && hoverPoint"
+        class="map-hover-card pointer-events-none absolute grid gap-0.5 rounded-md border border-line-strong bg-panel px-2.5 py-2 text-base leading-snug text-ink shadow-lg"
+        :style="{ left: `${hoverPoint.x}px`, top: `${hoverPoint.y}px` }">
+        <strong class="truncate">{{ displayStationName(hoveredStation.name) }}</strong>
+        <span class="text-muted">{{ hoveredStation.district || '新北市' }}・可借 {{ hoveredStation.availableBikes }}・可還 {{
+          hoveredStation.availableDocks }}</span>
+        <span class="text-muted">{{ hoveredSeverityLabel }}</span>
+      </div>
+      <div v-if="clickedGroupPoint && clickedGroupStations.length"
+        class="map-group-card absolute grid max-w-72 gap-1.5 rounded-lg border border-line-strong bg-panel p-3 text-base leading-snug text-ink shadow-lg"
+        :style="{ left: `${clickedGroupPoint.x}px`, top: `${clickedGroupPoint.y}px` }" @click.stop>
+        <div class="flex items-start justify-between gap-2">
+          <strong>這一帶由 {{ clickedGroupStations.length }} 站服務</strong>
+          <button type="button"
+            class="grid h-6 w-6 shrink-0 place-items-center rounded text-muted transition-colors hover:bg-accent-strong hover:text-on-accent"
+            aria-label="關閉鄰近群清單" @click="closeClickedGroup">
+            <X class="text-lg" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />
+          </button>
+        </div>
+        <ul class="grid max-h-56 gap-1 overflow-y-auto">
+          <li v-for="station in clickedGroupStations" :key="station.id">
+            <button type="button"
+              class="flex w-full min-w-0 items-center justify-between gap-2 rounded-md px-1.5 py-1 text-left transition-colors hover:bg-panel-muted"
+              @click="selectFromClickedGroup(station.id)">
+              <span class="grid min-w-0 gap-0.5"><strong class="truncate">{{ displayStationName(station.name)
+              }}</strong>
+                <small class="text-muted">{{ station.district || '新北市' }}・{{ severityLabelFor(station) }}</small></span>
+              <b class="shrink-0 whitespace-nowrap font-mono text-accent-strong">{{ station.availableBikes }} 車</b>
+            </button>
+          </li>
+        </ul>
+      </div>
+      <p v-if="!allMappedStations.length"
         class="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 rounded-lg border border-line-strong bg-panel p-3 text-base font-bold text-ink">
         目前沒有可定位的站點資料。</p>
     </div>
     <div class="map-caption grid gap-2 px-4 pt-3">
-      <p class="inline-flex items-center gap-1.5 text-base font-semibold text-muted">
-        <Icon class="text-xl text-accent-strong" icon="solar:cursor-square-outline" /> 點選站點查看詳情
-      </p>
+      <p class="map-visible-count">{{ headerCount }}{{ headerLabel }}<span>點選站點查看庫存與預測</span></p>
+      <!-- <p class="inline-flex items-center gap-1.5 text-base font-semibold text-muted">
+        <Info class="text-xl text-accent-strong" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />
+        綠底代表有服務涵蓋，顏色越深表示越需要處置；放大到街道層級會看到逐站標記，點選標記查看該站資料；點選色斑其餘範圍會展開該處鄰近群的站點清單
+      </p> -->
       <p v-if="baselineNotice" class="flex flex-wrap items-start gap-1.5 text-base font-semibold"
         :class="hasBaselineLoadError ? 'text-warning' : 'text-muted'">
-        <Icon class="mt-0.5 shrink-0 text-xl" :class="hasBaselineLoadError ? 'text-warning' : 'text-accent-strong'"
-          :icon="hasBaselineLoadError ? 'solar:danger-triangle-outline' : 'solar:info-circle-outline'" />
+        <component class="mt-0.5 shrink-0 text-xl" :class="hasBaselineLoadError ? 'text-warning' : 'text-accent-strong'"
+          :is="hasBaselineLoadError ? TriangleAlert : Info" style="width: 1em; height: 1em" :stroke-width="2"
+          aria-hidden="true" />
         <span>{{ baselineNotice }}</span>
         <button v-if="hasBaselineLoadError" type="button"
           class="inline-flex min-h-8 shrink-0 items-center gap-1 rounded-md border border-line-strong bg-transparent px-2 py-1 text-base font-bold text-accent-strong transition-colors hover:border-accent-strong hover:bg-panel-muted hover:text-ink"
           @click="emit('retryBaseline')">
-          <Icon class="text-lg" icon="solar:refresh-circle-outline" /> 重新比對
+          <RefreshCw class="text-lg" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" /> 重新比對
         </button>
       </p>
-      <div class="flex flex-wrap gap-x-3 gap-y-1.5 text-base font-semibold text-muted" aria-label="風險方向圖例">
-        <span v-if="riskProximityClusters.length" class="inline-flex items-center gap-1.5"><i
-            class="h-3 w-5 shrink-0 rounded-full border"
-            :style="{ backgroundColor: `${HOTSPOT_FILL}24`, borderColor: HOTSPOT_STROKE }" />粉紅底｜300 公尺鄰近群</span>
-        <template v-if="hasVisibleStableStations">
-          <span class="inline-flex min-w-0 items-center gap-1.5 leading-snug"><i
-              class="h-2.5 w-2.5 shrink-0 rounded-full border border-line-strong"
-              :style="{ backgroundColor: STABLE_MARKER_COLORS.balanced }" />黃褐｜穩定均衡</span>
-          <span class="inline-flex min-w-0 items-center gap-1.5 leading-snug"><i
-              class="h-2.5 w-2.5 shrink-0 rounded-full border border-line-strong"
-              :style="{ backgroundColor: STABLE_MARKER_COLORS['bike-heavy'] }" />可借車位 ≥ 2/3</span>
-          <span class="inline-flex min-w-0 items-center gap-1.5 leading-snug"><i
-              class="h-2.5 w-2.5 shrink-0 rounded-full border border-line-strong"
-              :style="{ backgroundColor: STABLE_MARKER_COLORS['dock-heavy'] }" />可還車位 ≥ 2/3</span>
-        </template>
-        <span class="inline-flex min-w-0 items-center gap-1.5 leading-snug"><i
-            class="h-2.5 w-2.5 shrink-0 rounded-full border border-line-strong"
-            :style="{ backgroundColor: MARKER_COLORS['empty-risk'] }" />紅｜缺車,可借車位0</span>
-        <span class="inline-flex min-w-0 items-center gap-1.5 leading-snug"><i
-            class="h-2.5 w-2.5 shrink-0 rounded-full border border-line-strong"
-            :style="{ backgroundColor: MARKER_COLORS['full-risk'] }" />藍｜缺位,可還車位0</span>
-        <span class="inline-flex min-w-0 items-center gap-1.5 leading-snug"><i
-            class="h-2.5 w-2.5 shrink-0 rounded-full border border-line-strong"
-            :style="{ backgroundColor: MARKER_COLORS['service-review'] }" />灰｜服務異常</span>
-        <span v-if="isLive && !hasBaselineLoadError && hasVisibleInventoryOnlyStations"
-          class="inline-flex min-w-0 items-center gap-1.5 leading-snug"><i
-            class="h-2.5 w-2.5 shrink-0 rounded-full border border-line-strong"
-            :style="{ backgroundColor: MARKER_COLORS['inventory-only'] }" />黃｜沒有基線</span>
+      <div v-if="routeStops && routeStops.length"
+        class="flex flex-wrap gap-x-3 gap-y-1.5 text-base font-semibold text-muted" aria-label="路線觀察圖例">
+        <span class="inline-flex min-w-0 items-center gap-1.5 leading-snug">
+          <i class="h-2.5 w-2.5 shrink-0 rounded-full border border-line-strong"
+            style="background-color: #3ecf8e" />取車：薄荷綠
+        </span>
+        <span class="inline-flex min-w-0 items-center gap-1.5 leading-snug">
+          <i class="h-2.5 w-2.5 shrink-0 rounded-full border border-line-strong"
+            style="background-color: #ff6f61" />卸車：珊瑚紅
+        </span>
+      </div>
+      <div class="flex flex-wrap gap-x-3 gap-y-1.5 text-base font-semibold text-muted" aria-label="嚴重度圖例">
+        <span v-for="entry in SEVERITY_LEGEND" :key="entry.severity"
+          class="inline-flex min-w-0 items-center gap-1.5 leading-snug">
+          <i class="h-2.5 w-2.5 shrink-0 rounded-full border border-line-strong"
+            :style="{ backgroundColor: `rgb(${SEVERITY_RGB[entry.severity].join(',')})` }" />{{ entry.label }}
+        </span>
       </div>
     </div>
     <div class="h-4" aria-hidden="true" />
@@ -501,9 +814,88 @@ onBeforeUnmount(() => {
   container-type: inline-size;
 }
 
+/*
+ * `.map-canvas`'s children (the blend/marker canvas, appended in
+ * initialiseMap, inline style `zIndex: '450'`) and everything below share one
+ * stacking context with `.geographic-map`'s other direct children -- Leaflet's
+ * container is `position: relative` but never sets its own z-index, so it
+ * doesn't start a new context. That means every DOM overlay below needs a
+ * z-index above 450 or the canvas paints over it (pointer events still pass
+ * through, since the canvas is `pointer-events: none`, so this only breaks
+ * what's visible, not what's clickable). Only enough headroom to clear that
+ * 450 and stay ordered among ourselves -- nothing here needs to fend off
+ * Leaflet's own controls (z-index 1000, see the same note in
+ * RoiMap.client.vue), so there is no reason to reach for a large number.
+ */
+.map-route-line,
+.map-selected-pin,
+.map-route-stop-marker {
+  /* The line and the pins tie on purpose: DOM order (line first) puts the
+     pins on top of the line's endpoints without needing a separate tier. */
+  z-index: 451;
+}
+
+.map-hover-card,
+.map-route-stop-pill {
+  /* Tooltips read above a pin, not equal to it. */
+  z-index: 452;
+}
+
+.map-group-card {
+  /* The one overlay that can take focus (buttons, a scrollable list), so it
+     wins over a passive tooltip if both ever end up stacked. */
+  z-index: 453;
+}
+
+.map-hover-card {
+  max-width: 14rem;
+  transform: translate(-50%, calc(-100% - 12px));
+}
+
+.map-group-card {
+  transform: translate(-50%, calc(-100% - 12px));
+}
+
+.map-selected-pin {
+  /* Anchors the pin's point (near the bottom of its viewBox) at the
+     station's coordinate, the same way a Leaflet marker icon does. */
+  transform: translate(-50%, -96%);
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.6));
+}
+
+.map-route-stop-marker {
+  width: 42px;
+  height: 42px;
+  transform: translate(-50%, -96%);
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.6));
+}
+
+.map-route-stop-pin {
+  display: block;
+  width: 38px;
+  height: 38px;
+  /* fill: color-mix(in srgb, currentColor 24%, white); */
+}
+
+.map-route-stop-number {
+  top: 7px;
+  left: calc(50% - 2px);
+  width: 16px;
+  height: 16px;
+  transform: translateX(-50%);
+  font-size: 10px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.map-route-stop-pill {
+  max-width: 16rem;
+  transform: translate(-50%, calc(-100% - 32px));
+}
+
 @container (max-width: 760px) {
   .map-height {
-    min-height: 22rem;
+    min-height: 48rem;
   }
 
   .map-command-row {
@@ -541,7 +933,7 @@ onBeforeUnmount(() => {
 
 @container (max-width: 480px) {
   .map-height {
-    min-height: 20rem;
+    min-height: 36rem;
   }
 
   .map-heading {
@@ -582,6 +974,110 @@ onBeforeUnmount(() => {
   .map-search-results {
     margin-right: 0.625rem;
     margin-left: 0.625rem;
+  }
+}
+</style>
+
+<style scoped>
+.map-heading-refined {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 14px;
+}
+
+.map-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 5px;
+}
+
+.map-eyebrow svg {
+  color: var(--accent);
+  font-size: 16px;
+}
+
+.map-heading-refined h2 {
+  font-size: 19px;
+  font-weight: 650;
+  letter-spacing: -.025em;
+}
+
+.map-view-state {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.home-risk-map .map-height {
+  height: clamp(430px, 55vh, 620px);
+  min-height: 430px;
+}
+
+.home-risk-map .map-command-row {
+  flex-wrap: nowrap;
+  align-items: center;
+}
+
+.home-risk-map .map-search {
+  flex-basis: auto;
+}
+
+.home-risk-map .map-actions {
+  width: auto;
+  display: flex;
+}
+
+.home-risk-map .map-reset {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 10px;
+}
+
+.home-risk-map .map-reset:hover {
+  color: var(--ink);
+  border-color: var(--accent);
+  background: var(--panel-muted);
+}
+
+.map-visible-count {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+  font-size: 12px;
+  color: var(--muted);
+  padding-bottom: 4px;
+}
+
+.map-visible-count>span {
+  font-size: 12px;
+}
+
+.home-risk-map .map-caption [aria-label] {
+  font-size: 12px;
+  font-weight: 400;
+}
+
+@container (max-width: 480px) {
+  .map-heading-refined {
+    display: flex;
+    padding: 16px;
+  }
+
+  .map-heading-refined h2 {
+    font-size: 18px;
+  }
+
+  .home-risk-map .map-height {
+    min-height: 400px;
+    height: 400px;
   }
 }
 </style>

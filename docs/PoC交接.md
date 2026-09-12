@@ -598,7 +598,7 @@ XGBoost 在兩個嚴重度層級都領先，`near`（早期預警）門檻的三
 
 **現階段（純靜態 Cloudflare Pages）做法：本機手動觸發 demo**
 
-新增 `npm run predict:xgboost`（`ml/src/export_model_for_web.py` 匯出模型 + 一支 Node 腳本讀取匯出檔跑推論），流程：
+新增 `npm run predict:xgboost`（一支 Node 腳本讀取已匯出模型跑推論）。首次執行或模型更新後，必須先在 repo root 執行 `python ml/src/export_model_for_web.py`；這個匯出器需要本機上未進版控的 `ml/data/features.parquet` 與 `ml/output/model_30.json`/`model_60.json`。推論流程：
 
 1. 抓一次官方即時資料
 2. 只對 `app/data/station-risk-evaluation.json` 裡 baseline 60分鐘 F1≤60% 的站（既有混合部署站清單）算 XGBoost 風險分數（30分鐘用 `model_30.json`，18個特徵、無鄰站特徵；60分鐘用 `model_60.json`，20個特徵、含鄰站特徵）

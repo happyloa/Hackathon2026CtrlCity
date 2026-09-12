@@ -93,7 +93,7 @@ interface RouteInsertion {
 }
 
 export const DEFAULT_DISPATCH_ROUTE_POLICY: Readonly<DispatchRoutePlanningPolicy> = Object.freeze({
-  vehicleCapacity: 12,
+  vehicleCapacity: 14,
   maximumTasksPerRoute: 4,
   maximumStopsPerRoute: 8,
   maximumRouteDistanceKm: 20,

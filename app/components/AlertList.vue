@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Icon } from '@iconify/vue'
+import { ArrowUpRight, BellRing, CheckCircle2, Info, Settings, TriangleAlert } from '@lucide/vue'
 import { displayStationName, type Alert, type StationRisk } from '~/shared/ops'
 import { ALERT_PRIORITY_THRESHOLDS } from '~/shared/operational-policy.mjs'
 
@@ -74,8 +74,8 @@ function inventoryRowClasses(score: number) {
 
 function inventoryIcon(score: number) {
   return score >= ALERT_PRIORITY_THRESHOLDS.immediate
-    ? 'solar:danger-triangle-bold'
-    : score >= ALERT_PRIORITY_THRESHOLDS.high ? 'solar:bell-bing-outline' : 'solar:info-circle-outline'
+    ? TriangleAlert
+    : score >= ALERT_PRIORITY_THRESHOLDS.high ? BellRing : Info
 }
 
 function scorePartsLabel(alert: Alert) {
@@ -88,10 +88,10 @@ function scorePartsLabel(alert: Alert) {
   <section :class="embedded ? 'overflow-hidden border-0 bg-transparent shadow-none' : 'panel overflow-hidden'">
     <div v-if="!embedded" class="flex flex-col gap-3 border-b border-line p-4 sm:flex-row sm:items-start sm:justify-between">
       <div>
-        <p class="section-kicker text-base"><Icon :icon="kind === 'service' ? 'solar:settings-minimalistic-outline' : 'solar:bell-bing-outline'" /> {{ kind === 'service' ? '營運狀態' : '需注意站點' }}</p>
+        <p class="section-kicker text-base"><component :is="kind === 'service' ? Settings : BellRing" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" /> {{ kind === 'service' ? '營運狀態' : '需注意站點' }}</p>
         <h2 class="m-0 mt-1 text-xl font-bold tracking-tight text-ink">{{ sectionTitle }}</h2>
       </div>
-      <NuxtLink v-if="compact" :to="allAlertsTarget" class="text-link min-h-11 text-base">查看全部 <Icon icon="solar:arrow-right-up-outline" /></NuxtLink>
+      <NuxtLink v-if="compact" :to="allAlertsTarget" class="text-link min-h-11 text-base">查看全部 <ArrowUpRight style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" /></NuxtLink>
     </div>
 
     <template v-if="visibleAlerts.length">
@@ -103,7 +103,7 @@ function scorePartsLabel(alert: Alert) {
           :class="kind === 'service' ? 'border-l-line-strong bg-panel-muted' : inventoryRowClasses(alert.priorityScore)"
         >
           <span class="grid size-10 shrink-0 place-items-center rounded-full bg-panel text-lg" :class="kind === 'service' ? 'text-muted' : priorityClasses(alert.priorityScore)">
-            <Icon :icon="kind === 'service' ? 'solar:settings-minimalistic-outline' : inventoryIcon(alert.priorityScore)" />
+            <component :is="kind === 'service' ? Settings : inventoryIcon(alert.priorityScore)" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />
           </span>
           <button type="button" class="min-w-0 flex-1 text-left text-base leading-6 text-ink hover:underline" @click="emit('select', alert.stationId)">
             <strong class="block break-words font-bold">{{ stationNameFor(alert) }}</strong>
@@ -123,7 +123,7 @@ function scorePartsLabel(alert: Alert) {
       </div>
     </template>
     <div v-else class="flex min-h-24 items-center justify-center gap-2 p-4 text-center text-base font-semibold text-positive">
-      <Icon class="text-lg" icon="solar:check-circle-outline" />
+      <CheckCircle2 class="text-lg" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />
       <span>{{ emptyMessage }}</span>
     </div>
   </section>
