@@ -251,12 +251,11 @@ async function handleEditRoute() {
 </template>
 
 <style scoped>
-.dispatch-page { --dispatch-workspace-height: 720px; --dispatch-pickup: #82dfbb; --dispatch-dropoff: #ff958b; --dispatch-mixed: #f4cc79; max-width: 1760px; margin: auto; padding: 20px 32px 28px; display: grid; gap: 16px; }
+.dispatch-page { --dispatch-workspace-height: 720px; --dispatch-pickup: #7dd3fc; --dispatch-dropoff: #ff6f61; --dispatch-mixed: #f4cc79; max-width: 1760px; margin: auto; padding: 20px 32px 28px; display: grid; gap: 16px; }
 /* Grid items default to min-width:auto, which lets the min-content of the
    route rail (fixed-width cards behind an overflow-x scroller) widen the
    whole column and scroll the page sideways on a phone. */
 .dispatch-page > * { min-width: 0; }
-:global([data-theme="light"]) .dispatch-page { --dispatch-pickup: #0f766e; --dispatch-dropoff: #b91c1c; --dispatch-mixed: #92400e; }
 .dispatch-heading, .dispatch-source, .dispatch-source > span, .dispatch-button, .dispatch-policy, .dispatch-comparison > header, .dispatch-comparison-controls, .dispatch-sort, .dispatch-pagination, .dispatch-choice-top, .dispatch-choice-load, .dispatch-choice-load > span, .dispatch-choice-numbers, .dispatch-selected-label, .dispatch-footnote, .dispatch-footnote > span { display: flex; align-items: center; }
 .dispatch-heading { justify-content: space-between; gap: 16px; }
 .dispatch-eyebrow { display: flex; align-items: center; gap: 7px; color: var(--accent); font-size: var(--type-body2); font-weight: 650; margin-bottom: 6px; }

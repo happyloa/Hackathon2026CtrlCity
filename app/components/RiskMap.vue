@@ -868,7 +868,11 @@ onBeforeUnmount(() => {
         class="flex flex-wrap gap-x-3 gap-y-1.5 text-body1 font-semibold text-muted" aria-label="路線觀察圖例">
         <span class="inline-flex min-w-0 items-center gap-1.5 leading-snug">
           <i class="h-2.5 w-2.5 shrink-0 rounded-full border border-line-strong"
-            style="background-color: #3ecf8e" />取車：薄荷綠
+            style="background-color: #3ecf8e" />起點：薄荷綠
+        </span>
+        <span class="inline-flex min-w-0 items-center gap-1.5 leading-snug">
+          <i class="h-2.5 w-2.5 shrink-0 rounded-full border border-line-strong"
+            style="background-color: #7dd3fc" />取車：天藍
         </span>
         <span class="inline-flex min-w-0 items-center gap-1.5 leading-snug">
           <i class="h-2.5 w-2.5 shrink-0 rounded-full border border-line-strong"

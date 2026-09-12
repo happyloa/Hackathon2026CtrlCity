@@ -125,7 +125,7 @@ function focusDispatchQueue(event: MouseEvent) {
 
 <template>
   <div class="operations-home">
-    <section class="overview-metrics" aria-label="營運摘要">
+    <!-- <section class="overview-metrics" aria-label="營運摘要">
       <a href="#dispatch-queue" class="overview-metric metric-routes" @click="focusDispatchQueue">
         <div class="metric-label"><span>目前可行路線</span>
           <RouteIcon style="width: 1em; height: 1em" aria-hidden="true" />
@@ -152,7 +152,7 @@ function focusDispatchQueue(event: MouseEvent) {
         }}</span><i>/</i>{{ dashboard?.summary.fullNow ?? '—' }}<span>站</span></div>
         <div class="metric-bottom"><span>無車可借／無位可還</span><span class="metric-tag">即時</span></div>
       </NuxtLink>
-    </section>
+    </section> -->
 
     <WarningPanel v-if="dashboard" :stations="dashboard.stations" :as-of="dashboard.meta.asOf"
       :summary="dashboard.summary" :realtime-low-bikes="dashboard.realtimeLowBikes"
