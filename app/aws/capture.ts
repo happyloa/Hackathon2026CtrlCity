@@ -9,8 +9,22 @@ const MAX_UPSTREAM_BYTES = 5 * 1024 * 1024
 const DEFAULT_LIVE_FEED_URL =
   'https://data.ntpc.gov.tw/api/datasets/010e5b15-3823-4b20-b401-b1cf000550c5/json?page=0&size=2000'
 
-import type { PersistenceState } from '../shared/station-persistence.ts'
+import type { PersistenceState, StationPersistence } from '../shared/station-persistence.ts'
+import { FROZEN_STATION_POLICY, LIVE_SNAPSHOT_POLICY } from '../shared/parameters.mjs'
 export type { PersistenceState, StationPersistence } from '../shared/station-persistence.ts'
+
+/**
+ * The live counterpart of `scripts/detect-frozen-stations.mjs`: one metric
+ * sitting at a single low reading while the other still moves. Returns the
+ * candidate for this observation only; `mergePersistence` decides how long it
+ * has held. Bikes win ties so the message names the side riders feel first.
+ */
+function frozenCandidate(bikes: number, docks: number): { metric: 'bikes' | 'docks', value: number } | null {
+  const ceiling = FROZEN_STATION_POLICY.stuckValueCeiling
+  if (bikes <= ceiling && docks > 0) return { metric: 'bikes', value: bikes }
+  if (docks <= ceiling && bikes > 0) return { metric: 'docks', value: docks }
+  return null
+}
 
 export interface CaptureDependencies {
   fetchImpl?: typeof fetch
@@ -61,7 +75,7 @@ export function mergePersistence(
       && prior!.last[1] === station.availableDocks
     const stateSince = sameState ? prior!.stateSince : iso
     const unchangedSince = unchanged ? prior!.unchangedSince : iso
-    next.stations[station.id] = {
+    const record: StationPersistence = {
       currentState: station.currentState,
       stateSince,
       stateMinutes: minutesSince(stateSince, epoch),
@@ -69,6 +83,27 @@ export function mergePersistence(
       unchangedMinutes: minutesSince(unchangedSince, epoch),
       last: [station.availableBikes, station.availableDocks],
     }
+
+    // Both runs below are omitted unless the station currently qualifies, so
+    // the published file only carries the handful of stations each list needs.
+    if (station.availableBikes < LIVE_SNAPSHOT_POLICY.lowBikesThreshold) {
+      const lowBikesSince = prior?.lowBikesSince ?? iso
+      record.lowBikesSince = lowBikesSince
+      record.lowBikesMinutes = minutesSince(lowBikesSince, epoch)
+    }
+
+    const candidate = frozenCandidate(station.availableBikes, station.availableDocks)
+    if (candidate) {
+      // A different metric or a different reading is a new run, not a longer one.
+      const continues = prior?.frozenMetric === candidate.metric && prior?.frozenValue === candidate.value
+      const frozenSince = continues ? prior!.frozenSince! : iso
+      record.frozenMetric = candidate.metric
+      record.frozenValue = candidate.value
+      record.frozenSince = frozenSince
+      record.frozenMinutes = minutesSince(frozenSince, epoch)
+    }
+
+    next.stations[station.id] = record
   }
   return next
 }

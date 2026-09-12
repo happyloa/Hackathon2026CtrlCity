@@ -19,8 +19,14 @@ onMounted(() => {
   durationTimer = setInterval(() => { now.value = Date.now() }, 15_000)
 })
 onBeforeUnmount(() => { if (durationTimer) clearInterval(durationTimer) })
+// `statusDurationMinutes` is filled upstream in `useLiveDashboard`, from the
+// scheduler's clock where one is published and the browser buffer otherwise.
+// Recomputing it here from the buffer first used to override that with a value
+// measured from whenever this tab opened -- on AWS, where the buffer is not
+// persisted, that meant the label vanished after every reload.
 const durations = computed(() => new Map(props.stations.map(station => [station.id,
-  now.value ? stationStatusDurationMinutes(station, snapshotsFor(station.id), now.value) : station.statusDurationMinutes ?? null,
+  station.statusDurationMinutes
+    ?? (now.value ? stationStatusDurationMinutes(station, snapshotsFor(station.id), now.value) : null),
 ])))
 function durationLabel(station: StationRisk) {
   const minutes = durations.value.get(station.id) ?? null

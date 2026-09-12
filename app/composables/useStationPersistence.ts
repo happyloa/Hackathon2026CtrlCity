@@ -8,6 +8,10 @@ export function useStationPersistence() {
     try { state.value = freshPersistence(await $fetch(path, { cache: 'no-store', timeout: 10_000, retry: 0 })) }
     catch { state.value = null }
   }
-  function lookup(id: string) { return freshPersistence(state.value)?.stations[id] ?? null }
-  return { state, refresh, lookup }
+  // Validated once per poll rather than once per station: `lookup` runs for
+  // every one of ~1,600 stations on each render, and re-validating the whole
+  // document each time scanned it 1,600 times over.
+  const fresh = computed(() => freshPersistence(state.value))
+  function lookup(id: string) { return fresh.value?.stations[id] ?? null }
+  return { state, fresh, refresh, lookup }
 }

@@ -1,7 +1,14 @@
 import { configureSnapshotPersistence } from '~/composables/useStationSnapshots'
-import type { StationPersistence } from '~/shared/station-persistence'
+import {
+  frozenStationsFromPersistence,
+  hasServerRuns,
+  lowBikesIdsFromPersistence,
+  type PersistenceState,
+  type StationPersistence,
+} from '~/shared/station-persistence'
 import { stationStatusDurationMinutes } from '~/shared/station-overview'
 import { buildLiveOperations } from '~/shared/live-operations'
+import { FROZEN_STATION_POLICY } from '~/shared/parameters.mjs'
 import { lowBikesPersistedIds } from '~/composables/useLiveRiskProfiles'
 import { frozenStationIds } from '~/composables/useFrozenStations'
 import type {
@@ -119,15 +126,19 @@ function createLiveDashboard(
   })
   const { snapshotsFor } = useStationSnapshots()
   for (const station of stations) {
-    station.statusDurationMinutes = stationStatusDurationMinutes(station, snapshotsFor(station.id), Date.now())
-  }
-  for (const station of stations) {
     const carried = persistence.lookup(station.id)
-    if (carried && carried.currentState === station.currentState
-      && carried.last[0] === station.availableBikes && carried.last[1] === station.availableDocks) {
-      station.statusDurationMinutes = carried.stateMinutes
+    // The scheduler has watched every poll since long before this tab opened,
+    // so its clock is the answer whenever it describes the reading on screen.
+    // The browser buffer is only the fallback for hosts without the scheduler.
+    const describesThisReading = Boolean(carried) && carried!.currentState === station.currentState
+      && carried!.last[0] === station.availableBikes && carried!.last[1] === station.availableDocks
+    station.statusDurationMinutes = describesThisReading
+      ? carried!.stateMinutes
+      : stationStatusDurationMinutes(station, snapshotsFor(station.id), Date.now())
+
+    if (describesThisReading) {
       const hour = new Date(Date.parse(response.meta.asOf) + 8 * 3600000).getUTCHours()
-      if (hour >= 6 && carried.unchangedMinutes >= 180) station.qualityFlags.push(`疑似壞車／感測異常：庫存已 ${Math.floor(carried.unchangedMinutes / 60)} 小時未變化，請現場查驗。`)
+      if (hour >= 6 && carried!.unchangedMinutes >= 180) station.qualityFlags.push(`疑似壞車／感測異常：庫存已 ${Math.floor(carried!.unchangedMinutes / 60)} 小時未變化，請現場查驗。`)
     }
   }
   const plan = buildLiveOperations(stations, response.meta.asOf)
@@ -267,12 +278,26 @@ export function useLiveDashboard() {
       // Read after forecastsFor resolves: it records this poll's snapshot for
       // every station internally, so the persistence check below already
       // sees the just-updated buffer, including the current reading.
-      const realtimeLowBikes = {
-        atLeast30: [...lowBikesPersistedIds(response.data.stations, response.meta.asOf, 30)],
-        atLeast60: [...lowBikesPersistedIds(response.data.stations, response.meta.asOf, 60)],
-      }
-      const frozenStations = [...frozenStationIds(response.data.stations, response.meta.asOf)]
-        .map(([stationId, info]) => ({ stationId, ...info }))
+      // Both lists answer "how long has this held", which the scheduler has
+      // measured across every poll. Deriving them from the browser's own
+      // buffer instead left them empty until a tab had been open for the whole
+      // window -- the reason the AWS deployment showed 0 stations while
+      // state/persistence.json already listed them.
+      const served = persistence.fresh.value
+      const serverBacked = hasServerRuns(served)
+      const realtimeLowBikes = serverBacked
+        ? {
+            atLeast30: lowBikesIdsFromPersistence(served as PersistenceState, 30),
+            atLeast60: lowBikesIdsFromPersistence(served as PersistenceState, 60),
+          }
+        : {
+            atLeast30: [...lowBikesPersistedIds(response.data.stations, response.meta.asOf, 30)],
+            atLeast60: [...lowBikesPersistedIds(response.data.stations, response.meta.asOf, 60)],
+          }
+      const frozenStations = serverBacked
+        ? frozenStationsFromPersistence(served as PersistenceState, FROZEN_STATION_POLICY.minRunMinutes)
+        : [...frozenStationIds(response.data.stations, response.meta.asOf)]
+            .map(([stationId, info]) => ({ stationId, ...info }))
       const nextDashboard = createLiveDashboard(response, forecasts, profileManifest.value, realtimeLowBikes, frozenStations, persistence)
       const nextSignature = snapshotSignature(response)
       const nextBaselineSignature = profileSignature(profileError.value, profileCoverage.value)

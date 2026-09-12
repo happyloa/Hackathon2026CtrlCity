@@ -44,7 +44,7 @@ const ceiling = FROZEN_STATION_POLICY.stuckValueCeiling
       <span class="frozen-action">{{ expanded ? '收合清單' : '查看清單' }}<ChevronDown style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" :class="{ 'is-expanded': expanded }" /></span>
     </button>
     <div v-if="expanded" :id="panelContentId" class="frozen-content">
-      <p class="frozen-context">此清單依此頁面持續開啟期間累積的即時快照，找出可借車或可還位「連續 {{ hours }} 小時都卡在同一個 0～{{ ceiling }} 之間的讀數」的站點——比一般缺車／缺位更像是感測器卡住或站點未通報停用，僅供派人現場確認，不是確定故障。清單需頁面持續開啟並累積足夠時間才會出現。</p>
+      <p class="frozen-context">此清單找出可借車或可還位「連續 {{ hours }} 小時都卡在同一個 0～{{ ceiling }} 之間的讀數」的站點——比一般缺車／缺位更像是感測器卡住或站點未通報停用，僅供派人現場確認，不是確定故障。由每 5 分鐘的排程快照累積判定。</p>
       <div v-if="hasItems" class="divide-y divide-line border-t border-line">
         <button v-for="item in items" :key="item.station.id" type="button"
           class="flex w-full flex-wrap items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-panel-muted"
@@ -63,7 +63,7 @@ const ceiling = FROZEN_STATION_POLICY.stuckValueCeiling
         </button>
       </div>
       <div v-else class="flex min-h-24 items-center justify-center gap-2 border-t border-line p-4 text-center text-body1 font-semibold text-positive">
-        <CheckCircle2 class="icon-md" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />目前沒有符合的站點；此清單需頁面持續開啟並累積至少 {{ hours }} 小時的即時快照才會出現。
+        <CheckCircle2 class="icon-md" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />目前沒有符合的站點；需連續 {{ hours }} 小時卡在同一讀數才會列入。
       </div>
     </div>
   </section>

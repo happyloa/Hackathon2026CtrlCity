@@ -49,3 +49,82 @@ test('handler writes raw, latest and state objects', async () => {
   const state = JSON.parse(puts.find(p => p.Key === 'state/persistence.json').Body)
   assert.equal(state.stations['500201001'].currentState, 'empty_now')
 })
+
+const {
+  freshPersistence, hasServerRuns, lowBikesIdsFromPersistence, frozenStationsFromPersistence,
+} = await import('../shared/station-persistence.ts')
+
+/** Replays one capture every 5 minutes, the way the scheduler actually runs. */
+function replay(readings, fromIso, count) {
+  let state = null
+  let epoch = Date.parse(fromIso)
+  for (let i = 0; i < count; i += 1, epoch += 5 * 60_000) {
+    state = mergePersistence(state, readings, new Date(epoch))
+  }
+  return state
+}
+
+test('tracks how long available bikes stayed below the low threshold', () => {
+  // 3 bikes is at the threshold, not below it: no run is recorded.
+  const atThreshold = mergePersistence(null, [station('a', 3, 17)], at('2026-09-12T01:00:00Z'))
+  assert.equal(atThreshold.stations.a.lowBikesSince, undefined)
+  assert.equal(atThreshold.stations.a.lowBikesMinutes, undefined)
+
+  // 01:00 -> 01:35 at 2 bikes is 8 captures, so 35 minutes of an unbroken run.
+  const low = replay([station('a', 2, 18)], '2026-09-12T01:00:00Z', 8)
+  assert.equal(low.stations.a.lowBikesSince, '2026-09-12T01:00:00.000Z')
+  assert.equal(low.stations.a.lowBikesMinutes, 35)
+
+  // Refilling clears the run rather than pausing it.
+  const refilled = mergePersistence(low, [station('a', 9, 11)], at('2026-09-12T01:40:00Z'))
+  assert.equal(refilled.stations.a.lowBikesSince, undefined)
+  const lowAgain = mergePersistence(refilled, [station('a', 1, 19)], at('2026-09-12T01:45:00Z'))
+  assert.equal(lowAgain.stations.a.lowBikesMinutes, 0)
+})
+
+test('tracks a metric stuck at one low reading while the other keeps moving', () => {
+  // Bikes pinned at 2 for 2 hours while docks stay positive.
+  const stuck = replay([station('a', 2, 18)], '2026-09-12T01:00:00Z', 25)
+  assert.equal(stuck.stations.a.frozenMetric, 'bikes')
+  assert.equal(stuck.stations.a.frozenValue, 2)
+  assert.equal(stuck.stations.a.frozenMinutes, 120)
+
+  // A different reading starts a new run even though it is still low.
+  const moved = mergePersistence(stuck, [station('a', 1, 19)], at('2026-09-12T03:05:00Z'))
+  assert.equal(moved.stations.a.frozenValue, 1)
+  assert.equal(moved.stations.a.frozenMinutes, 0)
+
+  // Nothing is a candidate once the other metric hits zero: a station with no
+  // bikes and no docks is a suspended station, not a stuck sensor.
+  const bothZero = mergePersistence(stuck, [station('a', 0, 0, 'unavailable')], at('2026-09-12T03:05:00Z'))
+  assert.equal(bothZero.stations.a.frozenMetric, undefined)
+})
+
+test('derives both dashboard lists from the published document', () => {
+  const state = replay([station('a', 0, 20, 'empty_now'), station('b', 9, 11)], '2026-09-12T01:00:00Z', 13)
+  assert.equal(state.updatedAt, '2026-09-12T02:00:00.000Z')
+  assert.ok(hasServerRuns(state))
+
+  assert.deepEqual(lowBikesIdsFromPersistence(state, 30), ['a'])
+  assert.deepEqual(lowBikesIdsFromPersistence(state, 60), ['a'])
+  assert.deepEqual(lowBikesIdsFromPersistence(state, 90), [])
+  assert.deepEqual(frozenStationsFromPersistence(state, 60), [{ stationId: 'a', metric: 'bikes', stuckValue: 0 }])
+  assert.deepEqual(frozenStationsFromPersistence(state, 120), [])
+
+  // A document from a Lambda that predates these fields must not be mistaken
+  // for "no station qualifies"; the browser keeps using its own buffer.
+  const legacy = { ...state, stations: Object.fromEntries(Object.entries(state.stations).map(([id, item]) => {
+    const { lowBikesSince, lowBikesMinutes, frozenMetric, frozenValue, frozenSince, frozenMinutes, ...rest } = item
+    return [id, rest]
+  })) }
+  assert.equal(hasServerRuns(legacy), false)
+  assert.ok(freshPersistence(legacy, Date.parse('2026-09-12T02:01:00Z')), '舊格式仍須通過驗證')
+})
+
+test('freshPersistence rejects a malformed run but tolerates an absent one', () => {
+  const base = mergePersistence(null, [station('a', 0, 20, 'empty_now')], at('2026-09-12T01:00:00Z'))
+  const now = Date.parse('2026-09-12T01:01:00Z')
+  assert.ok(freshPersistence(base, now))
+  assert.equal(freshPersistence({ ...base, stations: { a: { ...base.stations.a, lowBikesMinutes: -1 } } }, now), null)
+  assert.equal(freshPersistence({ ...base, stations: { a: { ...base.stations.a, frozenMetric: 'wheels' } } }, now), null)
+})

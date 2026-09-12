@@ -36,6 +36,9 @@ const TABS: TabDef[] = [
 
 const activeTab = ref<TabKey>('30')
 const activeTabDef = computed(() => TABS.find(tab => tab.key === activeTab.value) ?? TABS[0]!)
+// With a scheduler publishing state/persistence.json the list is complete on
+// first paint, so the "keep this page open" caveat would be untrue.
+const serverBackedRuns = computed(() => Boolean(useRuntimeConfig().public.persistencePath))
 
 /**
  * A station only belongs here once its forecast for this horizon is
@@ -184,7 +187,7 @@ const hasWarnings = computed(() => TABS.some(tab => countsByTab.value[tab.key] >
         <div v-else
           class="flex min-h-24 items-center justify-center gap-2 border-t border-line p-4 text-center text-body1 font-semibold text-positive">
           <CheckCircle2 class="icon-md" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />
-          這個條件目前沒有符合的站點；此清單需頁面持續開啟並累積至少 {{ activeTabDef.minutes }} 分鐘的即時快照才會出現。
+          這個條件目前沒有符合的站點。{{ serverBackedRuns ? '' : '此清單需頁面持續開啟並累積至少 ' + activeTabDef.minutes + ' 分鐘的即時快照才會出現。' }}
         </div>
       </div>
     </div>
