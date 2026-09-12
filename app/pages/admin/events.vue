@@ -2,7 +2,7 @@
 import { displayStationName } from '~/shared/ops'
 import type { DemandEventPattern } from '~/shared/demand-events.mjs'
 
-const { events, cloud, replace } = useDemandEvents()
+const { events, replace } = useDemandEvents()
 const live = useLiveDashboard()
 onMounted(() => { if (!live.dashboard.value) void live.refresh() })
 
@@ -65,17 +65,8 @@ function remove(id: string) { replace({ events: events.value.filter(event => eve
     <h1 class="text-h5 font-bold">活動管理</h1>
     <NuxtLink to="/admin/adjustments" class="text-accent">營運排除窗</NuxtLink>
     <p>記錄活動名稱、影響站點與台北時間。活動開始前 60 分鐘內，營運總覽與調度規劃會依此評估鄰近站點的補位能力。</p>
-    <p role="status">{{ cloud.status.value }}</p>
-    <p v-if="cloud.authError.value" role="alert">{{ cloud.authError.value }}</p>
-    <div v-if="cloud.remote" class="flex flex-wrap gap-3">
-      <p v-if="!cloud.enabled">目前開放雲端唯讀，尚未啟用調度登入。</p>
-      <button v-if="cloud.enabled && !cloud.accessToken.value" class="min-h-11 text-accent" @click="cloud.signIn">登入後可編輯</button>
-      <button v-else class="min-h-11 text-accent" @click="cloud.signOut">登出</button>
-      <button :disabled="cloud.pending.value" class="min-h-11 text-accent" @click="cloud.reload">重新載入雲端清單</button>
-      <button :disabled="!cloud.canEdit.value || !cloud.dirty.value" class="min-h-11 text-accent" @click="cloud.save">儲存到雲端</button>
-      <button :disabled="!cloud.canEdit.value" class="min-h-11 text-accent" @click="cloud.restoreDraft">還原本分頁草稿</button>
-    </div>
-    <fieldset :disabled="!cloud.canEdit.value" class="grid gap-3 rounded-xl border border-line bg-panel p-4">
+    <p class="text-body2 text-muted">活動只保存在這台瀏覽器，換裝置或清除瀏覽資料後需重新建立。</p>
+    <fieldset class="grid gap-3 rounded-xl border border-line bg-panel p-4">
       <label class="grid gap-1">活動名稱<input v-model="name" class="min-h-11 border border-line bg-surface p-2" /></label>
       <div class="grid gap-1">
         <span>影響站點</span>
@@ -120,7 +111,7 @@ function remove(id: string) { replace({ events: events.value.filter(event => eve
         </span>
         <span v-if="event.note"> · {{ event.note }}</span>
       </p>
-      <button :disabled="!cloud.canEdit.value" class="min-h-11 text-danger" @click="remove(event.id)">刪除</button>
+      <button class="min-h-11 text-danger" @click="remove(event.id)">刪除</button>
     </article>
   </main>
 </template>

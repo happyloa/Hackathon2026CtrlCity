@@ -8,7 +8,6 @@ import { formatLocalDateTime, type OperationalAdjustment, type OperationalAdjust
 // separate match key and a mismatch would silently drop the exclusion.
 const { stations: profileStations } = useOperationalRoi()
 const {
-  cloud,
   adjustments,
   openEnded,
   add,
@@ -91,7 +90,7 @@ function submit() {
     issues.value = Object.fromEntries(result.issues.map(issue => [issue.field, issue.message]))
     return
   }
-  notice.value = cloud.remote ? '已更新草稿，請儲存到雲端' : editingId.value ? '已更新排除窗' : '已新增排除窗'
+  notice.value = editingId.value ? '已更新排除窗' : '已新增排除窗'
   resetForm()
 }
 
@@ -114,7 +113,6 @@ function endOpenWindow(item: OperationalAdjustment) {
 }
 
 function download() {
-  if (cloud.remote) { void cloud.save(); return }
   if (!import.meta.client) return
   const blob = new Blob([exportPayload()], { type: 'application/json' })
   const url = URL.createObjectURL(blob)
@@ -127,7 +125,6 @@ function download() {
 }
 
 function reload() {
-  if (cloud.remote) { void cloud.reload(); return }
   const count = reloadFromSeed()
   notice.value = `已重新載入內建清單，共 ${count} 筆（此瀏覽器先前的本機編輯已被覆蓋）`
 }
@@ -153,14 +150,8 @@ function windowLabel(item: OperationalAdjustment) {
 <template>
   <div class="mx-auto w-full max-w-screen-3xl space-y-4 px-4 py-4 sm:px-6 lg:px-8 lg:py-6">
 
-    <section v-if="cloud.remote" class="rounded-xl border border-line bg-panel p-4 sm:p-5">
-      <p role="status" class="text-body1">{{ cloud.status.value || '正在讀取雲端資料…' }}</p>
-      <p v-if="!cloud.enabled" class="text-body1">目前開放雲端唯讀，尚未啟用調度登入。</p>
-      <p v-else-if="!cloud.accessToken.value" class="text-body1">登入後可編輯</p>
-      <button v-if="cloud.enabled && !cloud.accessToken.value" class="min-h-11 px-3 text-body1 text-accent" @click="cloud.signIn">登入</button>
-      <button v-else class="min-h-11 px-3 text-body1 text-accent" @click="cloud.signOut">登出</button>
-      <button :disabled="!cloud.canEdit.value" class="min-h-11 px-3 text-body1 text-accent" @click="cloud.restoreDraft">還原本分頁草稿</button>
-      <p v-if="cloud.authError.value" role="alert">{{ cloud.authError.value }}</p>
+    <section class="rounded-xl border border-line bg-panel p-4 sm:p-5">
+      <p class="text-body1 text-muted">排除窗只保存在這台瀏覽器。要讓模型真的忽略這些時段，請用下方「匯出 JSON」覆蓋 <code>app/data/operational-adjustments.json</code> 後重跑統計。</p>
       <NuxtLink to="/admin/events" class="text-body1 text-accent">活動管理</NuxtLink>
     </section>
     <section class="rounded-xl border border-line bg-panel p-4 sm:p-5">
@@ -169,7 +160,7 @@ function windowLabel(item: OperationalAdjustment) {
         記錄站點停止服務的期間。維修、道路施工或活動封閉期間的快照看起來與長期缺車一模一樣，不排除會讓模型誤以為該站永遠缺車。
       </p>
 
-      <fieldset :disabled="!cloud.canEdit.value" class="mt-4 grid gap-3 lg:grid-cols-2">
+      <fieldset class="mt-4 grid gap-3 lg:grid-cols-2">
         <ModalPicker v-model="selectedStationId" label="站點" :options="stationOptions" empty-label="站點資料載入中" />
         <label class="grid min-w-0 gap-1.5 text-body1 font-bold text-muted">
           <span>原因（選填）</span>
@@ -209,7 +200,7 @@ function windowLabel(item: OperationalAdjustment) {
       <div class="mt-4 flex flex-wrap gap-2">
         <button
           class="inline-flex min-h-11 items-center gap-2 rounded-lg border border-accent bg-accent px-4 text-body1 font-bold text-on-accent transition-colors hover:opacity-90"
-          type="button" :disabled="!cloud.canEdit.value" @click="submit">
+          type="button" @click="submit">
           <Icon class="icon-md" :icon="editingId ? 'solar:check-circle-outline' : 'solar:add-circle-outline'" />
           {{ editingId ? '儲存變更' : '新增' }}
         </button>
@@ -233,16 +224,16 @@ function windowLabel(item: OperationalAdjustment) {
           <button
             class="inline-flex min-h-11 items-center gap-2 rounded-lg border border-line bg-surface px-3 text-body1 font-bold text-ink transition-colors hover:border-accent-strong"
             type="button" title="從 app/data/operational-adjustments.json 重新載入，覆蓋此瀏覽器的本機清單" @click="reload">
-            <Icon class="icon-md text-accent" icon="solar:refresh-outline" /> {{ cloud.remote ? '重新載入雲端清單' : '重新載入內建清單' }}
+            <Icon class="icon-md text-accent" icon="solar:refresh-outline" /> 重新載入內建清單
           </button>
           <button
             class="inline-flex min-h-11 items-center gap-2 rounded-lg border border-line bg-surface px-3 text-body1 font-bold text-ink transition-colors hover:border-accent-strong"
-            type="button" :disabled="cloud.remote && (!cloud.canEdit.value || !cloud.dirty.value)" @click="download">
-            <Icon class="icon-md text-accent" icon="solar:download-outline" /> {{ cloud.remote ? '儲存到雲端' : '匯出 JSON' }}
+            type="button" @click="download">
+            <Icon class="icon-md text-accent" icon="solar:download-outline" /> 匯出 JSON
           </button>
           <button
             class="inline-flex min-h-11 items-center gap-2 rounded-lg border border-line bg-surface px-3 text-body1 font-bold text-ink transition-colors hover:border-accent-strong"
-            type="button" :disabled="!cloud.canEdit.value" @click="showImport = !showImport">
+            type="button" @click="showImport = !showImport">
             <Icon class="icon-md text-accent" icon="solar:upload-outline" /> 匯入
           </button>
         </div>
@@ -255,7 +246,7 @@ function windowLabel(item: OperationalAdjustment) {
         <div>
           <button
             class="inline-flex min-h-11 items-center gap-2 rounded-lg border border-accent bg-accent px-4 text-body1 font-bold text-on-accent"
-            type="button" :disabled="!cloud.canEdit.value" @click="runImport">
+            type="button" @click="runImport">
             覆蓋目前清單
           </button>
         </div>
@@ -290,15 +281,15 @@ function windowLabel(item: OperationalAdjustment) {
                 <div class="flex flex-wrap justify-end gap-2">
                   <button v-if="item.endAt === null"
                     class="inline-flex min-h-9 items-center gap-1 rounded-md border border-line bg-panel px-2 text-body1 font-bold text-ink hover:border-accent-strong"
-                    type="button" :disabled="!cloud.canEdit.value" @click="endOpenWindow(item)">結束於現在</button>
+                    type="button" @click="endOpenWindow(item)">結束於現在</button>
                   <button
                     class="inline-flex min-h-9 items-center gap-1 rounded-md border border-line bg-panel px-2 text-body1 font-bold text-ink hover:border-accent-strong"
-                    type="button" :disabled="!cloud.canEdit.value" @click="edit(item)">
+                    type="button" @click="edit(item)">
                     <Icon class="icon-md" icon="solar:pen-outline" /> 編輯
                   </button>
                   <button
                     class="inline-flex min-h-9 items-center gap-1 rounded-md border border-line bg-panel px-2 text-body1 font-bold text-danger hover:border-danger"
-                    type="button" :disabled="!cloud.canEdit.value" @click="remove(item.id)">
+                    type="button" @click="remove(item.id)">
                     <Icon class="icon-md" icon="solar:trash-bin-trash-outline" /> 刪除
                   </button>
                 </div>

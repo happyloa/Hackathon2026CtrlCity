@@ -20,20 +20,20 @@ function createId(): string {
 /**
  * Operator-declared suspensions.
  *
- * Local/Cloudflare edits use localStorage and export to the offline pipeline.
- * With an AWS endpoint, S3 is authoritative: load its ETag, edit a draft,
- * explicitly save with Cognito authorization, then rebuild via CodeBuild.
+ * Browser-local on every deployment, and exported to the offline pipeline from
+ * there. The cloud path this used to take required a Cognito access token, and
+ * the deployed stack runs with dispatcher login switched off -- so every write
+ * was refused and the whole page rendered as a permanently greyed-out form,
+ * which reads as a missing feature rather than a disabled one. A prototype
+ * needs the feature demonstrable, not shared, so localStorage is the right home
+ * for it. `exportPayload` remains the way an edit reaches the model pipeline.
  */
 export function useOperationalAdjustments() {
-  const browserStorage = useBrowserStorage()
+  const browserStorage = useBrowserStorage({ authored: true })
   const adjustments = useState<OperationalAdjustment[]>(STATE_KEY, () => parseAdjustmentsFile(seed))
   const loaded = useState<boolean>(`${STATE_KEY}:loaded`, () => false)
 
-  const endpoint = String(useRuntimeConfig().public.adjustmentsEndpoint || '')
-  const cloud = useOperatorDocument(endpoint, parseAdjustmentsFile, () => adjustments.value, value => { adjustments.value = value }, value => ({ schemaVersion: '1.0', adjustments: value }))
-
   function persist() {
-    if (cloud.remote) { cloud.markDirty(); return }
     if (!import.meta.client) return
     try {
       // `dirty` marks that this browser has an explicit local edit worth
@@ -49,7 +49,6 @@ export function useOperationalAdjustments() {
 
   function load() {
     if (!import.meta.client || loaded.value) return
-    if (cloud.remote) { if (!cloud.ready.value) void cloud.reload(); return }
     loaded.value = true
     try {
       const raw = browserStorage.getItem(STORAGE_KEY)
@@ -75,7 +74,6 @@ export function useOperationalAdjustments() {
   }
 
   function add(draft: OperationalAdjustmentDraft): { ok: true; item: OperationalAdjustment } | { ok: false; issues: AdjustmentValidationIssue[] } {
-    if (!cloud.canEdit.value) return { ok: false, issues: [{ field: 'stationId', message: '登入並載入雲端資料後可編輯' }] }
     const issues = validateAdjustment(draft)
     if (issues.length) return { ok: false, issues }
 
@@ -97,7 +95,6 @@ export function useOperationalAdjustments() {
   }
 
   function update(id: string, draft: OperationalAdjustmentDraft): { ok: true } | { ok: false; issues: AdjustmentValidationIssue[] } {
-    if (!cloud.canEdit.value) return { ok: false, issues: [{ field: 'stationId', message: '登入並載入雲端資料後可編輯' }] }
     const issues = validateAdjustment(draft)
     if (issues.length) return { ok: false, issues }
 
@@ -118,13 +115,11 @@ export function useOperationalAdjustments() {
   }
 
   function remove(id: string) {
-    if (!cloud.canEdit.value) return
     adjustments.value = adjustments.value.filter(item => item.id !== id)
     persist()
   }
 
   function closeNow(id: string, endAt: string) {
-    if (!cloud.canEdit.value) return
     adjustments.value = adjustments.value.map(item => item.id === id
       ? { ...item, endAt, updatedAt: new Date().toISOString() }
       : item)
@@ -132,7 +127,6 @@ export function useOperationalAdjustments() {
   }
 
   function replaceAll(next: OperationalAdjustment[]) {
-    if (!cloud.canEdit.value) return
     adjustments.value = next
     persist()
   }
@@ -174,7 +168,6 @@ export function useOperationalAdjustments() {
   }
 
   return {
-    cloud,
     adjustments: sorted,
     openEnded,
     add,

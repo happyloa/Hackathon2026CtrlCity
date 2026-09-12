@@ -1,19 +1,27 @@
 import { parseDemandEventsFile, type DemandEvent } from '~/shared/demand-events.mjs'
 
+const STORAGE_KEY = 'demand-events:v1'
+
+/**
+ * Operator-declared demand events (a concert, a match, a festival) that the
+ * dispatch pipeline turns into anticipated surges -- see
+ * `shared/demand-surge-impact.ts`.
+ *
+ * Browser-local on every deployment. The cloud path this used to take required
+ * a Cognito access token, and the deployed stack runs with dispatcher login
+ * switched off, so `replace` threw on its first line and no event could ever be
+ * created there -- the whole surge pipeline had an outlet and no inlet. A
+ * prototype needs the feature demonstrable rather than shared across operators.
+ */
 export function useDemandEvents() {
-  const browserStorage = useBrowserStorage()
+  const browserStorage = useBrowserStorage({ authored: true })
   const events = useState<DemandEvent[]>('demand-events', () => [])
-  const endpoint = String(useRuntimeConfig().public.eventsEndpoint || '')
-  const cloud = useOperatorDocument(endpoint, parseDemandEventsFile, () => events.value, value => { events.value = value }, value => ({ schemaVersion: '1.0', events: value }))
   onMounted(() => {
-    if (cloud.remote) { if (!cloud.ready.value) void cloud.reload(); return }
-    try { events.value = parseDemandEventsFile(JSON.parse(browserStorage.getItem('demand-events:v1') || '{"events":[]}')) } catch { /* start empty */ }
+    try { events.value = parseDemandEventsFile(JSON.parse(browserStorage.getItem(STORAGE_KEY) || '{"events":[]}')) } catch { /* start empty */ }
   })
   function replace(raw: unknown) {
-    if (!cloud.canEdit.value) throw new Error('登入後可編輯')
     events.value = parseDemandEventsFile(raw)
-    if (cloud.remote) cloud.markDirty()
-    else { try { browserStorage.setItem('demand-events:v1', JSON.stringify({ events: events.value })) } catch { /* session edits remain */ } }
+    try { browserStorage.setItem(STORAGE_KEY, JSON.stringify({ events: events.value })) } catch { /* session edits remain */ }
   }
-  return { events, cloud, replace }
+  return { events, replace }
 }
