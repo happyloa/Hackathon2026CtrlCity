@@ -157,6 +157,7 @@ function focusDispatchQueue(event: MouseEvent) {
     <WarningPanel v-if="dashboard" :stations="dashboard.stations" :as-of="dashboard.meta.asOf"
       :summary="dashboard.summary" :realtime-low-bikes="dashboard.realtimeLowBikes"
       @select="selectedStationId = $event" />
+    <DemandSurgePanel v-if="dashboard" :stations="dashboard.stations" @select="selectedStationId = $event" />
     <!-- <FrozenStationPanel v-if="dashboard" :stations="dashboard.stations" :frozen-stations="dashboard.frozenStations"
       @select="selectedStationId = $event" /> -->
 

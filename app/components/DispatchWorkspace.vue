@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { ArrowDownUp, ArrowRight, Bike, ChevronDown, ChevronLeft, ChevronRight, CircleCheck, Info, LoaderCircle, MapPinned, RefreshCw, Route as RouteIcon, ShieldCheck, TriangleAlert, Truck } from '@lucide/vue'
 import { buildDispatchRoutePlans, DEFAULT_DISPATCH_ROUTE_POLICY, type DispatchRoutePlan } from '~/shared/dispatch-route-planner'
+import { eventDrivenOperations } from '~/shared/demand-surge-dispatch'
 import { buildLiveOperationsForHorizon, type DispatchHorizon } from '~/shared/live-operations'
+import type { HorizonKey } from '~/shared/ops'
 import {
   applyManualRouteEffects,
   horizonBucketFor,
@@ -35,6 +37,18 @@ const routePage = ref(0)
 const pageSize = 3
 const dashboard = computed(() => live.dashboardForDistrict(selectedDistrict.value))
 const manualRoutesApi = useManualRoutes()
+const { events: demandEvents } = useDemandEvents()
+
+/**
+ * Own clock for the 30/60-minute event lead tiers -- independent of the live
+ * dashboard's poll cycle, same as `useDemandSurgeImpacts` (the advisory
+ * panel above), so an event crossing a tier boundary updates the route list
+ * even while the station snapshot itself hasn't changed.
+ */
+const eventClockEpoch = ref(Date.now())
+let eventClockTimer: ReturnType<typeof setInterval> | null = null
+onMounted(() => { eventClockTimer = setInterval(() => { eventClockEpoch.value = Date.now() }, 60_000) })
+onUnmounted(() => { if (eventClockTimer) clearInterval(eventClockTimer) })
 
 /**
  * The full, unfiltered station list -- manual routes are user-authored
@@ -69,10 +83,24 @@ const manualPlans = computed(() => {
 const adjustedStations = computed(() => (dashboard.value
   ? applyManualRouteEffects(dashboard.value.stations, manualPlans.value, activeHorizon.value)
   : []))
+/**
+ * Anticipated activity-driven demand (see /admin/events) within lead time of
+ * the active horizon, converted to the same Alert/DispatchRecommendation
+ * shape the live model produces (see demand-surge-dispatch.ts). "now" stays
+ * untouched -- it means a currently-observed failure, not a forecast, so an
+ * event that hasn't started yet has no place there.
+ */
+const eventOperations = computed(() => {
+  if (!dashboard.value || activeHorizon.value === 'now') return { alerts: [], dispatches: [] }
+  return eventDrivenOperations(
+    demandEvents.value, adjustedStations.value, dashboard.value.meta.asOf, eventClockEpoch.value,
+    activeHorizon.value as HorizonKey,
+  )
+})
 const planning = computed(() => {
   if (!dashboard.value) return { routes: [], unplannedDispatches: [] }
   const operations = buildLiveOperationsForHorizon(adjustedStations.value, dashboard.value.meta.asOf, activeHorizon.value)
-  return buildDispatchRoutePlans(operations.dispatches, adjustedStations.value)
+  return buildDispatchRoutePlans([...operations.dispatches, ...eventOperations.value.dispatches], adjustedStations.value)
 })
 const manualChoices = computed<RouteChoice[]>(() => manualPlans.value
   .filter(plan => plan.stops.length > 0)
@@ -216,6 +244,7 @@ async function handleEditRoute() {
       <div class="dispatch-source"><span><i :class="{ 'is-stale': live.error.value }" />{{ live.error.value ? '更新暫時中斷' : '官方即時資料' }}<time>{{ asOfLabel }}</time></span><button type="button" class="dispatch-button" :disabled="live.pending.value" @click="live.refresh({ manual: true })"><LoaderCircle v-if="live.pending.value" :size="16" class="dispatch-spin" aria-hidden="true" /><RefreshCw v-else :size="16" aria-hidden="true" />{{ live.pending.value ? '更新中' : '更新資料' }}</button></div>
       <span class="sr-only" role="status" aria-live="polite">{{ locationMessage }}</span>
     </section>
+    <DemandSurgePanel v-if="allStations.length" :stations="allStations" @select="manualInspectedStationId = $event" />
     <div v-if="live.pending.value && !dashboard" class="loading-board" role="status" aria-busy="true"><LoaderCircle :size="22" class="dispatch-spin" aria-hidden="true" />正在建立即時路線建議…</div>
     <div v-else-if="live.error.value && !dashboard" class="loading-board error-board" role="alert"><TriangleAlert :size="22" aria-hidden="true" />{{ live.error.value }}<PageRetryButton :busy="live.pending.value" @retry="live.refresh({ manual: true })" /></div>
     <template v-else-if="dashboard">

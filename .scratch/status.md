@@ -49,3 +49,10 @@
 - 原始 raw prefix 禁止 CloudFront 存取；公開快照讀取與營運文件 API 是不同路徑，不應記成所有讀取都經 Lambda。
 - 文件的 65 分鐘測試已改成每 5 分鐘連續輸入，避免觸發 gap reset。
 - 工作目錄保留所有實作與測試檔案，未提交 git。
+
+## 正式站 500 定點診斷（2026-09-12 16:30）
+- 使用者回報正式 CloudFront `/dispatch` 頁面的 `/api/v1/live-stations` 回傳 500，遂僅進行此問題的唯讀 HTTP／CloudWatch／Lambda 設定查詢，未恢復整套檢查。
+- CloudWatch 在 16:24 左右記錄 `Runtime.UserCodeSyntaxError: Cannot use import statement outside a module`，指出 `/var/task/handler.js` 含 ESM import 卻按 CommonJS 載入；可確認當時 Lambda 初始化失敗。
+- 16:29:33 正式 CloudFront API 已回傳 HTTP 200 與站況 JSON。Lambda 設定顯示最後更新為 16:28:58，狀態 Active、LastUpdateStatus Successful；本次未查明該更新的執行者，不推定由本對話執行。
+- 本地打包腳本已使用 `format: cjs`、`handler.cjs`；CI zip 與 SAM 格式設定亦已對應，並已有實際 bundle 載入檢查。此次未另改程式、未執行部署或雲端寫入。
+- 目前的 200 表示本次請求已恢復，不能據此保證所有後續請求皆正常；使用者可重新整理確認。
