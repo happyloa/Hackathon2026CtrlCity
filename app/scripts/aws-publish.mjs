@@ -30,6 +30,14 @@ try {
   if (!/^[a-z0-9.-]{3,63}$/.test(bucket || '')) throw new Error('Stack SiteBucketName output is missing or invalid.')
   if (!/^[A-Z0-9]{8,32}$/.test(distributionId || '')) throw new Error('Stack DistributionId output is missing or invalid.')
 
+  // Upload hashed assets first and retain previous versions for open tabs.
+  const nuxtAssets = resolve(distPath, '_nuxt')
+  requireFile(nuxtAssets, 'Nuxt asset directory')
+  run('aws', awsArgs(options, [
+    's3', 'sync', nuxtAssets, `s3://${bucket}/_nuxt`,
+    '--cache-control', 'public,max-age=31536000,immutable',
+  ]))
+
   run('aws', awsArgs(options, [
     's3',
     'sync',
@@ -40,25 +48,11 @@ try {
     '_headers',
     '--exclude',
     '_routes.json',
+    '--exclude',
+    '_nuxt/*',
     '--cache-control',
     'public,max-age=300,must-revalidate',
   ]))
-
-  const nuxtAssets = resolve(distPath, '_nuxt')
-  try {
-    requireFile(nuxtAssets, 'Nuxt asset directory')
-    run('aws', awsArgs(options, [
-      's3',
-      'cp',
-      nuxtAssets,
-      `s3://${bucket}/_nuxt`,
-      '--recursive',
-      '--cache-control',
-      'public,max-age=31536000,immutable',
-    ]))
-  } catch (error) {
-    console.warn(error instanceof Error ? error.message : error)
-  }
 
   run('aws', awsArgs(options, [
     'cloudfront',
@@ -66,9 +60,7 @@ try {
     '--distribution-id',
     distributionId,
     '--paths',
-    '/index.html',
-    '/*.html',
-    '/data/*',
+    '/*',
   ]))
 
   console.log(`Published to ${outputs.SiteUrl} with AgentCore UI ${agentEnabled ? 'enabled' : 'disabled'}.`)

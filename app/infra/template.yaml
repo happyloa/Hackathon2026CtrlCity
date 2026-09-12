@@ -4,6 +4,15 @@ Description: >-
   CtrlCity YouBike demo: private S3 static site, CloudFront, a small HTTP API,
   and an opt-in Amazon Bedrock AgentCore review boundary.
 
+# The optional Harness ARN is empty only while AgentReviewEnabled is false.
+# cfn-lint does not carry that condition through the SAM-generated IAM role.
+Metadata:
+  cfn-lint:
+    config:
+      ignore_checks:
+        - W1030
+        - W1031
+
 Parameters:
   EnvironmentName:
     Type: String
@@ -325,14 +334,15 @@ Resources:
       BuildProperties:
         EntryPoints:
           - aws/handler.ts
-        Format: esm
+        Format: cjs
+        OutExtension:
+          - .js=.cjs
         Minify: true
         Sourcemap: false
         Target: es2022
 
   OperationsApiLogGroup:
     Type: AWS::Logs::LogGroup
-    DependsOn: OperationsApiFunction
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
@@ -422,6 +432,10 @@ Resources:
                 AWS:SourceArn: !Sub 'arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${SiteDistribution}'
 
 Outputs:
+  ApiFunctionName:
+    Description: Lambda function updated by the GitHub deployment role.
+    Value: !Ref OperationsApiFunction
+
   SiteUrl:
     Description: Public CloudFront URL for the final AWS demo.
     Value: !Sub 'https://${SiteDistribution.DomainName}'
