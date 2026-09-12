@@ -7,6 +7,19 @@ import { formatLocalDateTime, type OperationalAdjustment, type OperationalAdjust
 // a recorded window is guaranteed to match. Live-feed ids are resolved through a
 // separate match key and a mismatch would silently drop the exclusion.
 const { stations: profileStations } = useOperationalRoi()
+
+/**
+ * Demo trigger for the dashboard's opening shortage alarm. The dashboard
+ * itself raises it once per tab session, which is right for an operator but
+ * useless on stage -- this button replays it on demand against the same live
+ * data, with no session guard.
+ */
+const live = useLiveDashboard()
+const shortageAlarm = useShortageAlarm()
+const alarmSnapshot = computed(() => shortageAlarmSnapshot(live.dashboard.value))
+async function demoShortageAlarm() {
+  if (await shortageAlarm.show(alarmSnapshot.value)) await navigateTo('/dispatch')
+}
 const {
   adjustments,
   openEnded,
@@ -153,6 +166,25 @@ function windowLabel(item: OperationalAdjustment) {
     <section class="rounded-xl border border-line bg-panel p-4 sm:p-5">
       <p class="text-body1 text-muted">排除窗只保存在這台瀏覽器。要讓模型真的忽略這些時段，請用下方「匯出 JSON」覆蓋 <code>app/data/operational-adjustments.json</code> 後重跑統計。</p>
       <NuxtLink to="/admin/events" class="text-body1 text-accent">活動管理</NuxtLink>
+    </section>
+
+    <section class="rounded-xl border border-line bg-panel p-4 sm:p-5">
+      <h2 class="m-0 text-h6 font-bold">展示工具</h2>
+      <p class="mt-1 text-body1 leading-6 text-muted">
+        營運總覽開啟時會自動跳出一次長時間缺車警示（每個分頁一次）。此按鈕以相同的即時資料重播該警示，不受一次性限制，供展示使用。
+      </p>
+      <div class="mt-3 flex flex-wrap items-center gap-3">
+        <button
+          class="inline-flex min-h-11 items-center gap-2 rounded-md border border-accent-strong bg-accent px-3 text-body1 font-semibold text-on-accent"
+          type="button" :disabled="!live.dashboard.value" @click="demoShortageAlarm">
+          <Icon class="icon-md" icon="solar:bell-bing-outline" /> 顯示長時間缺車警示
+        </button>
+        <span class="text-body1 text-muted">
+          {{ live.dashboard.value
+            ? `目前符合條件：${alarmSnapshot.total} 站（可借車低於 ${shortageAlarm.threshold} 台，持續 ${SHORTAGE_ALARM_MINUTES} 分鐘以上）`
+            : '正在載入即時站況…' }}
+        </span>
+      </div>
     </section>
     <section class="rounded-xl border border-line bg-panel p-4 sm:p-5">
       <h2 class="m-0 text-h6 font-bold">{{ editingId ? '編輯排除窗' : '新增排除窗' }}</h2>

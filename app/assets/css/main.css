@@ -563,3 +563,116 @@
   margin-left: auto;
   margin-right: auto;
 }
+/* ---------------------------------------------------------------------------
+ * SweetAlert2 dialogs
+ *
+ * The library ships its own type ramp in px, which would sit outside the nine
+ * steps this file owns. Every size below is re-pointed at a `--type-*` role so
+ * a dialog scales with the rest of the interface at each breakpoint, and the
+ * surface colours follow the panel tokens so it stays correct in both themes.
+ * ------------------------------------------------------------------------- */
+.swal2-popup.shortage-alarm {
+  background: var(--panel);
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+  border-radius: 0.75rem;
+  font-size: var(--type-body1);
+  line-height: var(--type-body1-lh);
+}
+
+.swal2-popup.shortage-alarm .swal2-title {
+  color: var(--ink);
+  font-size: var(--type-h5);
+  line-height: var(--type-h5-lh);
+  letter-spacing: var(--type-h5-ls);
+  font-weight: 700;
+}
+
+.swal2-popup.shortage-alarm .swal2-html-container,
+.swal2-popup.shortage-alarm .swal2-footer {
+  color: var(--muted);
+  font-size: var(--type-body1);
+  line-height: var(--type-body1-lh);
+}
+
+.swal2-popup.shortage-alarm .swal2-footer {
+  border-top-color: var(--line);
+  font-size: var(--type-body2);
+  line-height: var(--type-body2-lh);
+}
+
+.swal2-popup.shortage-alarm .swal2-styled.swal2-confirm {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.swal2-popup.shortage-alarm .swal2-styled.swal2-cancel {
+  background: var(--panel-muted);
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+}
+
+.swal2-popup.shortage-alarm .swal2-styled {
+  font-size: var(--type-body1);
+  line-height: var(--type-body1-lh);
+  min-height: 2.75rem;
+  border-radius: 0.5rem;
+}
+
+.shortage-alarm-list {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  text-align: start;
+}
+
+.shortage-alarm-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0.25rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.shortage-alarm-row:last-child {
+  border-bottom: 0;
+}
+
+.shortage-alarm-station {
+  display: grid;
+  min-width: 0;
+}
+
+.shortage-alarm-station strong {
+  color: var(--ink);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.shortage-alarm-station small {
+  color: var(--muted);
+  font-size: var(--type-body2);
+  line-height: var(--type-body2-lh);
+}
+
+.shortage-alarm-bikes {
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.shortage-alarm-bikes b {
+  color: var(--danger);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.shortage-alarm-more {
+  margin: 0.75rem 0 0;
+  text-align: start;
+  color: var(--muted);
+  font-size: var(--type-body2);
+  line-height: var(--type-body2-lh);
+}

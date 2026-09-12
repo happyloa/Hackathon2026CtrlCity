@@ -98,6 +98,19 @@ watch(dashboard, (value) => {
   if (selectedStationId.value && !value?.stations.some(station => station.id === selectedStationId.value)) selectedStationId.value = ''
 })
 
+/**
+ * Opening alarm for prolonged shortages, raised once per tab session as soon
+ * as the first live payload lands. Deliberately reads `live.dashboard` rather
+ * than the district-filtered `dashboard`: an operator opening the console
+ * needs the whole network's hour-long shortages, not only whichever district
+ * the picker happens to have restored.
+ */
+const shortageAlarm = useShortageAlarm()
+watch(live.dashboard, async (value) => {
+  if (!value) return
+  if (await shortageAlarm.notifyOnce(value)) await navigateTo('/dispatch')
+}, { immediate: true })
+
 // `?station=` is a deep-linkable URL contract, which needs picking up even
 // when index.vue is already mounted (Nuxt reuses the page component across
 // an in-app navigateTo to the same route).

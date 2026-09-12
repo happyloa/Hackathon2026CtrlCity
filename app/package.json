@@ -36,6 +36,7 @@
     "leaflet": "^1.9.4",
     "nuxt": "4.5.2",
     "oidc-client-ts": "^3.5.0",
+    "sweetalert2": "^11.26.25",
     "vue": "^3.5.40",
     "vue-router": "^5.2.0"
   },
