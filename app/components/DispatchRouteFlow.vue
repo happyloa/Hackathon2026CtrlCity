@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ArrowDownToLine, ArrowUpFromLine, ArrowUpRight, ArrowUpDown, MapPin, Navigation, Pencil, Route } from '@lucide/vue'
+import { ArrowUpRight, MapPin, Navigation, Pencil, Route } from '@lucide/vue'
 import type { DispatchRoutePlan, DispatchRouteStopAction } from '~/shared/dispatch-route-planner'
 import type { StationRisk } from '~/shared/ops'
 
@@ -58,10 +58,6 @@ function loadPercent(load: number) {
 
 function actionLabel(action: DispatchRouteStopAction) {
   return { pickup: '取車', dropoff: '卸車', mixed: '取車與卸車' }[action]
-}
-
-function actionIcon(action: DispatchRouteStopAction) {
-  return { pickup: ArrowUpFromLine, dropoff: ArrowDownToLine, mixed: ArrowUpDown }[action]
 }
 
 function stopPinColor(stop: DispatchRoutePlan['stops'][number]) {
@@ -147,7 +143,12 @@ onMounted(() => { void revealSelectedStop() })
               :aria-label="`定位第 ${stop.sequence} 站：${stop.stationName}，取車 ${stop.pickupBikes} 台、卸車 ${stop.dropoffBikes} 台，車載 ${stop.vehicleLoadAfter} 台`"
               @click="emit('selectStop', stop.sequence)">
               <span class="flow-stop-topline">
-                <span class="flow-action"><component :is="actionIcon(stop.action)" :size="14" :stroke-width="2" aria-hidden="true" />{{ actionLabel(stop.action) }}</span>
+                <span class="flow-action">
+                  <span class="flow-action-icons" aria-hidden="true">
+                    <img v-if="stop.action !== 'pickup'" src="/animations/dropoff.svg" alt="" width="15" height="20" class="shrink-0" />
+                    <img v-if="stop.action !== 'dropoff'" src="/animations/pickup.svg" alt="" width="15" height="20" class="shrink-0" />
+                  </span>{{ actionLabel(stop.action) }}
+                </span>
                 <span v-if="stopIndex === 0" class="flow-endpoint">起點</span>
                 <span v-else-if="stopIndex === route.stops.length - 1" class="flow-endpoint">終點</span>
                 <span v-if="selectedSequence === stop.sequence" class="flow-selected-label">已選取</span>
@@ -225,6 +226,7 @@ onMounted(() => { void revealSelectedStop() })
 .flow-stop-select:hover { background: color-mix(in srgb, var(--stop-color) 7%, transparent); }
 .flow-stop-topline { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 6px; }
 .flow-action { display: inline-flex; align-items: center; gap: 5px; color: var(--stop-color); font-size: var(--type-body2); font-weight: 600; }
+.flow-action-icons { display: inline-flex; align-items: center; gap: 1px; }
 .flow-endpoint { color: var(--muted); font-size: var(--type-body2); border-left: 1px solid var(--line); padding-left: 6px; }
 .flow-selected-label { margin-left: auto; color: var(--muted); font-size: var(--type-body2); }
 .flow-station-name { display: block; font-size: var(--type-body2); line-height: 1.5; font-weight: 600; overflow-wrap: anywhere; }

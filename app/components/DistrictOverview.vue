@@ -75,8 +75,7 @@ function choose(district: string) { emit('select', district === props.selectedDi
 </template>
 
 <style scoped>
-.district-overview { --area-quiet: #a7cbbf; --area-low: #82b7aa; --area-medium: #e2b970; --area-high: #e58e89; --area-none: #414754; display: grid; grid-template-columns: minmax(0, 1fr) 310px; gap: 20px; align-items: start; }
-:global([data-theme="light"]) .district-overview { --area-none: #e2e4e8; }
+.district-overview { --area-quiet: #22c55e; --area-low: #eab308; --area-medium: #f97316; --area-high: #ef4444; --area-none: #9ca3af; display: grid; grid-template-columns: minmax(0, 1fr) 310px; gap: 20px; align-items: start; }
 [data-tone="quiet"] { --tone: var(--area-quiet); }[data-tone="low"] { --tone: var(--area-low); }[data-tone="medium"] { --tone: var(--area-medium); }[data-tone="high"] { --tone: var(--area-high); }[data-tone="none"] { --tone: var(--area-none); }
 .district-overview-heading, .district-card-title, .district-card-count, .district-card-now, .district-map-focus, .district-map-panel header, .district-expand, .district-clear { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .district-eyebrow { display: flex; align-items: center; gap: 6px; color: var(--accent); font-size: var(--type-body2); margin-bottom: 5px; }.district-overview-heading h2 { font-size: var(--type-h6); font-weight: 650; }.district-overview-heading h2 > span { color: var(--muted); font-size: var(--type-body2); font-weight: 400; margin-left: 8px; white-space: nowrap; }.district-intro { font-size: var(--type-body2); color: var(--muted); margin: 7px 0 16px; }.district-clear { border: 1px solid var(--line); border-radius: 6px; background: var(--panel); min-height: 40px; padding: 6px 10px; font-size: var(--type-body2); flex-shrink: 0; }
