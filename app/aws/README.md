@@ -7,6 +7,7 @@
 - GitHub Actions 先執行測試與型別檢查，再建置並驗證 Lambda bundle、更新 API、發布前端、等待 CloudFront 快取失效，最後執行線上 smoke test。
 - GitHub 使用 OIDC role `ctrlcity-github-deploy`，信任限於該 repo 的 `main`；role ARN 存在 repository variable `AWS_DEPLOY_ROLE_ARN`，不需要保存 AWS access key。
 - `infra/github-deploy-policy.json` 記錄這次部署的資源權限。若重建 stack，需更新其中的 bucket、distribution、Lambda ARN，再更新 role policy。
+- `infra/github-deploy-trust.json` 記錄 OIDC 信任條件；此 repo 使用含 owner ID／repo ID 的 immutable subject，不能改成舊版只含名稱的格式。Lambda 更新等待器需要 `lambda:GetFunction`，權限仍限本 Demo 函式。
 - 自動部署更新前端與 Lambda 程式；修改基礎設施模板時，另執行下方 `aws:deploy`。CI role 沒有建立 IAM 或變更基礎設施的權限。
 
 Cloudflare Pages 的 Git Integration 繼續使用同一個 `main`，兩個平台各自建置。AWS 使用主辦方臨時帳號，活動後的保留期限依主辦方設定。

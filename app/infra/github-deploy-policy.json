@@ -28,7 +28,7 @@
     {
       "Sid": "UpdateDemoApi",
       "Effect": "Allow",
-      "Action": ["lambda:UpdateFunctionCode", "lambda:GetFunctionConfiguration"],
+      "Action": ["lambda:UpdateFunctionCode", "lambda:GetFunctionConfiguration", "lambda:GetFunction"],
       "Resource": "arn:aws:lambda:us-west-2:953694300276:function:ctrlcity-hackathon-OperationsApiFunction-XIwpZjVZet66"
     }
   ]
