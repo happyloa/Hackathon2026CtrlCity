@@ -107,7 +107,7 @@ function scorePartsLabel(alert: Alert) {
           </span>
           <button type="button" class="min-w-0 flex-1 text-left text-body1 leading-6 text-ink hover:underline" @click="emit('select', alert.stationId)">
             <strong class="block break-words font-bold">{{ stationNameFor(alert) }}</strong>
-            <span class="mt-1 block text-muted">{{ conditionLabel(alert) }} · {{ stationFor(alert)?.district || '行政區未標示' }}</span>
+            <span class="mt-1 block text-muted">{{ conditionLabel(alert) }}<span v-if="alert.durationMinutes > 0"> · 已{{ alert.condition === 'empty_now' ? '缺車' : alert.condition === 'full_now' ? '缺位' : '異常' }} {{ Math.floor(alert.durationMinutes / 60) }} 小時 {{ alert.durationMinutes % 60 }} 分</span> · {{ stationFor(alert)?.district || '行政區未標示' }}</span>
             <small v-if="kind === 'inventory'" class="mt-1 block text-body1 leading-6 text-muted">{{ scorePartsLabel(alert) }}</small>
             <small v-else class="mt-1 block text-body1 leading-6 text-muted">服務異常，不排入搬運路線。</small>
           </button>

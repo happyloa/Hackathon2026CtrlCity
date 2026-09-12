@@ -52,7 +52,7 @@ const PRIMARY_HORIZON_MINUTES = 60
 const SUFFICIENT_BASELINE_MIN_SAMPLES = 6
 const HIGH_CONFIDENCE_MIN_SAMPLES = 12
 
-const HEADER_MAP = new Map([
+export const HEADER_MAP = new Map([
   ['日期', 'observedAt'],
   ['城市', 'city'],
   ['行政區', 'district'],
@@ -116,7 +116,7 @@ function formatObservedAt(year, month, day, hour, minute, second) {
   return `${year}-${pad(month)}-${pad(day)}T${pad(hour)}:${pad(minute)}:${pad(second)}+08:00`
 }
 
-function parseLocalTimestamp(value) {
+export function parseLocalTimestamp(value) {
   const match = normalizeText(value).match(
     /^(\d{4})[/-](\d{1,2})[/-](\d{1,2})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?$/,
   )
@@ -347,7 +347,7 @@ async function streamRows(filePath, onRow) {
   return { encoding, rows: sourceRow - 1 }
 }
 
-function toSnapshot(row, source, aliases, stationIndex, quality, districts) {
+export function toSnapshot(row, source, aliases, stationIndex, quality, districts) {
   const timestamp = parseLocalTimestamp(row.observedAt)
   if (!timestamp) {
     quality.invalidTimestampRows += 1

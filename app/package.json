@@ -24,15 +24,18 @@
     "aws:smoke": "node scripts/aws-smoke.mjs",
     "test": "node scripts/validate-type-scale.mjs && node --test tests/*.test.mjs",
     "typecheck": "nuxt typecheck",
-    "type:validate": "node scripts/validate-type-scale.mjs"
+    "type:validate": "node scripts/validate-type-scale.mjs",
+    "aws:rebuild": "node scripts/aws-rebuild.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-agentcore": "3.1116.0",
+    "@aws-sdk/client-s3": "^3.1131.0",
     "@iconify/vue": "^5.0.1",
     "@lucide/vue": "^1.41.0",
     "font-gis": "^1.0.6",
     "leaflet": "^1.9.4",
     "nuxt": "4.5.2",
+    "oidc-client-ts": "^3.5.0",
     "vue": "^3.5.40",
     "vue-router": "^5.2.0"
   },

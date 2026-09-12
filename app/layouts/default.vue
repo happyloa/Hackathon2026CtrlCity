@@ -1,15 +1,16 @@
 <script setup lang="ts">
 import { ChevronRight, CircleChevronLeft, CircleChevronRight, LayoutDashboard, MapPin, Moon, Route, Sun } from "@lucide/vue";
 
+const browserStorage = useBrowserStorage();
 const route = useRoute();
 const sidebarCollapsed = ref(false);
 
 onMounted(() => {
-  sidebarCollapsed.value = localStorage.getItem("ctrlcity-sidebar-collapsed") === "true";
+  sidebarCollapsed.value = browserStorage.getItem("ctrlcity-sidebar-collapsed") === "true";
 });
 
 watch(sidebarCollapsed, (collapsed) => {
-  if (import.meta.client) localStorage.setItem("ctrlcity-sidebar-collapsed", String(collapsed));
+  if (import.meta.client) browserStorage.setItem("ctrlcity-sidebar-collapsed", String(collapsed));
 });
 
 const { theme, toggle: toggleTheme } = useTheme();
@@ -31,6 +32,8 @@ const navigation = [
 /** Admin pages (`/admin/*`) are reached by direct URL, not the sidebar, so
  * they need their header label listed separately from `navigation`. */
 const adminLabels: Record<string, string> = {
+  "/admin/events": "活動管理",
+  "/admin/callback": "登入",
   "/admin/roi": "營運ROI",
   "/admin/adjustments": "營運調整",
   "/design-system": "字級設計系統",

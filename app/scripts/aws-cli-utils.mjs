@@ -16,6 +16,8 @@ const optionNames = new Set([
   'harness-qualifier',
   'model-id',
   'url',
+  'alert-email',
+  'site-url',
 ])
 const booleanNames = new Set([
   'create-harness',
@@ -23,6 +25,9 @@ const booleanNames = new Set([
   'yes',
   'include-agent',
   'confirm-agent-cost',
+  'enable-capture',
+  'build-runner',
+  'dispatcher-login',
 ])
 
 export function parseOptions(argv = process.argv.slice(2)) {

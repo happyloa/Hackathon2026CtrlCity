@@ -386,6 +386,9 @@ onBeforeUnmount(() => {
               </span>
             </div>
           </DisclosurePanel>
+          <NuxtLink v-if="isLive && station.qualityFlags.some(flag => flag.includes('疑似壞車'))"
+            :to="{ path: '/admin/adjustments', query: { stationName: station.name, district: station.district } }"
+            class="mt-3 inline-flex min-h-11 items-center text-body1 text-accent">登記排除窗</NuxtLink>
           <NuxtLink v-if="!isLive" :to="detailTarget"
             class="mt-4 inline-flex items-center gap-1 text-body1 font-bold text-accent transition-colors hover:text-accent-strong">
             開啟完整站點視圖

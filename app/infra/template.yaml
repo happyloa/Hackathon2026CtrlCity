@@ -80,7 +80,43 @@ Parameters:
       - 'false'
     Description: Opt-in private S3 source for curated Markdown only; it does not create a vector store.
 
+  EnableSnapshotCapture:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+    Description: Opt-in. Captures the official live feed every 5 minutes into the site bucket.
+
+  AlertEmail:
+    Type: String
+    Default: ''
+    Description: Optional e-mail for snapshot capture alarms. Empty creates no SNS topic.
+    AllowedPattern: '^$|^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  CreateBuildRunner:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+    Description: Opt-in. Creates a private raw-data bucket and a CodeBuild project that rebuilds the historical profile.
+
+  EnableDispatcherLogin:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+    Description: Opt-in. Creates a Cognito user pool that protects the operator write endpoints.
+
+
+  DispatcherSiteUrl:
+    Type: String
+    Default: ''
+    AllowedPattern: '^$|^https://[a-zA-Z0-9.-]+$'
+    Description: Existing site origin for Cognito callbacks; avoids a CloudFront/API dependency cycle.
+
 Rules:
+  LoginRequiresSiteUrl:
+    RuleCondition: !Equals [!Ref EnableDispatcherLogin, 'true']
+    Assertions:
+      - Assert: !Not [!Equals [!Ref DispatcherSiteUrl, '']]
+        AssertDescription: DispatcherSiteUrl is required for dispatcher login.
+
   ManagedHarnessRequiresModel:
     RuleCondition: !Equals [!Ref CreateAgentCoreHarness, 'true']
     Assertions:
@@ -102,12 +138,30 @@ Conditions:
     - !Not [!Equals [!Ref AgentCoreHarnessArn, '']]
   CreateKnowledgeSource: !Equals [!Ref CreateKnowledgeSourceBucket, 'true']
 
+  CaptureEnabled: !Equals [!Ref EnableSnapshotCapture, 'true']
+  CaptureAlertsEnabled: !And
+    - !Condition CaptureEnabled
+    - !Not [!Equals [!Ref AlertEmail, '']]
+  BuildRunnerEnabled: !Equals [!Ref CreateBuildRunner, 'true']
+  LoginEnabled: !Equals [!Ref EnableDispatcherLogin, 'true']
+
 Resources:
   SiteBucket:
     Type: AWS::S3::Bucket
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
+      LifecycleConfiguration: !If
+        - CaptureEnabled
+        - Rules:
+            - Id: archive-raw-snapshots
+              Status: Enabled
+              Prefix: raw/
+              Transitions:
+                - StorageClass: GLACIER_IR
+                  TransitionInDays: 30
+              ExpirationInDays: 180
+        - !Ref AWS::NoValue
       BucketEncryption:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
@@ -277,6 +331,8 @@ Resources:
       Description: Thin NTPC live proxy and guarded AgentCore review facade.
       Environment:
         Variables:
+          SITE_BUCKET: !Ref SiteBucket
+          OPERATOR_WRITE_ENABLED: !If [LoginEnabled, 'true', 'false']
           LIVE_FEED_URL: !Ref LiveFeedUrl
           AGENTCORE_HARNESS_ARN: !If
             - CreateManagedHarness
@@ -288,6 +344,17 @@ Resources:
             - !Ref AgentCoreHarnessQualifier
       Policies:
         - Statement:
+            - Sid: DetectMissingOperatorFiles
+              Effect: Allow
+              Action: s3:ListBucket
+              Resource: !GetAtt SiteBucket.Arn
+            - Sid: ReadWriteOperatorFiles
+              Effect: Allow
+              Action: [s3:GetObject, s3:PutObject]
+              Resource:
+                - !Sub '${SiteBucket.Arn}/data/operational-adjustments.json'
+                - !Sub '${SiteBucket.Arn}/data/demand-events.json'
+                - !Sub '${SiteBucket.Arn}/data/manual-routes.json'
             - Sid: InvokeConfiguredAgentCoreHarness
               Effect: Allow
               Action:
@@ -349,6 +416,319 @@ Resources:
       LogGroupName: !Sub '/aws/lambda/${OperationsApiFunction}'
       RetentionInDays: !Ref LogRetentionDays
 
+  SnapshotCaptureFunction:
+    Type: AWS::Serverless::Function
+    Condition: CaptureEnabled
+    Properties:
+      CodeUri: ../
+      Handler: aws/capture.captureHandler
+      Runtime: nodejs24.x
+      Architectures: [arm64]
+      MemorySize: 256
+      Timeout: 60
+      ReservedConcurrentExecutions: 1        # 單一寫入者：兩次執行絕不重疊
+      Description: Captures the official live feed every 5 minutes into raw/, snapshots/ and state/.
+      Environment:
+        Variables:
+          SITE_BUCKET: !Ref SiteBucket
+          LIVE_FEED_URL: !Ref LiveFeedUrl
+      Policies:
+        - Statement:
+            - Sid: DetectMissingCheckpoint
+              Effect: Allow
+              Action: s3:ListBucket
+              Resource: !GetAtt SiteBucket.Arn
+            - Sid: ReadWriteCapturePrefixesOnly
+              Effect: Allow
+              Action: [s3:GetObject, s3:PutObject]
+              Resource:
+                - !Sub '${SiteBucket.Arn}/raw/*'
+                - !Sub '${SiteBucket.Arn}/snapshots/*'
+                - !Sub '${SiteBucket.Arn}/state/*'
+      Events:
+        EveryFiveMinutes:
+          Type: ScheduleV2
+          Properties:
+            ScheduleExpression: rate(5 minutes)
+            FlexibleTimeWindow:
+              Mode: 'OFF'
+            RetryPolicy:
+              MaximumRetryAttempts: 1
+              MaximumEventAgeInSeconds: 240
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints: [aws/capture.ts]
+        Format: cjs
+        OutExtension: [.js=.cjs]
+        Minify: true
+        Sourcemap: false
+        Target: es2022
+
+  SnapshotCaptureLogGroup:
+    Type: AWS::Logs::LogGroup
+    Condition: CaptureEnabled
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${SnapshotCaptureFunction}'
+      RetentionInDays: !Ref LogRetentionDays
+
+  ShortLivedDataCachePolicy:
+    Type: AWS::CloudFront::CachePolicy
+    Condition: CaptureEnabled
+    Properties:
+      CachePolicyConfig:
+        Name: !Sub '${AWS::StackName}-short-lived-data'
+        Comment: 60-second edge cache for scheduler-written JSON.
+        MinTTL: 0
+        DefaultTTL: 60
+        MaxTTL: 120
+        ParametersInCacheKeyAndForwardedToOrigin:
+          EnableAcceptEncodingGzip: true
+          EnableAcceptEncodingBrotli: true
+          CookiesConfig: { CookieBehavior: none }
+          HeadersConfig: { HeaderBehavior: none }
+          QueryStringsConfig: { QueryStringBehavior: none }
+
+  CaptureAlertTopic:
+    Type: AWS::SNS::Topic
+    Condition: CaptureAlertsEnabled
+    Properties:
+      Subscription:
+        - Protocol: email
+          Endpoint: !Ref AlertEmail
+
+  SnapshotCaptureErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: CaptureEnabled
+    Properties:
+      AlarmDescription: Snapshot capture failed twice in a row; latest.json is going stale.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions: [{ Name: FunctionName, Value: !Ref SnapshotCaptureFunction }]
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: !If [CaptureAlertsEnabled, [!Ref CaptureAlertTopic], []]
+
+  SnapshotCaptureSilentAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: CaptureEnabled
+    Properties:
+      AlarmDescription: Snapshot capture has not run for 15 minutes; the scheduler may be disabled.
+      Namespace: AWS/Lambda
+      MetricName: Invocations
+      Dimensions: [{ Name: FunctionName, Value: !Ref SnapshotCaptureFunction }]
+      Statistic: Sum
+      Period: 900
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: LessThanThreshold
+      TreatMissingData: breaching
+      AlarmActions: !If [CaptureAlertsEnabled, [!Ref CaptureAlertTopic], []]
+  RawDataBucket:
+    Type: AWS::S3::Bucket
+    Condition: BuildRunnerEnabled
+    DeletionPolicy: Retain                   # 原始資料不跟著 stack 刪
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: { SSEAlgorithm: AES256 }
+      OwnershipControls:
+        Rules: [{ ObjectOwnership: BucketOwnerEnforced }]
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration: { Status: Enabled }
+      Tags:
+        - { Key: project, Value: ctrlcity-youbike }
+        - { Key: environment, Value: !Ref EnvironmentName }
+        - { Key: purpose, Value: raw-dataset-and-build-artifacts }
+
+  BuildRunnerRole:
+    Type: AWS::IAM::Role
+    Condition: BuildRunnerEnabled
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: codebuild.amazonaws.com }
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: history-build
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: cloudformation:DescribeStacks
+                Resource: !Ref 'AWS::StackId'
+              - Effect: Allow
+                Action: [logs:CreateLogGroup, logs:CreateLogStream, logs:PutLogEvents]
+                Resource: !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${AWS::StackName}-*'
+              - Effect: Allow
+                Action: [s3:GetObject, s3:ListBucket, s3:PutObject]
+                Resource: [!GetAtt RawDataBucket.Arn, !Sub '${RawDataBucket.Arn}/*']
+              - Effect: Allow
+                Action: [s3:GetObject, s3:ListBucket, s3:PutObject, s3:DeleteObject]
+                Resource: [!GetAtt SiteBucket.Arn, !Sub '${SiteBucket.Arn}/*']
+              - Effect: Allow
+                Action: cloudfront:CreateInvalidation
+                Resource: !Sub 'arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${SiteDistribution}'
+
+  HistoryBuildProject:
+    Type: AWS::CodeBuild::Project
+    Condition: BuildRunnerEnabled
+    Properties:
+      Name: !Sub '${AWS::StackName}-history-build'
+      Description: Rebuilds dashboard.json and the live-profile shards from the raw dataset, then publishes the site.
+      ServiceRole: !GetAtt BuildRunnerRole.Arn
+      Artifacts: { Type: NO_ARTIFACTS }
+      TimeoutInMinutes: 90
+      ConcurrentBuildLimit: 1
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_LARGE      # 8 vCPU / 15 GB：data:profile 要 12 GB heap
+        Image: aws/codebuild/standard:7.0
+        EnvironmentVariables:
+          - { Name: RAW_DATA_BUCKET, Value: !Ref RawDataBucket }
+          - { Name: SITE_BUCKET, Value: !Ref SiteBucket }
+          - { Name: DISTRIBUTION_ID, Value: !Ref SiteDistribution }
+          - { Name: AWS_STACK, Value: !Ref 'AWS::StackName' }
+          - { Name: SNAPSHOT_CAPTURE_ENABLED, Value: !Ref EnableSnapshotCapture }
+      Source:
+        Type: S3
+        Location: !Sub '${RawDataBucket}/source/repo.zip'
+        BuildSpec: app/infra/buildspec-history.yml
+      LogsConfig:
+        CloudWatchLogs: { Status: ENABLED }
+      Tags:
+        - { Key: project, Value: ctrlcity-youbike }
+        - { Key: environment, Value: !Ref EnvironmentName }
+  DispatcherUserPool:
+    Type: AWS::Cognito::UserPool
+    Condition: LoginEnabled
+    Properties:
+      UserPoolName: !Sub '${AWS::StackName}-dispatchers'
+      AdminCreateUserConfig: { AllowAdminCreateUserOnly: true }     # 不開放自助註冊
+      UsernameAttributes: [email]
+      AutoVerifiedAttributes: [email]
+      MfaConfiguration: 'OFF'
+      Policies:
+        PasswordPolicy: { MinimumLength: 12, RequireUppercase: true, RequireLowercase: true, RequireNumbers: true, RequireSymbols: false }
+      DeletionProtection: INACTIVE
+
+  DispatcherUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Condition: LoginEnabled
+    Properties:
+      UserPoolId: !Ref DispatcherUserPool
+      ClientName: ctrlcity-web
+      GenerateSecret: false                                           # SPA 用 PKCE，不能有 secret
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows: [code]
+      AllowedOAuthScopes: [openid, email]
+      SupportedIdentityProviders: [COGNITO]
+      CallbackURLs: [!Sub '${DispatcherSiteUrl}/admin/callback']
+      LogoutURLs: [!Sub '${DispatcherSiteUrl}/']
+      AccessTokenValidity: 1
+      IdTokenValidity: 1
+      RefreshTokenValidity: 12
+      TokenValidityUnits: { AccessToken: hours, IdToken: hours, RefreshToken: hours }
+
+  DispatcherUserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Condition: LoginEnabled
+    Properties:
+      UserPoolId: !Ref DispatcherUserPool
+      Domain: !Sub '${AWS::StackName}-${AWS::AccountId}'
+
+  DispatcherJwt:
+    Type: AWS::ApiGatewayV2::Authorizer
+    Condition: LoginEnabled
+    Properties:
+      ApiId: !Ref OperationsApi
+      Name: DispatcherJwt
+      AuthorizerType: JWT
+      IdentitySource: ['$request.header.Authorization']
+      JwtConfiguration:
+        Issuer: !Sub 'https://cognito-idp.${AWS::Region}.amazonaws.com/${DispatcherUserPool}'
+        Audience: [!Ref DispatcherUserPoolClient]
+
+  OperatorApiIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref OperationsApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt OperationsApiFunction.Arn
+      PayloadFormatVersion: '2.0'
+
+  OperatorApiPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref OperationsApiFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${OperationsApi}/*/*/api/v1/*'
+
+  AdjustmentsGETRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref OperationsApi
+      RouteKey: GET /api/v1/adjustments
+      Target: !Sub 'integrations/${OperatorApiIntegration}'
+
+  AdjustmentsPUTRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref OperationsApi
+      RouteKey: PUT /api/v1/adjustments
+      Target: !Sub 'integrations/${OperatorApiIntegration}'
+      AuthorizationType: !If [LoginEnabled, JWT, NONE]
+      AuthorizerId: !If [LoginEnabled, !Ref DispatcherJwt, !Ref 'AWS::NoValue']
+      AuthorizationScopes: !If [LoginEnabled, [openid], !Ref 'AWS::NoValue']
+
+  EventsGETRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref OperationsApi
+      RouteKey: GET /api/v1/events
+      Target: !Sub 'integrations/${OperatorApiIntegration}'
+
+  EventsPUTRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref OperationsApi
+      RouteKey: PUT /api/v1/events
+      Target: !Sub 'integrations/${OperatorApiIntegration}'
+      AuthorizationType: !If [LoginEnabled, JWT, NONE]
+      AuthorizerId: !If [LoginEnabled, !Ref DispatcherJwt, !Ref 'AWS::NoValue']
+      AuthorizationScopes: !If [LoginEnabled, [openid], !Ref 'AWS::NoValue']
+
+  ManualRoutesGETRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref OperationsApi
+      RouteKey: GET /api/v1/manual-routes
+      Target: !Sub 'integrations/${OperatorApiIntegration}'
+
+  ManualRoutesPUTRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref OperationsApi
+      RouteKey: PUT /api/v1/manual-routes
+      Target: !Sub 'integrations/${OperatorApiIntegration}'
+      AuthorizationType: !If [LoginEnabled, JWT, NONE]
+      AuthorizerId: !If [LoginEnabled, !Ref DispatcherJwt, !Ref 'AWS::NoValue']
+      AuthorizationScopes: !If [LoginEnabled, [openid], !Ref 'AWS::NoValue']
+
   SiteDistribution:
     Type: AWS::CloudFront::Distribution
     Properties:
@@ -387,6 +767,26 @@ Resources:
             - EventType: viewer-request
               FunctionARN: !GetAtt SpaRewriteFunction.FunctionARN
         CacheBehaviors:
+          - !If
+            - CaptureEnabled
+            - PathPattern: /snapshots/*
+              TargetOriginId: site-s3
+              ViewerProtocolPolicy: redirect-to-https
+              Compress: true
+              AllowedMethods: [GET, HEAD]
+              CachedMethods: [GET, HEAD]
+              CachePolicyId: !Ref ShortLivedDataCachePolicy
+            - !Ref AWS::NoValue
+          - !If
+            - CaptureEnabled
+            - PathPattern: /state/*
+              TargetOriginId: site-s3
+              ViewerProtocolPolicy: redirect-to-https
+              Compress: true
+              AllowedMethods: [GET, HEAD]
+              CachedMethods: [GET, HEAD]
+              CachePolicyId: !Ref ShortLivedDataCachePolicy
+            - !Ref AWS::NoValue
           - PathPattern: /api/*
             TargetOriginId: operations-api
             ViewerProtocolPolicy: https-only
@@ -421,6 +821,12 @@ Resources:
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
+          - Sid: DenyPublicRawSnapshots
+            Effect: Deny
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub '${SiteBucket.Arn}/raw/*'
           - Sid: AllowCloudFrontReadOnly
             Effect: Allow
             Principal:
@@ -465,3 +871,32 @@ Outputs:
     Condition: CreateKnowledgeSource
     Description: Private bucket for curated Markdown; never upload the raw competition CSV dataset.
     Value: !Ref KnowledgeSourceBucket
+
+  SnapshotCaptureEnabled:
+    Description: Whether the 5-minute snapshot capture is deployed. Read by aws:publish.
+    Value: !Ref EnableSnapshotCapture
+
+  RawDataBucketName:
+    Condition: BuildRunnerEnabled
+    Value: !Ref RawDataBucket
+  HistoryBuildProjectName:
+    Condition: BuildRunnerEnabled
+    Value: !Ref HistoryBuildProject
+
+  SnapshotCaptureFunctionName:
+    Condition: CaptureEnabled
+    Value: !Ref SnapshotCaptureFunction
+  DispatcherLoginEnabled:
+    Value: !Ref EnableDispatcherLogin
+  UserPoolId:
+    Condition: LoginEnabled
+    Value: !Ref DispatcherUserPool
+  UserPoolClientId:
+    Condition: LoginEnabled
+    Value: !Ref DispatcherUserPoolClient
+  CognitoAuthority:
+    Condition: LoginEnabled
+    Value: !Sub 'https://cognito-idp.${AWS::Region}.amazonaws.com/${DispatcherUserPool}'
+  UserPoolDomain:
+    Condition: LoginEnabled
+    Value: !Sub 'https://${DispatcherUserPoolDomain}.auth.${AWS::Region}.amazoncognito.com'

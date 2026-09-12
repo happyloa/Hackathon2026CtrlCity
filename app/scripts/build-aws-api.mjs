@@ -25,3 +25,11 @@ const response = await lambdaHandler({
 assert.equal(response.statusCode, 200)
 assert.equal(JSON.parse(response.body).status, 'ok')
 console.log('Lambda bundle built and health check passed.')
+
+const captureFile = resolve(appDir, '.aws-sam/capture/capture.cjs')
+await build({
+  entryPoints: [resolve(appDir, 'aws/capture.ts')], outfile: captureFile,
+  bundle: true, platform: 'node', target: 'node24', format: 'cjs', minify: true,
+})
+assert.equal(typeof createRequire(import.meta.url)(captureFile).captureHandler, 'function')
+console.log('Snapshot capture bundle built and import check passed.')

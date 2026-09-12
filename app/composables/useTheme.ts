@@ -14,6 +14,7 @@ function isTheme(value: unknown): value is Theme {
 }
 
 export function useTheme() {
+  const browserStorage = useBrowserStorage()
   const theme = useState<Theme>('theme', () => 'dark')
 
   /**
@@ -23,13 +24,13 @@ export function useTheme() {
    * and never recover a persisted 'light' choice.
    */
   if (import.meta.client) {
-    const stored = localStorage.getItem(STORAGE_KEY)
+    const stored = browserStorage.getItem(STORAGE_KEY)
     if (isTheme(stored)) theme.value = stored
   }
 
   watch(theme, (value) => {
     if (import.meta.client) {
-      localStorage.setItem(STORAGE_KEY, value)
+      browserStorage.setItem(STORAGE_KEY, value)
       document.documentElement.dataset.theme = value
     }
   }, { immediate: true })

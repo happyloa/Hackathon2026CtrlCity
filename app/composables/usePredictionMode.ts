@@ -16,6 +16,7 @@ function isPredictionMode(value: unknown): value is PredictionMode {
 }
 
 export function usePredictionMode() {
+  const browserStorage = useBrowserStorage()
   const mode = useState<PredictionMode>('prediction-mode', () => 'baseline')
   const xgboost = useXgboostPredictions()
 
@@ -26,12 +27,12 @@ export function usePredictionMode() {
    * and never recover a persisted 'xgboost' choice.
    */
   if (import.meta.client) {
-    const stored = localStorage.getItem(STORAGE_KEY)
+    const stored = browserStorage.getItem(STORAGE_KEY)
     if (isPredictionMode(stored)) mode.value = stored
   }
 
   watch(mode, (value) => {
-    if (import.meta.client) localStorage.setItem(STORAGE_KEY, value)
+    if (import.meta.client) browserStorage.setItem(STORAGE_KEY, value)
     if (value === 'xgboost') void xgboost.load()
   }, { immediate: true })
 

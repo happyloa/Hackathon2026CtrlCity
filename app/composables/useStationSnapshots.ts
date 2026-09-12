@@ -26,6 +26,8 @@ const RETENTION_MS = LIVE_SNAPSHOT_POLICY.localStorageRetentionHours * 60 * 60_0
  */
 const store = new Map<string, StationSnapshot[]>()
 let loaded = false
+let browserPersistence = true
+export function configureSnapshotPersistence(enabled: boolean) { browserPersistence = enabled }
 
 function isSnapshot(value: unknown): value is StationSnapshot {
   const candidate = value as Partial<StationSnapshot> | null
@@ -45,7 +47,7 @@ function withoutStale(snapshots: readonly StationSnapshot[], nowEpoch: number): 
 }
 
 function loadFromStorage() {
-  if (loaded || !import.meta.client) return
+  if (loaded || !browserPersistence || !import.meta.client) return
   loaded = true
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY)
@@ -63,7 +65,7 @@ function loadFromStorage() {
 }
 
 function persist() {
-  if (!import.meta.client) return
+  if (!browserPersistence || !import.meta.client) return
   try {
     const payload: Record<string, StationSnapshot[]> = {}
     for (const [stationId, snapshots] of store) payload[stationId] = snapshots

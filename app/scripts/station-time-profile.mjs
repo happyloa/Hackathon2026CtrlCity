@@ -26,6 +26,7 @@ import iconv from 'iconv-lite'
 
 import { buildExclusionIndex, parseAdjustmentsFile } from '../shared/operational-adjustments.mjs'
 import { LOW_INVENTORY_POLICY } from '../shared/parameters.mjs'
+import { historyPeriod } from '../shared/history-period.mjs'
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url))
 const APP_DIR = resolve(SCRIPT_DIR, '..')
@@ -39,16 +40,17 @@ const OUTPUT_DIR = resolve(REPO_DIR, 'ml', 'output')
 const ROI_FILE = resolve(APP_DIR, 'data', 'operational-roi.json')
 const SHARD_DIR = resolve(APP_DIR, 'public', 'data', 'roi')
 const ROI_PERIOD = 'all'
-const RECORDS_PER_STATION = 181 * 48 // PERIOD_DAYS x slotsPerDay, fixed stride so a station's byte offset is index * RECORDS_PER_STATION * 2
+const HISTORY_PERIOD = historyPeriod(process.env.CTRL_CITY_ROLLING_HISTORY === 'true')
+const RECORDS_PER_STATION = HISTORY_PERIOD.days * 48
 const MISSING_RECORD = 0xffff
 // Cloudflare Pages rejects any single static asset over 25 MiB (the whole
 // deploy fails instantly, not a real build error). One binary covering all
 // 1,577 stations comes to ~27.4 MB, just over that cap, so it is split into
 // fixed-size station shards well under the limit with room to grow.
-const DETAIL_SHARD_COUNT = 2
+const DETAIL_SHARD_COUNT = HISTORY_PERIOD.detailShardCount
 
-const PERIOD_ORIGIN = Date.UTC(2026, 0, 1)
-const PERIOD_DAYS = 181                      // 2026-01-01 .. 2026-06-30
+const PERIOD_ORIGIN = HISTORY_PERIOD.origin
+const PERIOD_DAYS = HISTORY_PERIOD.days
 const DAY_MS = 24 * 60 * 60 * 1000
 const BITMAP_BYTES = Math.ceil(PERIOD_DAYS / 8)
 
@@ -59,7 +61,7 @@ const LOW_FLOOR = LOW_INVENTORY_POLICY.floor
 
 const PERIODS = Object.freeze({
   train: { label: '訓練期 1-4 月', start: Date.UTC(2026, 0, 1), end: Date.UTC(2026, 4, 1) },
-  all: { label: '全期 1-6 月', start: Date.UTC(2026, 0, 1), end: Date.UTC(2026, 6, 1) },
+  all: { label: HISTORY_PERIOD.label, start: PERIOD_ORIGIN, end: HISTORY_PERIOD.end },
 })
 
 const WEEKDAY_NAMES = ['週日', '週一', '週二', '週三', '週四', '週五', '週六']

@@ -49,3 +49,13 @@ skills-lock.json
 /node_modules/
 /package.json
 /package-lock.json
+
+# Local AWS tooling and validation output (never deployment source).
+/.scratch/aws-validation/
+/.scratch/sam-cli/
+/.scratch/aws-*.log
+/.scratch/aws-*.json
+/.scratch/aws-*.zip
+/.scratch/implement-aws-stages.py
+/.playwright-cli/
+/output/playwright/

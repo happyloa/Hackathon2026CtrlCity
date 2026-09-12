@@ -37,11 +37,20 @@ try {
   requireFile(builtTemplate, 'SAM built template')
 
   const parameters = [
+    `EnableSnapshotCapture=${options['enable-capture'] ? 'true' : 'false'}`,
+    `CreateBuildRunner=${options['build-runner'] ? 'true' : 'false'}`,
+    `EnableDispatcherLogin=${options['dispatcher-login'] ? 'true' : 'false'}`,
+    `AlertEmail=${options['alert-email'] || ''}`, 
     `EnvironmentName=${options.environment}`,
     `CreateAgentCoreHarness=${options['create-harness'] ? 'true' : 'false'}`,
     `CreateKnowledgeSourceBucket=${options['knowledge-source'] ? 'true' : 'false'}`,
     `AgentCoreHarnessQualifier=${options['harness-qualifier']}`,
   ]
+  if (options['dispatcher-login']) {
+    const siteUrl = options['site-url'] || readStackOutputs(options).SiteUrl
+    if (!/^https:\/\/[a-zA-Z0-9.-]+$/.test(siteUrl || '')) throw new Error('Deploy the base stack first, or pass --site-url for Cognito callbacks.')
+    parameters.push(`DispatcherSiteUrl=${siteUrl}`)
+  }
   if (options['harness-arn']) parameters.push(`AgentCoreHarnessArn=${options['harness-arn']}`)
   if (options['model-id']) parameters.push(`AgentCoreModelId=${options['model-id']}`)
 

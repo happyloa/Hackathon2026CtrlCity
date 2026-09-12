@@ -44,7 +44,7 @@ const manualRoutesApi = useManualRoutes()
  * instead would make a route's own stations silently disappear ("站點資料
  * 不存在或目前離線") the moment the district filter changes -- e.g. after a
  * reload re-picks a district by geolocation -- even though the route's data
- * is intact in localStorage the whole time.
+ * is intact in its configured storage the whole time.
  */
 const allStations = computed(() => live.dashboard.value?.stations ?? [])
 
@@ -177,6 +177,11 @@ async function handleEditRoute() {
     routeId = choice.manualRouteId
   } else {
     const scheduledAt = taipeiTimeLabel(Date.now() + HORIZON_MINUTES[activeHorizon.value] * 60_000)
+    if (!manualRoutesApi.cloud.canEdit.value) {
+      manualRoutesApi.editorExpanded.value = true
+      document.getElementById('manual-route-editor')?.scrollIntoView({ behavior: 'smooth' })
+      return
+    }
     const route = manualRoutesApi.createRoute({
       label: `路線 ${String(choice.number).padStart(2, '0')} 編輯版`,
       vehicleCapacity: choice.plan.vehicleCapacity,

@@ -1,3 +1,5 @@
+import { createOperatorHandler } from './operator-files.ts'
+import type { S3Client } from '@aws-sdk/client-s3'
 import {
   BedrockAgentCoreClient,
   InvokeHarnessCommand,
@@ -19,6 +21,7 @@ export interface HttpApiEvent {
   isBase64Encoded?: boolean
   headers?: Record<string, string | undefined>
   requestContext?: {
+    authorizer?: { jwt?: { claims?: Record<string, string | number | boolean> } }
     requestId?: string
     http?: { method?: string; path?: string }
   }
@@ -65,6 +68,7 @@ interface AgentInvocationResult {
 }
 
 export interface HandlerDependencies {
+  s3?: Pick<S3Client, 'send'>
   fetchImpl?: typeof fetch
   invokeAgent?: (request: AgentReviewRequest) => Promise<AgentInvocationResult>
   now?: () => Date
@@ -73,6 +77,7 @@ export interface HandlerDependencies {
 class RequestValidationError extends Error {}
 
 export function createLambdaHandler(dependencies: HandlerDependencies = {}) {
+  const operator = createOperatorHandler(dependencies.s3)
   const fetchImpl = dependencies.fetchImpl ?? fetch
   const now = dependencies.now ?? (() => new Date())
 
@@ -135,6 +140,9 @@ export function createLambdaHandler(dependencies: HandlerDependencies = {}) {
         })
       }
     }
+
+    const operatorResponse = await operator(path, method, event)
+    if (operatorResponse) return operatorResponse
 
     return json(404, {
       error: { code: 'ROUTE_NOT_FOUND', message: 'Unknown API route.' },

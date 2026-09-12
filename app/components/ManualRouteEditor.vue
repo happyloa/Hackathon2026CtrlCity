@@ -7,6 +7,7 @@ const props = defineProps<{ stations: StationRisk[]; asOf: string }>()
 const emit = defineEmits<{ select: [stationId: string] }>()
 
 const {
+  cloud,
   routes,
   activeRouteId,
   editorExpanded: expanded,
@@ -71,6 +72,14 @@ function loadPercent(load: number, capacity: number) {
       <span class="manual-action">{{ expanded ? '收合' : '編輯路線' }}<ChevronDown style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" :class="{ 'is-expanded': expanded }" /></span>
     </button>
 
+    <div v-if="cloud.remote" class="p-3 text-body1">
+      <p role="status">{{ cloud.status.value || '正在載入雲端路線…' }}</p>
+      <button v-if="!cloud.accessToken.value" type="button" class="min-h-11 px-3 text-accent" @click="cloud.signIn">登入後可編輯</button>
+      <button type="button" class="min-h-11 px-3 text-accent" :disabled="cloud.pending.value" @click="cloud.reload">重新載入雲端路線</button>
+      <button type="button" class="min-h-11 px-3 text-accent" :disabled="!cloud.canEdit.value || !cloud.dirty.value" @click="cloud.save">儲存到雲端</button>
+      <button type="button" class="min-h-11 px-3 text-accent" :disabled="!cloud.canEdit.value" @click="cloud.restoreDraft">還原本分頁草稿</button>
+      <p v-if="cloud.authError.value" role="alert">{{ cloud.authError.value }}</p>
+    </div>
     <div v-if="expanded" :id="editorContentId" class="manual-content">
       <div class="manual-route-tabs" role="group" aria-label="選擇手動路線">
         <button v-for="route in routes" :key="route.id" type="button" class="manual-route-tab"
@@ -79,7 +88,7 @@ function loadPercent(load: number, capacity: number) {
           <TriangleAlert v-if="!plans.get(route.id)?.feasible" :size="13" aria-hidden="true" />
           {{ route.label }}<b>{{ route.scheduledAt }} · {{ route.stops.length }} 站</b>
         </button>
-        <button type="button" class="manual-route-add" @click="handleCreateRoute"><Plus :size="15" aria-hidden="true" />新增路線</button>
+        <button type="button" class="manual-route-add" :disabled="!cloud.canEdit.value" @click="handleCreateRoute"><Plus :size="15" aria-hidden="true" />新增路線</button>
       </div>
 
       <div v-if="!activeRoute" class="manual-empty">
@@ -87,7 +96,7 @@ function loadPercent(load: number, capacity: number) {
         <p>尚未建立手動路線，點「新增路線」開始安排。</p>
       </div>
 
-      <div v-else-if="activePlan" class="manual-editor">
+      <fieldset v-else-if="activePlan" :disabled="!cloud.canEdit.value" class="manual-editor">
         <div class="manual-route-header">
           <input class="manual-route-label" type="text" :value="activeRoute.label"
             aria-label="路線名稱" @change="renameRoute(activeRoute.id, ($event.target as HTMLInputElement).value)" />
@@ -146,7 +155,7 @@ function loadPercent(load: number, capacity: number) {
         <div class="manual-add-stop">
           <ModalPicker v-model="addStationId" label="新增停靠站" title="選擇要新增的站點" :options="stationOptions" @update:model-value="handleAddStation" />
         </div>
-      </div>
+      </fieldset>
     </div>
   </section>
 </template>

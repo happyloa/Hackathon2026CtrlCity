@@ -1,26 +1,23 @@
+import { configureSnapshotPersistence } from '~/composables/useStationSnapshots'
+import type { StationPersistence } from '~/shared/station-persistence'
 import { stationStatusDurationMinutes } from '~/shared/station-overview'
 import { buildLiveOperations } from '~/shared/live-operations'
 import { lowBikesPersistedIds } from '~/composables/useLiveRiskProfiles'
 import { frozenStationIds } from '~/composables/useFrozenStations'
 import type {
   Alert,
-  ApiEnvelope,
-  ApiMeta,
-  CurrentState,
   DashboardArtifact,
   DashboardSummary,
   DispatchRecommendation,
   Forecast,
   HorizonKey,
   LiveStation,
-  LiveStationsPayload,
   PredictionCoverage,
-  ServiceStatus,
   StationRisk,
 } from '~/shared/ops'
 
-export type LiveResponse = ApiEnvelope<LiveStationsPayload>
-type NtpRawStation = Record<string, unknown>
+import { createLiveResponse, type LiveResponse } from '~/shared/live-feed'
+export type { LiveResponse } from '~/shared/live-feed'
 
 type LiveProfilePolicy = {
   riskPolicy: {
@@ -30,98 +27,6 @@ type LiveProfilePolicy = {
 } | null
 
 let updateResetTimer: ReturnType<typeof setTimeout> | undefined
-
-function asRecord(value: unknown): NtpRawStation {
-  return value !== null && typeof value === 'object' && !Array.isArray(value)
-    ? value as NtpRawStation
-    : {}
-}
-
-function asString(value: unknown, fallback = ''): string {
-  return typeof value === 'string' && value.trim() ? value.trim() : fallback
-}
-
-function asNumber(value: unknown, fallback = 0): number {
-  const candidate = typeof value === 'number' ? value : Number(value)
-  return Number.isFinite(candidate) ? candidate : fallback
-}
-
-function asCurrentState(active: boolean, bikes: number, docks: number): CurrentState {
-  if (!active || (bikes === 0 && docks === 0)) return 'unavailable'
-  if (bikes === 0) return 'empty_now'
-  if (docks === 0) return 'full_now'
-  return 'normal'
-}
-
-function serviceStatusFor(active: boolean, bikes: number, docks: number): ServiceStatus {
-  if (!active) return 'official_inactive'
-  if (bikes === 0 && docks === 0) return 'suspected_unavailable'
-  return 'operational'
-}
-
-function mapLiveStation(value: unknown): LiveStation | null {
-  const station = asRecord(value)
-  const id = asString(station.sno)
-  if (!id) return null
-
-  const totalDocks = Math.max(0, Math.round(asNumber(station.tot_quantity)))
-  const availableBikes = Math.max(0, Math.round(asNumber(station.sbi_quantity, asNumber(station.sbi))))
-  const availableDocks = Math.max(0, Math.round(asNumber(station.bemp)))
-  const active = asString(station.act) === '1' || asNumber(station.act) === 1
-  const latitude = asNumber(station.lat, Number.NaN)
-  const longitude = asNumber(station.lng, Number.NaN)
-
-  return {
-    id,
-    name: asString(station.sna, '未命名站點'),
-    district: asString(station.sarea, '未分類'),
-    totalDocks,
-    availableBikes,
-    availableDocks,
-    capacityGap: totalDocks - availableBikes - availableDocks,
-    latitude: Number.isFinite(latitude) ? latitude : null,
-    longitude: Number.isFinite(longitude) ? longitude : null,
-    active,
-    currentState: asCurrentState(active, availableBikes, availableDocks),
-    serviceStatus: serviceStatusFor(active, availableBikes, availableDocks),
-    sourceUpdatedAt: asString(station.mday),
-    youbike2Bikes: Math.max(0, Math.round(asNumber(station.yb2_quantity))),
-    eBikeBikes: Math.max(0, Math.round(asNumber(station.eyb_quantity))),
-    dataMode: 'live',
-  }
-}
-
-function asOfFromSourceTime(value: string | undefined): string {
-  if (value && /^\d{8}T\d{6}$/.test(value)) {
-    return `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)}T${value.slice(9, 11)}:${value.slice(11, 13)}:${value.slice(13, 15)}+08:00`
-  }
-  return new Date().toISOString()
-}
-
-function createLiveResponse(payload: unknown): LiveResponse {
-  const stations = Array.isArray(payload)
-    ? payload.map(mapLiveStation).filter((station): station is LiveStation => station !== null)
-    : []
-  if (!stations.length) throw new Error('官方即時資料沒有可辨識的站點。')
-  const sourceUpdatedAt = stations.map(station => station.sourceUpdatedAt).filter(Boolean).sort().at(-1)
-  const meta: ApiMeta = {
-    asOf: asOfFromSourceTime(sourceUpdatedAt),
-    generatedAt: new Date().toISOString(),
-    dataMode: 'live',
-    forecastModel: 'historical-live-inventory-baseline-v2',
-    narrativeProvider: 'template',
-  }
-
-  return {
-    data: {
-      dataMode: 'live',
-      source: 'ntpc-open-data',
-      district: null,
-      stations,
-    },
-    meta,
-  }
-}
 
 function fallbackForecast(station: LiveStation, horizon: HorizonKey, observedAt: string): Forecast {
   return {
@@ -188,6 +93,7 @@ function createLiveDashboard(
   riskPolicy: LiveProfilePolicy,
   realtimeLowBikes: { atLeast30: string[]; atLeast60: string[] },
   frozenStations: { stationId: string; metric: 'bikes' | 'docks'; stuckValue: number }[],
+  persistence: { lookup: (id: string) => StationPersistence | null },
 ): DashboardArtifact {
   const stations: StationRisk[] = response.data.stations.map((station) => {
     const forecasts = forecastByStation.get(station.id) || {
@@ -214,6 +120,15 @@ function createLiveDashboard(
   const { snapshotsFor } = useStationSnapshots()
   for (const station of stations) {
     station.statusDurationMinutes = stationStatusDurationMinutes(station, snapshotsFor(station.id), Date.now())
+  }
+  for (const station of stations) {
+    const carried = persistence.lookup(station.id)
+    if (carried && carried.currentState === station.currentState
+      && carried.last[0] === station.availableBikes && carried.last[1] === station.availableDocks) {
+      station.statusDurationMinutes = carried.stateMinutes
+      const hour = new Date(Date.parse(response.meta.asOf) + 8 * 3600000).getUTCHours()
+      if (hour >= 6 && carried.unchangedMinutes >= 180) station.qualityFlags.push(`疑似壞車／感測異常：庫存已 ${Math.floor(carried.unchangedMinutes / 60)} 小時未變化，請現場查驗。`)
+    }
   }
   const plan = buildLiveOperations(stations, response.meta.asOf)
   const summary = summarize(stations, plan.alerts, plan.dispatches)
@@ -309,6 +224,22 @@ function scopedDashboard(dashboard: DashboardArtifact | null, district: string):
 
 export function useLiveDashboard() {
   const liveStationsEndpoint = String(useRuntimeConfig().public.liveStationsEndpoint || '/api/v1/live-stations')
+  const snapshotPath = String(useRuntimeConfig().public.liveSnapshotPath || '')
+  const persistence = useStationPersistence()
+  configureSnapshotPersistence(useRuntimeConfig().public.storageMode !== 'aws' && !useRuntimeConfig().public.persistencePath)
+  async function loadRawStations(): Promise<unknown> {
+    if (snapshotPath) {
+      try {
+        const result = await $fetch.raw<unknown>(snapshotPath, { cache: 'no-store', timeout: 10000, retry: 0 })
+        const modified = Date.parse(result.headers.get('last-modified') || '')
+        const sourceTimes = Array.isArray(result._data) && result._data.some(row => /^\d{8}T\d{6}$/.test(row?.mday))
+        const sourceAge = sourceTimes ? Date.now() - Date.parse(createLiveResponse(result._data).meta.asOf) : Infinity
+        const objectAge = Date.now() - modified
+        if (objectAge >= -60000 && objectAge < 15 * 60000 && sourceAge >= -60000 && sourceAge < 15 * 60000) return result._data
+      } catch { /* Missing, malformed or stale snapshots fall back to the live proxy. */ }
+    }
+    return $fetch(liveStationsEndpoint, { cache: 'no-store', timeout: 20000, retry: 0 })
+  }
   const payload = useState<LiveResponse | null>('live-dashboard-payload', () => null)
   const dashboard = useState<DashboardArtifact | null>('live-dashboard-artifact', () => null)
   const pending = useState('live-dashboard-pending', () => false)
@@ -328,7 +259,7 @@ export function useLiveDashboard() {
     pending.value = true
     error.value = ''
     try {
-      const rawStations = await $fetch<unknown>(liveStationsEndpoint, { cache: 'no-store' })
+      const [rawStations] = await Promise.all([loadRawStations(), persistence.refresh()])
       const response = createLiveResponse(rawStations)
       const forecasts = await forecastsFor(response.data.stations, response.meta.asOf, {
         refreshProfiles: Boolean(options.manual),
@@ -342,13 +273,13 @@ export function useLiveDashboard() {
       }
       const frozenStations = [...frozenStationIds(response.data.stations, response.meta.asOf)]
         .map(([stationId, info]) => ({ stationId, ...info }))
-      const nextDashboard = createLiveDashboard(response, forecasts, profileManifest.value, realtimeLowBikes, frozenStations)
+      const nextDashboard = createLiveDashboard(response, forecasts, profileManifest.value, realtimeLowBikes, frozenStations, persistence)
       const nextSignature = snapshotSignature(response)
       const nextBaselineSignature = profileSignature(profileError.value, profileCoverage.value)
       const hadPrevious = Boolean(payload.value)
       const changed = hadPrevious && nextSignature !== signature.value
       const baselineChanged = hadPrevious && nextBaselineSignature !== baselineSignature.value
-      if (!hadPrevious || changed || baselineChanged || options.manual) {
+      if (!hadPrevious || changed || baselineChanged || options.manual || snapshotPath) {
         payload.value = response
         dashboard.value = nextDashboard
       }

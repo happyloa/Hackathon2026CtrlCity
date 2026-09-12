@@ -52,6 +52,12 @@ jobs:
           (cd .aws-sam/api && zip -q ../api.zip handler.cjs)
           aws lambda update-function-code --function-name "$function_name" --zip-file fileb://.aws-sam/api.zip --query 'LastUpdateStatus' --output text
           aws lambda wait function-updated-v2 --function-name "$function_name"
+          capture_function=$(aws cloudformation describe-stacks --stack-name "$AWS_STACK" --query 'Stacks[0].Outputs[?OutputKey==`SnapshotCaptureFunctionName`].OutputValue | [0]' --output text)
+          if [ "$capture_function" != "None" ] && [ -n "$capture_function" ]; then
+            (cd .aws-sam/capture && zip -q ../capture.zip capture.cjs)
+            aws lambda update-function-code --function-name "$capture_function" --zip-file fileb://.aws-sam/capture.zip --query 'LastUpdateStatus' --output text
+            aws lambda wait function-updated-v2 --function-name "$capture_function"
+          fi
       - run: npm run aws:publish -- --stack "$AWS_STACK" --region "$AWS_REGION"
       - name: Wait for CloudFront deployment and invalidations
         run: |

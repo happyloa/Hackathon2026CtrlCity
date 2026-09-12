@@ -1,0 +1,30 @@
+version: 0.2
+env:
+  variables:
+    NODE_OPTIONS: --max-old-space-size=12288
+    CTRL_CITY_DATASET_DIR: /codebuild/dataset
+    CTRL_CITY_ROLLING_HISTORY: 'true'
+phases:
+  install:
+    runtime-versions:
+      nodejs: 24
+    commands:
+      - cd app && npm ci
+  pre_build:
+    commands:
+      - mkdir -p "$CTRL_CITY_DATASET_DIR"
+      - aws s3 sync "s3://$RAW_DATA_BUCKET/dataset/" "$CTRL_CITY_DATASET_DIR/"
+      - if [ "$SNAPSHOT_CAPTURE_ENABLED" = "true" ]; then node scripts/raw-snapshots-to-csv.mjs --bucket "$SITE_BUCKET" --out "$CTRL_CITY_DATASET_DIR/captured-live.csv"; fi
+      - node scripts/aws-prepare-history.mjs
+  build:
+    commands:
+      - npm run data:build
+      - npm run data:profile
+      - npm run data:validate
+      - npm test
+      - npm run typecheck
+      - STAMP=$(date -u +%Y%m%dT%H%M%SZ)
+      - aws s3 cp data/dashboard.json "s3://$RAW_DATA_BUCKET/artifacts/$STAMP/dashboard.json"
+      - aws s3 cp data/operational-roi.json "s3://$RAW_DATA_BUCKET/artifacts/$STAMP/operational-roi.json"
+      # Publish only after all preceding commands succeed, with the same flags and exclusions as CI.
+      - npm run aws:publish -- --stack "$AWS_STACK" --region "$AWS_REGION"

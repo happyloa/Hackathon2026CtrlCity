@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0",
-  "generatedAt": "2026-08-24T17:22:57.214Z",
+  "generatedAt": "2026-09-12T08:07:33.406Z",
   "evidencePolicy": {
     "forecast": "2026 年 6 月保留測試集；每筆為可評估的站點半小時快照。",
     "dispatch": "歷史情境的即時庫存反事實試算；依建議順序，只計入可完整執行建議量且保留來源站安全庫存與目的站空位緩衝的任務。",
@@ -8,34 +8,34 @@
   },
   "forecastHoldout": {
     "split": "2026-06",
-    "cohortStations": 217,
+    "cohortStations": 1578,
     "horizons": {
       "30": {
         "leadTimeMinutes": 30,
-        "evaluatedSnapshots": 301867,
-        "issueSnapshots": 12357,
-        "correctlyFlaggedSnapshots": 6844,
-        "precision": 0.433,
-        "recall": 0.554,
-        "f1": 0.486
+        "evaluatedSnapshots": 2183238,
+        "issueSnapshots": 81992,
+        "correctlyFlaggedSnapshots": 42354,
+        "precision": 0.403,
+        "recall": 0.517,
+        "f1": 0.453
       },
       "60": {
         "leadTimeMinutes": 60,
-        "evaluatedSnapshots": 301564,
-        "issueSnapshots": 12344,
-        "correctlyFlaggedSnapshots": 5495,
-        "precision": 0.35,
-        "recall": 0.445,
-        "f1": 0.392
+        "evaluatedSnapshots": 2180655,
+        "issueSnapshots": 81872,
+        "correctlyFlaggedSnapshots": 36841,
+        "precision": 0.284,
+        "recall": 0.45,
+        "f1": 0.348
       },
       "120": {
         "leadTimeMinutes": 120,
-        "evaluatedSnapshots": 300958,
-        "issueSnapshots": 12323,
-        "correctlyFlaggedSnapshots": 4855,
-        "precision": 0.248,
-        "recall": 0.394,
-        "f1": 0.304
+        "evaluatedSnapshots": 2175489,
+        "issueSnapshots": 81685,
+        "correctlyFlaggedSnapshots": 26877,
+        "precision": 0.217,
+        "recall": 0.329,
+        "f1": 0.261
       }
     }
   },
@@ -44,35 +44,35 @@
       "2026-04-26T17:00:00+08:00": {
         "asOf": "2026-04-26T17:00:00+08:00",
         "label": "evening_pressure",
-        "beforeIssueStations": 211,
-        "afterIssueStations": 198,
+        "beforeIssueStations": 200,
+        "afterIssueStations": 187,
         "immediatelyAddressedStations": 13,
-        "reductionRate": 0.062,
+        "reductionRate": 0.065,
         "proposedMoves": 12,
         "feasibleMoves": 12,
-        "bikesMoved": 45
+        "bikesMoved": 56
       },
       "2026-04-27T09:00:00+08:00": {
         "asOf": "2026-04-27T09:00:00+08:00",
         "label": "morning_pressure",
-        "beforeIssueStations": 250,
-        "afterIssueStations": 237,
-        "immediatelyAddressedStations": 13,
-        "reductionRate": 0.052,
+        "beforeIssueStations": 239,
+        "afterIssueStations": 227,
+        "immediatelyAddressedStations": 12,
+        "reductionRate": 0.05,
         "proposedMoves": 12,
         "feasibleMoves": 12,
-        "bikesMoved": 52
+        "bikesMoved": 60
       },
       "2026-06-30T23:30:00+08:00": {
         "asOf": "2026-06-30T23:30:00+08:00",
         "label": "latest_coverage",
-        "beforeIssueStations": 119,
-        "afterIssueStations": 107,
+        "beforeIssueStations": 104,
+        "afterIssueStations": 92,
         "immediatelyAddressedStations": 12,
-        "reductionRate": 0.101,
+        "reductionRate": 0.115,
         "proposedMoves": 12,
         "feasibleMoves": 12,
-        "bikesMoved": 57
+        "bikesMoved": 63
       }
     }
   }

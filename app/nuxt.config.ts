@@ -34,7 +34,16 @@ export default defineNuxtConfig({
   },
   runtimeConfig: {
     public: {
+      storageMode: process.env.NUXT_PUBLIC_STORAGE_MODE === 'aws' ? 'aws' : 'local',
+      manualRoutesEndpoint: process.env.NUXT_PUBLIC_MANUAL_ROUTES_ENDPOINT || '',
       liveStationsEndpoint: process.env.NUXT_PUBLIC_LIVE_STATIONS_ENDPOINT || '/api/v1/live-stations',
+      liveSnapshotPath: process.env.NUXT_PUBLIC_LIVE_SNAPSHOT_PATH || '',
+      persistencePath: process.env.NUXT_PUBLIC_PERSISTENCE_PATH || '',
+      adjustmentsEndpoint: process.env.NUXT_PUBLIC_ADJUSTMENTS_ENDPOINT || '',
+      eventsEndpoint: process.env.NUXT_PUBLIC_EVENTS_ENDPOINT || '',
+      cognitoAuthority: process.env.NUXT_PUBLIC_COGNITO_AUTHORITY || '',
+      cognitoClientId: process.env.NUXT_PUBLIC_COGNITO_CLIENT_ID || '',
+      cognitoDomain: process.env.NUXT_PUBLIC_COGNITO_DOMAIN || '',
       agentEnabled: process.env.NUXT_PUBLIC_AGENT_ENABLED === 'true',
       agentReviewEndpoint: process.env.NUXT_PUBLIC_AGENT_REVIEW_ENDPOINT || '/api/v1/agent-review',
     },
@@ -44,7 +53,7 @@ export default defineNuxtConfig({
       autoSubfolderIndex: false,
       // Not linked from the sidebar, so the link crawler (starting at "/")
       // never discovers them on its own — list them explicitly.
-      routes: ['/admin/roi', '/admin/adjustments', '/design-system'],
+      routes: ['/admin/callback', '/admin/events', '/admin/roi', '/admin/adjustments', '/design-system'],
     },
   },
 })

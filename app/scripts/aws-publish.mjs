@@ -1,3 +1,6 @@
+import { frontendEnvironment, protectedPublishPaths } from './aws-publish-config.mjs'
+import { syncOperatorSeed } from './aws-sync-operator-seed.mjs'
+import { S3Client } from '@aws-sdk/client-s3'
 import { resolve } from 'node:path'
 import {
   awsArgs,
@@ -18,17 +21,18 @@ try {
 
   const outputs = readStackOutputs(options)
   const agentEnabled = outputs.AgentReviewEnabled === 'true'
-  runNpmScript('build', {
-    NUXT_PUBLIC_LIVE_STATIONS_ENDPOINT: '/api/v1/live-stations',
-    NUXT_PUBLIC_AGENT_ENABLED: String(agentEnabled),
-    NUXT_PUBLIC_AGENT_REVIEW_ENDPOINT: '/api/v1/agent-review',
-  })
+  runNpmScript('build', frontendEnvironment(outputs))
   requireFile(resolve(distPath, 'index.html'), 'Built Nuxt site')
 
   const bucket = outputs.SiteBucketName
   const distributionId = outputs.DistributionId
   if (!/^[a-z0-9.-]{3,63}$/.test(bucket || '')) throw new Error('Stack SiteBucketName output is missing or invalid.')
   if (!/^[A-Z0-9]{8,32}$/.test(distributionId || '')) throw new Error('Stack DistributionId output is missing or invalid.')
+
+  if (options.profile) process.env.AWS_PROFILE = options.profile
+  if (outputs.DispatcherLoginEnabled === 'true') {
+    await syncOperatorSeed(bucket, { initialize: true, s3: new S3Client({ region: options.region }) })
+  }
 
   // Upload hashed assets first and retain previous versions for open tabs.
   const nuxtAssets = resolve(distPath, '_nuxt')
@@ -44,12 +48,7 @@ try {
     distPath,
     `s3://${bucket}`,
     '--delete',
-    '--exclude',
-    '_headers',
-    '--exclude',
-    '_routes.json',
-    '--exclude',
-    '_nuxt/*',
+    ...protectedPublishPaths.flatMap(path => ['--exclude', path]),
     '--cache-control',
     'public,max-age=300,must-revalidate',
   ]))

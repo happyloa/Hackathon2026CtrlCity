@@ -7,12 +7,14 @@ import {
 
 try {
   const options = parseOptions()
+  let outputs = {}
   let baseUrl = options.url?.replace(/\/+$/, '')
 
   if (!baseUrl) {
     if (!commandAvailable('aws')) throw new Error('AWS CLI v2 is required unless --url is provided.')
     options.region = resolveRegion(options)
-    baseUrl = readStackOutputs(options).SiteUrl
+    outputs = readStackOutputs(options)
+    baseUrl = outputs.SiteUrl
   }
   if (!/^https:\/\//.test(baseUrl || '')) throw new Error('A valid HTTPS SiteUrl is required.')
 
@@ -23,6 +25,24 @@ try {
   const live = await expectResponse(`${baseUrl}/api/v1/live-stations`, 200, 'live station proxy')
   if (!String(live.headers.get('content-type')).includes('json')) {
     throw new Error('Live station proxy did not return JSON content.')
+  }
+
+  if (outputs.SnapshotCaptureEnabled === 'true') {
+    const latest = await expectJson(`${baseUrl}/snapshots/latest.json`, { expectedStatus: 200 })
+    if (!Array.isArray(latest) || !latest.length) throw new Error('latest.json is not a station array.')
+    const state = await expectJson(`${baseUrl}/state/persistence.json`, { expectedStatus: 200 })
+    const age = Date.now() - Date.parse(state.updatedAt)
+    if (!(age >= -60000 && age < 15 * 60000)) throw new Error('Cloud persistence is stale or invalid.')
+  }
+  if (outputs.DispatcherLoginEnabled !== undefined) {
+    for (const resource of ['adjustments', 'events', 'manual-routes']) {
+      const data = await expectJson(`${baseUrl}/api/v1/${resource}`, { expectedStatus: 200 })
+      const field = resource === 'manual-routes' ? 'routes' : resource
+      if (!Array.isArray(data[field])) throw new Error(`Invalid ${resource} envelope.`)
+      await expectResponse(`${baseUrl}/api/v1/${resource}`, outputs.DispatcherLoginEnabled === 'true' ? 401 : 503, 'anonymous write guard', {
+        method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ [field]: [] }),
+      })
+    }
   }
 
   if (health.agentReviewEnabled) {
