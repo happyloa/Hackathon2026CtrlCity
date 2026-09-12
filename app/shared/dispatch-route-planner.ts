@@ -1,5 +1,6 @@
 import { distanceKmBetween, safetyStockFor } from './live-operations.ts'
 import { displayStationName, type DispatchRecommendation, type StationRisk } from './ops.ts'
+import { DEFAULT_DISPATCH_ROUTE_POLICY } from './parameters.mjs'
 
 export interface DispatchRoutePlanningPolicy {
   vehicleCapacity: number
@@ -92,16 +93,7 @@ interface RouteInsertion {
   distanceKm: number
 }
 
-export const DEFAULT_DISPATCH_ROUTE_POLICY: Readonly<DispatchRoutePlanningPolicy> = Object.freeze({
-  vehicleCapacity: 14,
-  maximumTasksPerRoute: 4,
-  maximumStopsPerRoute: 8,
-  maximumRouteDistanceKm: 20,
-  maximumAdjacentTaskDistanceKm: 2.5,
-  priorityOrderTolerance: 8,
-  safetyStockRatio: 0.15,
-  minimumSafetyStock: 2,
-})
+export { DEFAULT_DISPATCH_ROUTE_POLICY }
 
 function finite(value: number, fallback: number): number {
   return Number.isFinite(value) ? value : fallback

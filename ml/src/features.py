@@ -31,6 +31,7 @@ evaluate-forecast.mjs, not the anchor row's own slot.
 Usage:
     python ml/src/features.py   (reads ml/data/clean.parquet)
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -77,12 +78,18 @@ def main() -> None:
     if not INPUT_FILE.exists():
         raise SystemExit(f"{INPUT_FILE} not found — run ml/src/clean.py first.")
     if not NEIGHBORS_FILE.exists():
-        raise SystemExit(f"{NEIGHBORS_FILE} not found — run ml/src/build_neighbors.py first.")
+        raise SystemExit(
+            f"{NEIGHBORS_FILE} not found — run ml/src/build_neighbors.py first."
+        )
     if not PROFILE_FILE.exists():
-        raise SystemExit(f"{PROFILE_FILE} not found — run `npm run data:profile` (or the underlying "
-                          f"station-time-profile.mjs) in app/ first.")
+        raise SystemExit(
+            f"{PROFILE_FILE} not found — run `npm run data:profile` (or the underlying "
+            f"station-time-profile.mjs) in app/ first."
+        )
     if not PEAK_WINDOWS_FILE.exists():
-        raise SystemExit(f"{PEAK_WINDOWS_FILE} not found — run ml/src/build_station_peaks.py first.")
+        raise SystemExit(
+            f"{PEAK_WINDOWS_FILE} not found — run ml/src/build_station_peaks.py first."
+        )
 
     # Per-station characteristic peak window (discrete, one of 7 time-of-day
     # buckets, train-period only, separate for workday vs weekend) -- see
@@ -128,7 +135,7 @@ def main() -> None:
     duckdb.sql(f"""
         CREATE OR REPLACE TEMP TABLE low_flag AS
         SELECT station_id, bucket_at, is_operational,
-               (available_bikes <= GREATEST(2, CEIL(total_docks * 0.1)))::INT AS is_low_bikes
+               (available_bikes <= GREATEST(3, CEIL(total_docks * 0.1)))::INT AS is_low_bikes
         FROM read_parquet('{INPUT_FILE.as_posix()}')
     """)
     duckdb.sql("""
@@ -216,7 +223,9 @@ def main() -> None:
             f"ELSE ({bucket_expr} = sp.weekend_peak_full) END AS in_own_peak_full_{label}"
         )
 
-    peak_select = ",\n                ".join(peak_columns_for(label, minutes) for label, _, minutes in TARGETS)
+    peak_select = ",\n                ".join(
+        peak_columns_for(label, minutes) for label, _, minutes in TARGETS
+    )
 
     duckdb.sql(f"""
         COPY (
@@ -224,7 +233,7 @@ def main() -> None:
                 SELECT
                     feat.station_id, feat.city, feat.district, feat.name,
                     feat.bucket_at, feat.slot, feat.weekday,
-                    {SPLIT_CASE.replace('bucket_at', 'feat.bucket_at')} AS split,
+                    {SPLIT_CASE.replace("bucket_at", "feat.bucket_at")} AS split,
                     feat.total_docks, feat.available_bikes, feat.available_docks,
                     feat.available_bikes::DOUBLE / NULLIF(feat.total_docks, 0) AS bike_ratio,
                     feat.available_docks::DOUBLE / NULLIF(feat.total_docks, 0) AS dock_ratio,
@@ -238,7 +247,7 @@ def main() -> None:
                 LEFT JOIN station_peaks sp ON sp.station_id = feat.station_id
                 {profile_joins}
                 WHERE feat.is_operational
-                  AND {SPLIT_CASE.replace('bucket_at', 'feat.bucket_at')} IS NOT NULL
+                  AND {SPLIT_CASE.replace("bucket_at", "feat.bucket_at")} IS NOT NULL
             )
             -- Stacking feature: the rule baseline's own composite risk score
             -- (forecastRisk() in evaluate-forecast.mjs), reconstructed from
@@ -252,7 +261,7 @@ def main() -> None:
                 LEAST(1, GREATEST(0,
                     COALESCE(profile_empty_rate_30, 0) * 0.7
                     + CASE WHEN available_bikes = 0 THEN 0.48
-                           WHEN available_bikes <= GREATEST(2, CEIL(total_docks * 0.1)) OR bike_ratio <= 0.1 THEN 0.25
+                           WHEN available_bikes <= GREATEST(3, CEIL(total_docks * 0.1)) OR bike_ratio <= 0.1 THEN 0.25
                            ELSE 0 END
                     + CASE WHEN COALESCE(available_bikes - lag_30m_bikes, 0) < 0
                            THEN LEAST(0.12, ABS(available_bikes - lag_30m_bikes)::DOUBLE / GREATEST(1, total_docks))
@@ -261,7 +270,7 @@ def main() -> None:
                 LEAST(1, GREATEST(0,
                     COALESCE(profile_full_rate_30, 0) * 0.7
                     + CASE WHEN available_docks = 0 THEN 0.48
-                           WHEN available_docks <= GREATEST(2, CEIL(total_docks * 0.1)) OR dock_ratio <= 0.1 THEN 0.25
+                           WHEN available_docks <= GREATEST(3, CEIL(total_docks * 0.1)) OR dock_ratio <= 0.1 THEN 0.25
                            ELSE 0 END
                     + CASE WHEN COALESCE(available_docks - lag_30m_docks, 0) < 0
                            THEN LEAST(0.12, ABS(available_docks - lag_30m_docks)::DOUBLE / GREATEST(1, total_docks))
@@ -270,7 +279,7 @@ def main() -> None:
                 LEAST(1, GREATEST(0,
                     COALESCE(profile_empty_rate_60, 0) * 0.7
                     + CASE WHEN available_bikes = 0 THEN 0.48
-                           WHEN available_bikes <= GREATEST(2, CEIL(total_docks * 0.1)) OR bike_ratio <= 0.1 THEN 0.25
+                           WHEN available_bikes <= GREATEST(3, CEIL(total_docks * 0.1)) OR bike_ratio <= 0.1 THEN 0.25
                            ELSE 0 END
                     + CASE WHEN COALESCE(available_bikes - lag_30m_bikes, 0) < 0
                            THEN LEAST(0.12, ABS(available_bikes - lag_30m_bikes)::DOUBLE / GREATEST(1, total_docks))
@@ -279,7 +288,7 @@ def main() -> None:
                 LEAST(1, GREATEST(0,
                     COALESCE(profile_full_rate_60, 0) * 0.7
                     + CASE WHEN available_docks = 0 THEN 0.48
-                           WHEN available_docks <= GREATEST(2, CEIL(total_docks * 0.1)) OR dock_ratio <= 0.1 THEN 0.25
+                           WHEN available_docks <= GREATEST(3, CEIL(total_docks * 0.1)) OR dock_ratio <= 0.1 THEN 0.25
                            ELSE 0 END
                     + CASE WHEN COALESCE(available_docks - lag_30m_docks, 0) < 0
                            THEN LEAST(0.12, ABS(available_docks - lag_30m_docks)::DOUBLE / GREATEST(1, total_docks))
@@ -288,7 +297,7 @@ def main() -> None:
                 LEAST(1, GREATEST(0,
                     COALESCE(profile_empty_rate_120, 0) * 0.7
                     + CASE WHEN available_bikes = 0 THEN 0.48
-                           WHEN available_bikes <= GREATEST(2, CEIL(total_docks * 0.1)) OR bike_ratio <= 0.1 THEN 0.25
+                           WHEN available_bikes <= GREATEST(3, CEIL(total_docks * 0.1)) OR bike_ratio <= 0.1 THEN 0.25
                            ELSE 0 END
                     + CASE WHEN COALESCE(available_bikes - lag_30m_bikes, 0) < 0
                            THEN LEAST(0.12, ABS(available_bikes - lag_30m_bikes)::DOUBLE / GREATEST(1, total_docks))
@@ -297,7 +306,7 @@ def main() -> None:
                 LEAST(1, GREATEST(0,
                     COALESCE(profile_full_rate_120, 0) * 0.7
                     + CASE WHEN available_docks = 0 THEN 0.48
-                           WHEN available_docks <= GREATEST(2, CEIL(total_docks * 0.1)) OR dock_ratio <= 0.1 THEN 0.25
+                           WHEN available_docks <= GREATEST(3, CEIL(total_docks * 0.1)) OR dock_ratio <= 0.1 THEN 0.25
                            ELSE 0 END
                     + CASE WHEN COALESCE(available_docks - lag_30m_docks, 0) < 0
                            THEN LEAST(0.12, ABS(available_docks - lag_30m_docks)::DOUBLE / GREATEST(1, total_docks))
@@ -317,7 +326,9 @@ def main() -> None:
 
     print(f"Wrote {OUTPUT_FILE}")
     for split, rows, positives, rate in stats:
-        print(f"  {split:<12} rows={rows:>10,}  60-min positives={positives:>8,}  base_rate={rate}%")
+        print(
+            f"  {split:<12} rows={rows:>10,}  60-min positives={positives:>8,}  base_rate={rate}%"
+        )
 
 
 if __name__ == "__main__":

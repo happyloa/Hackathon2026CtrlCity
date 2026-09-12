@@ -1,8 +1,7 @@
 import roi from '~/data/operational-roi.json'
 import type { Forecast, HorizonKey, RiskLevel, StationRisk } from './ops.ts'
 import type { XgboostHorizonPrediction, XgboostStationPrediction } from '~/composables/useXgboostPredictions'
-
-const XGBOOST_ALERT_THRESHOLD = 0.5
+import { XGBOOST_ALERT_THRESHOLD } from './parameters.mjs'
 
 /**
  * `StationRisk.id` on the live dashboard is NTPC's own numeric `sno` (see

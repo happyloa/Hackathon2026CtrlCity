@@ -505,8 +505,8 @@ test('never recommends moving more than the one bike or dock available above saf
   const futureFullWithOneSurplusBike = station({
     id: 'future-full-one-surplus-bike',
     totalDocks: 10,
-    availableBikes: 3,
-    availableDocks: 7,
+    availableBikes: 4, // safety stock is max(3, ceil(10 * 0.15)) = 3, so this is exactly one bike above it
+    availableDocks: 6,
     latitude: 25,
     stationForecast: forecast({ predictedBikes: 10, predictedDocks: 0, fullRisk: 0.9, level: 'critical' }),
   })

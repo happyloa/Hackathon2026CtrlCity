@@ -1,18 +1,10 @@
-export const DEFAULT_LIVE_OPERATION_POLICY = Object.freeze({
-  horizon: '60',
-  safetyStockRatio: 0.15,
-  minimumSafetyStock: 2,
-  minimumTransferBikes: 1,
-  maximumTransferBikes: 8,
-  maximumDistanceKm: 8,
-  maximumAlerts: 80,
-  maximumDispatches: 16,
-})
+import {
+  DEFAULT_LIVE_OPERATION_POLICY,
+  NEAR_EMPTY_BIKES,
+  ALERT_PRIORITY_THRESHOLDS,
+} from './parameters.mjs'
 
-export const ALERT_PRIORITY_THRESHOLDS = Object.freeze({
-  immediate: 55,
-  high: 30,
-})
+export { DEFAULT_LIVE_OPERATION_POLICY, ALERT_PRIORITY_THRESHOLDS }
 
 // Single source of truth for "how severe is this station right now". Order is
 // priority: each station gets the first level whose condition matches, so the
@@ -25,8 +17,6 @@ export const SEVERITY_LEVELS = Object.freeze({
   LOW: 'low',
   NORMAL: 'normal',
 })
-
-const NEAR_EMPTY_BIKES = 2
 
 function finite(value, fallback = 0) {
   return Number.isFinite(value) ? value : fallback

@@ -1,16 +1,5 @@
-export interface OperationalPolicyShape {
-  horizon: '60'
-  safetyStockRatio: number
-  minimumSafetyStock: number
-  minimumTransferBikes: number
-  maximumTransferBikes: number
-  maximumDistanceKm: number
-  maximumAlerts: number
-  maximumDispatches: number
-}
-
-export const DEFAULT_LIVE_OPERATION_POLICY: Readonly<OperationalPolicyShape>
-export const ALERT_PRIORITY_THRESHOLDS: Readonly<{ immediate: number; high: number }>
+export type { LiveOperationPolicyShape as OperationalPolicyShape } from './parameters.d.mts'
+export { DEFAULT_LIVE_OPERATION_POLICY, ALERT_PRIORITY_THRESHOLDS } from './parameters.d.mts'
 
 export type SeverityLevel =
   | 'service_disruption'

@@ -24,6 +24,7 @@
 import { access, readFile, writeFile, mkdir, rename } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { XGBOOST_PREDICTION_POLICY } from '../shared/parameters.mjs'
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url))
 const APP_DIR = resolve(SCRIPT_DIR, '..')
@@ -34,10 +35,10 @@ const OUTPUT_FILE = resolve(XGBOOST_DIR, 'live-predictions.json')
 
 const NTPC_LIVE_STATIONS_URL = 'https://data.ntpc.gov.tw/api/datasets/010e5b15-3823-4b20-b401-b1cf000550c5/json?page=0&size=2000'
 const HORIZONS = [30, 60]
-const NEIGHBOR_RADIUS_METERS = 300
-const LOW_RATIO = 0.1
-const LOW_FLOOR = 2
-const BASELINE_F1_XGBOOST_THRESHOLD = 0.60 // matches the validated hybrid deployment cutoff
+const NEIGHBOR_RADIUS_METERS = XGBOOST_PREDICTION_POLICY.neighborRadiusMeters
+const LOW_RATIO = XGBOOST_PREDICTION_POLICY.lowInventoryRatio
+const LOW_FLOOR = XGBOOST_PREDICTION_POLICY.lowInventoryFloor
+const BASELINE_F1_XGBOOST_THRESHOLD = XGBOOST_PREDICTION_POLICY.baselineF1RoutingThreshold // matches the validated hybrid deployment cutoff
 const EARTH_RADIUS_METERS = 6_371_000
 
 async function requireExportedModels() {

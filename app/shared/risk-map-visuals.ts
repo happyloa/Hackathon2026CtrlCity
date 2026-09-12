@@ -1,4 +1,5 @@
 import type { ServiceStatus } from '~/shared/ops'
+import { NEARBY_STATION_RADII_METERS, STABLE_INVENTORY_TONE_RATIO } from './parameters.mjs'
 
 export interface GeographicPoint {
   id: string
@@ -57,11 +58,11 @@ function distanceMeters(left: { latitude: number; longitude: number }, right: { 
  */
 export function groupNearbyStations(
   input: readonly GeographicPoint[],
-  maximumDistanceMeters = 500,
+  maximumDistanceMeters = NEARBY_STATION_RADII_METERS.neighbourGroup,
 ): NeighbourGroup[] {
   const maximumDistance = Number.isFinite(maximumDistanceMeters)
     ? Math.max(1, maximumDistanceMeters)
-    : 500
+    : NEARBY_STATION_RADII_METERS.neighbourGroup
   const points = input
     .filter(validPoint)
     .sort((left, right) => left.id.localeCompare(right.id))
@@ -154,7 +155,7 @@ export interface StationForGrouping extends GeographicPoint {
  */
 export function groupOperationalStations(
   stations: readonly StationForGrouping[],
-  maximumDistanceMeters = 500,
+  maximumDistanceMeters = NEARBY_STATION_RADII_METERS.neighbourGroup,
 ): NeighbourGroup[] {
   return groupNearbyStations(
     stations.filter(station => station.serviceStatus === 'operational'),
@@ -167,8 +168,8 @@ export function stableInventoryTone(station: StationInventory): StableInventoryT
   if (!capacity) return 'balanced'
   const bikes = Math.max(0, Number.isFinite(station.availableBikes) ? station.availableBikes : 0)
   const docks = Math.max(0, Number.isFinite(station.availableDocks) ? station.availableDocks : 0)
-  const bikeHeavy = bikes * 3 >= capacity * 2
-  const dockHeavy = docks * 3 >= capacity * 2
+  const bikeHeavy = bikes >= capacity * STABLE_INVENTORY_TONE_RATIO
+  const dockHeavy = docks >= capacity * STABLE_INVENTORY_TONE_RATIO
   if (bikeHeavy && dockHeavy) return bikes >= docks ? 'bike-heavy' : 'dock-heavy'
   if (bikeHeavy) return 'bike-heavy'
   if (dockHeavy) return 'dock-heavy'

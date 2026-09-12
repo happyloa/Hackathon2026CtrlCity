@@ -5,6 +5,7 @@ import type {
   PredictionCoverage,
   PredictionMetadata,
 } from '~/shared/ops'
+import { LOW_INVENTORY_POLICY } from '~/shared/parameters.mjs'
 
 type CompactProfile = [number, number, number, number, number, number]
 
@@ -176,7 +177,7 @@ function makeForecast(
 ): Forecast {
   const [sampleSize, meanBikes, meanDocks, emptyPermille, fullPermille, servicePermille] = profile
   const minutes = Number(horizon)
-  const lowThreshold = Math.max(2, Math.ceil(station.totalDocks * .1))
+  const lowThreshold = Math.max(LOW_INVENTORY_POLICY.floor, Math.ceil(station.totalDocks * LOW_INVENTORY_POLICY.ratio))
   const bikeRatio = station.availableBikes / Math.max(1, station.totalDocks)
   const dockRatio = station.availableDocks / Math.max(1, station.totalDocks)
   const blendWeight = Math.min(.55, minutes / 240)

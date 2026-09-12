@@ -11,6 +11,7 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { parse } from 'csv-parse/sync'
+import { LOW_INVENTORY_POLICY } from '../shared/parameters.mjs'
 
 const APP_DIR = resolve(import.meta.dirname, '..')
 const REPO_DIR = resolve(APP_DIR, '..')
@@ -187,7 +188,7 @@ function main() {
     const jsonOut = {
       generatedAt: new Date().toISOString(),
       method: {
-        source: 'ml/output/station-time-profile-all.csv (lowBikesRate/lowDocksRate, threshold = max(2, ceil(totalDocks*0.1)))',
+        source: `ml/output/station-time-profile-all.csv (lowBikesRate/lowDocksRate, threshold = max(${LOW_INVENTORY_POLICY.floor}, ceil(totalDocks*${LOW_INVENTORY_POLICY.ratio})))`,
         minObservationsPerCell: MIN_OBSERVATIONS,
         topN: TOP_N_STATIONS,
         clusterRadiusMeters: CLUSTER_RADIUS_METERS,
@@ -236,7 +237,7 @@ function main() {
     lines.push(`# 高風險站點分析（共 ${byStation.size} 站中，取前 ${TOP_N_STATIONS} 名）`)
     lines.push('')
     lines.push(`## 方法`)
-    lines.push(`- 用既有的 lowBikesRate/lowDocksRate（門檻 = max(2, ceil(總車柱數 x 0.1))），不重跑 F1。`)
+    lines.push(`- 用既有的 lowBikesRate/lowDocksRate（門檻 = max(${LOW_INVENTORY_POLICY.floor}, ceil(總車柱數 x ${LOW_INVENTORY_POLICY.ratio}))），不重跑 F1。`)
     lines.push(`- 每站的 combinedRisk = 所有樣本數 >= ${MIN_OBSERVATIONS} 的「星期 x 時段」格子，依樣本數加權平均 lowBikesRate + lowDocksRate。`)
     lines.push(`- ${CLUSTER_RADIUS_METERS}m 內的站點會被歸成同一群。`)
     lines.push('')

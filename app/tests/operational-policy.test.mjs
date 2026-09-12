@@ -47,9 +47,9 @@ test('a well-stocked station is normal', () => {
 test('refill amount tops a station up to its safety stock, not merely past the near-empty threshold', () => {
   const bigStation = station({ totalDocks: 60 })
   const stockRequired = safetyStockFor(bigStation)
-  assert.equal(stockRequired, 9) // max(2, ceil(60 * 0.15))
+  assert.equal(stockRequired, 9) // max(3, ceil(60 * 0.15))
   assert.equal(refillAmountFor(bigStation, 1), stockRequired - 1)
-  assert.notEqual(refillAmountFor(bigStation, 1), 1) // not "just enough to clear the 2-bike threshold"
+  assert.notEqual(refillAmountFor(bigStation, 1), 1) // not "just enough to clear the 3-bike threshold"
 })
 
 test('refill amount never goes negative once a station already meets its safety stock', () => {
@@ -58,8 +58,8 @@ test('refill amount never goes negative once a station already meets its safety 
   assert.equal(refillAmountFor(bigStation, 50), 0)
 })
 
-test('safety stock is a single 15%-of-capacity implementation with a 2-bike floor', () => {
-  assert.equal(safetyStockFor(station({ totalDocks: 10 })), 2)
-  assert.equal(safetyStockFor(station({ totalDocks: 20 })), 3)
-  assert.equal(safetyStockFor(station({ totalDocks: 60 })), 9)
+test('safety stock is a single 15%-of-capacity implementation with a 3-bike floor', () => {
+  assert.equal(safetyStockFor(station({ totalDocks: 10 })), 3) // max(3, ceil(10 * 0.15))
+  assert.equal(safetyStockFor(station({ totalDocks: 20 })), 3) // max(3, ceil(20 * 0.15))
+  assert.equal(safetyStockFor(station({ totalDocks: 60 })), 9) // max(3, ceil(60 * 0.15))
 })

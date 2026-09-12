@@ -29,6 +29,7 @@ import {
   alertThresholdFor,
 } from './risk-policy.mjs'
 import { buildExclusionIndex, parseAdjustmentsFile } from '../shared/operational-adjustments.mjs'
+import { LOW_INVENTORY_POLICY } from '../shared/parameters.mjs'
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url))
 const APP_DIR = resolve(SCRIPT_DIR, '..')
@@ -201,7 +202,7 @@ function stateForSnapshot(totalDocks, availableBikes, availableDocks) {
   if (availableBikes === 0 && availableDocks > 0) return 'empty'
   if (availableDocks === 0 && availableBikes > 0) return 'full'
 
-  const lowThreshold = Math.max(2, Math.ceil(totalDocks * 0.1))
+  const lowThreshold = Math.max(LOW_INVENTORY_POLICY.floor, Math.ceil(totalDocks * LOW_INVENTORY_POLICY.ratio))
   if (availableBikes <= lowThreshold) return 'low_bikes'
   if (availableDocks <= lowThreshold) return 'low_docks'
   return 'normal'
@@ -521,7 +522,7 @@ function makeForecast(snapshot, history, profileStats) {
       ? profile.unavailable / Math.max(1, profile.observations + profile.unavailable)
       : 0
     const weight = Math.min(0.55, minutes / 240)
-    const lowThreshold = Math.max(2, Math.ceil(snapshot.totalDocks * 0.1))
+    const lowThreshold = Math.max(LOW_INVENTORY_POLICY.floor, Math.ceil(snapshot.totalDocks * LOW_INVENTORY_POLICY.ratio))
     const bikeRatio = snapshot.availableBikes / Math.max(1, snapshot.totalDocks)
     const dockRatio = snapshot.availableDocks / Math.max(1, snapshot.totalDocks)
     const previous = history.length >= 2 ? history.at(-2) : null

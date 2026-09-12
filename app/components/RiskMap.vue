@@ -185,15 +185,67 @@ const NEIGHBOUR_GROUP_RADIUS_METERS = 500
 
 const clickedGroupPoint = ref<{ x: number, y: number } | null>(null)
 const clickedGroupMemberIds = ref<globalThis.Set<string> | null>(null)
+// Straight-line metres from the actual click location (not a station-to-station
+// measure) to every member station, captured once at click time -- so the list
+// can be ordered "closest to where the dispatcher tapped" and show that
+// distance, without recomputing it against a possibly-since-moved map.
+const clickedGroupDistances = ref<globalThis.Map<string, number> | null>(null)
 const clickedGroupStations = computed(() => {
   const members = clickedGroupMemberIds.value
+  const distances = clickedGroupDistances.value
   if (!members) return []
-  return allMappedStations.value.filter(station => members.has(station.id))
+  return allMappedStations.value
+    .filter(station => members.has(station.id))
+    .sort((a, b) => (distances?.get(a.id) ?? Infinity) - (distances?.get(b.id) ?? Infinity))
+})
+
+function distanceForStation(station: StationRisk) {
+  return clickedGroupDistances.value?.get(station.id) ?? null
+}
+
+function distanceLabel(station: StationRisk) {
+  const meters = distanceForStation(station)
+  if (meters === null) return ''
+  return meters < 1000 ? `${Math.round(meters)} 公尺` : `${(meters / 1000).toFixed(1)} 公里`
+}
+
+/**
+ * A full (滿柱) station has nothing to lend either -- what it lacks is empty
+ * docks to receive a return -- so its own metric is "可還" (return) capacity;
+ * every other severity is short on bikes to lend, so "可借" (borrow).
+ *
+ * `forceReturn` overrides that per-station judgement for the return-focused
+ * list (clickedGroupReturnStations): those entries were picked specifically
+ * because they have spare docks, so the list must show "可還" for all of
+ * them regardless of their own borrow-side severity -- otherwise a "偏低"
+ * neighbour would read as "可借" right under a heading promising return
+ * spots, contradicting the very reason it's listed.
+ */
+function bikeMetricLabel(station: StationRisk, forceReturn = false) {
+  return forceReturn || severityFor(station) === 'full'
+    ? `可還 ${station.availableDocks} 位`
+    : `可借 ${station.availableBikes} 車`
+}
+
+// A click landing on a "full" (滿柱) blob is asking a different question than
+// a generic area click -- not "which stations serve here" but "since this one
+// can't take a return, where nearby can". `clickedGroupFocusSeverity` records
+// which case triggered the popup so the template can swap the whole list's
+// framing (return-dock capacity, sorted by who has the most room) instead of
+// just relabelling the same borrow-focused list.
+const clickedGroupFocusSeverity = ref<Severity | null>(null)
+const clickedGroupReturnStations = computed(() => {
+  if (clickedGroupFocusSeverity.value !== 'full') return []
+  return [...clickedGroupStations.value]
+    .filter(station => station.availableDocks > 0)
+    .sort((a, b) => b.availableDocks - a.availableDocks)
 })
 
 function closeClickedGroup() {
   clickedGroupPoint.value = null
   clickedGroupMemberIds.value = null
+  clickedGroupDistances.value = null
+  clickedGroupFocusSeverity.value = null
 }
 
 function selectFromClickedGroup(stationId: string) {
@@ -519,25 +571,30 @@ function onMapClick(event: LeafletMouseEvent) {
   // that blob", which is a much larger target than the precise dot above.
   // Service-disrupted stations aren't offering service, so a click on their
   // grey blob shouldn't open the area popup at all.
-  const covering = lastRadiusPixels > 0
-    ? lastVisible.some(entry => entry.severity !== 'service_disruption'
+  const coveringEntries = lastRadiusPixels > 0
+    ? lastVisible.filter(entry => entry.severity !== 'service_disruption'
       && Math.hypot(entry.x - point.x, entry.y - point.y) <= lastRadiusPixels)
-    : false
-  if (!covering || !leafletMap) {
+    : []
+  if (!coveringEntries.length || !leafletMap) {
     closeClickedGroup()
     return
   }
 
   const clickLatLng = leafletMap.containerPointToLatLng(point)
   const memberIds = new globalThis.Set<string>()
+  const distances = new globalThis.Map<string, number>()
   for (const station of allMappedStations.value) {
     if (station.serviceStatus !== 'operational') continue
-    if (clickLatLng.distanceTo([station.latitude!, station.longitude!]) <= NEIGHBOUR_GROUP_RADIUS_METERS) {
+    const distance = clickLatLng.distanceTo([station.latitude!, station.longitude!])
+    if (distance <= NEIGHBOUR_GROUP_RADIUS_METERS) {
       memberIds.add(station.id)
+      distances.set(station.id, distance)
     }
   }
   clickedGroupMemberIds.value = memberIds
+  clickedGroupDistances.value = distances
   clickedGroupPoint.value = { x: point.x, y: point.y }
+  clickedGroupFocusSeverity.value = coveringEntries.some(entry => entry.severity === 'full') ? 'full' : null
 }
 
 function focusSelectedStation() {
@@ -631,7 +688,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section class="map-panel geographic-map-panel panel overflow-hidden">
+  <section class="map-panel geographic-map-panel panel">
     <div class="map-heading map-heading-refined">
       <div>
         <p class="map-eyebrow">
@@ -691,9 +748,9 @@ onBeforeUnmount(() => {
     </div>
 
     <div
-      class="geographic-map map-height relative z-0 isolate mx-3.5 min-h-240 overflow-hidden rounded-lg border border-line bg-map"
+      class="geographic-map map-height relative z-0 isolate mx-3.5 min-h-240 rounded-lg border border-line bg-map"
       role="region" :aria-label="mapAriaLabel">
-      <div ref="mapElement" class="map-canvas map-height min-h-240 w-full" />
+      <div ref="mapElement" class="map-canvas map-height min-h-240 w-full overflow-hidden rounded-lg" />
 
       <svg v-if="routeStopPoints.length > 1" class="map-route-line pointer-events-none absolute inset-0 h-full w-full"
         aria-hidden="true">
@@ -744,22 +801,41 @@ onBeforeUnmount(() => {
         class="map-group-card absolute grid max-w-72 gap-1.5 rounded-lg border border-line-strong bg-panel p-3 text-body1 leading-snug text-ink shadow-lg"
         :style="{ left: `${clickedGroupPoint.x}px`, top: `${clickedGroupPoint.y}px` }" @click.stop>
         <div class="flex items-start justify-between gap-2">
-          <strong>這一帶由 {{ clickedGroupStations.length }} 站服務</strong>
+          <strong v-if="clickedGroupFocusSeverity === 'full'">已滿柱，附近可還車 {{ clickedGroupReturnStations.length }}
+            站</strong>
+          <strong v-else>這一帶由 {{ clickedGroupStations.length }} 站服務</strong>
           <button type="button"
             class="grid h-6 w-6 shrink-0 place-items-center rounded text-muted transition-colors hover:bg-accent-strong hover:text-on-accent"
             aria-label="關閉鄰近群清單" @click="closeClickedGroup">
             <X class="icon-md" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />
           </button>
         </div>
-        <ul class="grid max-h-56 gap-1 overflow-y-auto">
+        <template v-if="clickedGroupFocusSeverity === 'full'">
+          <p v-if="!clickedGroupReturnStations.length" class="text-muted">鄰近站點目前也都滿柱，建議稍後再嘗試還車。</p>
+          <ul v-else class="grid max-h-56 gap-1 overflow-y-auto">
+            <li v-for="station in clickedGroupReturnStations" :key="station.id">
+              <button type="button"
+                class="flex w-full min-w-0 items-center justify-between gap-2 rounded-md px-1.5 py-1 text-left transition-colors hover:bg-panel-muted"
+                @click="selectFromClickedGroup(station.id)">
+                <span class="grid min-w-0 gap-0.5"><strong class="truncate">{{ displayStationName(station.name)
+                }}</strong>
+                  <small class="text-muted">{{ station.district || '新北市' }}・{{ severityLabelFor(station) }}・{{
+                    distanceLabel(station) }}</small></span>
+                <b class="shrink-0 whitespace-nowrap font-mono text-accent-strong">{{ bikeMetricLabel(station, true) }}</b>
+              </button>
+            </li>
+          </ul>
+        </template>
+        <ul v-else class="grid max-h-56 gap-1 overflow-y-auto">
           <li v-for="station in clickedGroupStations" :key="station.id">
             <button type="button"
               class="flex w-full min-w-0 items-center justify-between gap-2 rounded-md px-1.5 py-1 text-left transition-colors hover:bg-panel-muted"
               @click="selectFromClickedGroup(station.id)">
               <span class="grid min-w-0 gap-0.5"><strong class="truncate">{{ displayStationName(station.name)
               }}</strong>
-                <small class="text-muted">{{ station.district || '新北市' }}・{{ severityLabelFor(station) }}</small></span>
-              <b class="shrink-0 whitespace-nowrap font-mono text-accent-strong">{{ station.availableBikes }} 車</b>
+                <small class="text-muted">{{ station.district || '新北市' }}・{{ severityLabelFor(station) }}・{{
+                  distanceLabel(station) }}</small></span>
+              <b class="shrink-0 whitespace-nowrap font-mono text-accent-strong">{{ bikeMetricLabel(station) }}</b>
             </button>
           </li>
         </ul>

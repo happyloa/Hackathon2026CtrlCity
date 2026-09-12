@@ -1,5 +1,6 @@
 import { safetyStockFor } from './operational-policy.mjs'
 import { displayStationName, type HorizonKey, type StationRisk } from './ops.ts'
+import { ALTERNATE_STATION_SUGGESTION_LIMIT, NEARBY_STATION_RADII_METERS } from './parameters.mjs'
 
 export interface NearbyReturnStation {
   stationId: string
@@ -49,8 +50,8 @@ function nearbyStationsWithResource(
   resource: 'docks' | 'bikes',
   options: { radiusMeters?: number; limit?: number },
 ) {
-  const radiusMeters = Math.max(100, options.radiusMeters ?? 600)
-  const limit = Math.max(1, options.limit ?? 3)
+  const radiusMeters = Math.max(100, options.radiusMeters ?? NEARBY_STATION_RADII_METERS.alternateStationSearch)
+  const limit = Math.max(1, options.limit ?? ALTERNATE_STATION_SUGGESTION_LIMIT)
   const isDocks = resource === 'docks'
 
   return stations

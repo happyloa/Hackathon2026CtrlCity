@@ -1,6 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { LOW_INVENTORY_POLICY, SAFETY_STOCK_POLICY } from '../shared/parameters.mjs'
 
 const APP_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const DASHBOARD_FILE = resolve(APP_DIR, 'data', 'dashboard.json')
@@ -32,8 +33,8 @@ function simulateScenario(asOf, scenario) {
     const to = stations.get(dispatch.destinationStationId)
     if (!from || !to || from.id === to.id) continue
 
-    const donorSafetyStock = Math.max(2, Math.ceil((Number(from.totalDocks) || 0) * .15))
-    const receiverDockBuffer = Math.max(2, Math.ceil((Number(to.totalDocks) || 0) * .1))
+    const donorSafetyStock = Math.max(SAFETY_STOCK_POLICY.minimum, Math.ceil((Number(from.totalDocks) || 0) * SAFETY_STOCK_POLICY.ratio))
+    const receiverDockBuffer = Math.max(LOW_INVENTORY_POLICY.floor, Math.ceil((Number(to.totalDocks) || 0) * LOW_INVENTORY_POLICY.ratio))
     const requested = Math.max(0, Math.round(Number(dispatch.suggestedBikes) || 0))
     const movable = Math.max(0, Math.min(
       requested,

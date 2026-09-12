@@ -1,5 +1,6 @@
 import type { Alert, StationRisk } from './ops.ts'
 import { stationOverviewStatus, type StationOverviewStatus } from './station-overview.ts'
+import { DISTRICT_ATTENTION_RATE_THRESHOLDS } from './parameters.mjs'
 
 export interface DistrictSummary {
   district: string
@@ -64,7 +65,7 @@ export type DistrictTone = 'none' | 'quiet' | 'low' | 'medium' | 'high'
 export function districtAttentionTone(summary?: DistrictSummary): DistrictTone {
   if (!summary || !summary.total || summary.counts.unknown + summary.counts.service === summary.total) return 'none'
   if (summary.attentionCount === 0) return 'quiet'
-  if (summary.attentionRate <= 0.1) return 'low'
-  if (summary.attentionRate <= 0.25) return 'medium'
+  if (summary.attentionRate <= DISTRICT_ATTENTION_RATE_THRESHOLDS.low) return 'low'
+  if (summary.attentionRate <= DISTRICT_ATTENTION_RATE_THRESHOLDS.medium) return 'medium'
   return 'high'
 }

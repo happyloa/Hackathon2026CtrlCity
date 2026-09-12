@@ -25,6 +25,7 @@ import { parse } from 'csv-parse'
 import iconv from 'iconv-lite'
 
 import { buildExclusionIndex, parseAdjustmentsFile } from '../shared/operational-adjustments.mjs'
+import { LOW_INVENTORY_POLICY } from '../shared/parameters.mjs'
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url))
 const APP_DIR = resolve(SCRIPT_DIR, '..')
@@ -51,10 +52,10 @@ const PERIOD_DAYS = 181                      // 2026-01-01 .. 2026-06-30
 const DAY_MS = 24 * 60 * 60 * 1000
 const BITMAP_BYTES = Math.ceil(PERIOD_DAYS / 8)
 
-// Kept identical to evaluate-forecast.mjs so the two reports agree on what an
-// "empty"/"full"/"unavailable" snapshot is.
-const LOW_RATIO = 0.1
-const LOW_FLOOR = 2
+// Kept identical to evaluate-forecast.mjs (both via LOW_INVENTORY_POLICY) so
+// the two reports agree on what an "empty"/"full"/"unavailable" snapshot is.
+const LOW_RATIO = LOW_INVENTORY_POLICY.ratio
+const LOW_FLOOR = LOW_INVENTORY_POLICY.floor
 
 const PERIODS = Object.freeze({
   train: { label: '訓練期 1-4 月', start: Date.UTC(2026, 0, 1), end: Date.UTC(2026, 4, 1) },
