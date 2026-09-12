@@ -9,7 +9,8 @@ export class OperatorDocumentClient<T> {
   constructor(endpoint: string, parse: (raw: unknown) => T, fetchImpl: typeof fetch = fetch) {
     this.endpoint = endpoint
     this.parse = parse
-    this.fetchImpl = fetchImpl
+    // Native browser fetch must not receive this document client as its receiver.
+    this.fetchImpl = fetchImpl.bind(globalThis)
   }
   async load(): Promise<T> {
     const response = await this.fetchImpl(this.endpoint, { cache: 'no-store', signal: AbortSignal.timeout(15000) })

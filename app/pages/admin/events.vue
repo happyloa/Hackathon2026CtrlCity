@@ -68,7 +68,8 @@ function remove(id: string) { replace({ events: events.value.filter(event => eve
     <p role="status">{{ cloud.status.value }}</p>
     <p v-if="cloud.authError.value" role="alert">{{ cloud.authError.value }}</p>
     <div v-if="cloud.remote" class="flex flex-wrap gap-3">
-      <button v-if="!cloud.accessToken.value" class="min-h-11 text-accent" @click="cloud.signIn">登入後可編輯</button>
+      <p v-if="!cloud.enabled">目前開放雲端唯讀，尚未啟用調度登入。</p>
+      <button v-if="cloud.enabled && !cloud.accessToken.value" class="min-h-11 text-accent" @click="cloud.signIn">登入後可編輯</button>
       <button v-else class="min-h-11 text-accent" @click="cloud.signOut">登出</button>
       <button :disabled="cloud.pending.value" class="min-h-11 text-accent" @click="cloud.reload">重新載入雲端清單</button>
       <button :disabled="!cloud.canEdit.value || !cloud.dirty.value" class="min-h-11 text-accent" @click="cloud.save">儲存到雲端</button>

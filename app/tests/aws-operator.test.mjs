@@ -59,11 +59,23 @@ test('client requires load, carries etag and blocks retries after conflicts unti
   assert.equal(calls.length, n)
   await client.load(); assert.equal(client.conflicted, false)
 })
+test('operator fetch uses the browser global receiver for reads and writes', async () => {
+  const client = new OperatorDocumentClient('/api/v1/events', value => value.events, function () {
+    assert.equal(this, globalThis)
+    return Promise.resolve(new Response('{"events":[]}', { headers: { etag: '"one"' } }))
+  })
+  await client.load()
+  await client.save({ events: [] }, 'token')
+})
+
 test('publish isolates local defaults and preserves scheduler/operator objects', () => {
   const defaults = frontendEnvironment({})
   assert.equal(defaults.NUXT_PUBLIC_PERSISTENCE_PATH, '')
-  assert.equal(defaults.NUXT_PUBLIC_ADJUSTMENTS_ENDPOINT, '')
+  assert.equal(defaults.NUXT_PUBLIC_ADJUSTMENTS_ENDPOINT, '/api/v1/adjustments')
+  assert.equal(defaults.NUXT_PUBLIC_MANUAL_ROUTES_ENDPOINT, '/api/v1/manual-routes')
+  assert.equal(defaults.NUXT_PUBLIC_EVENTS_ENDPOINT, '/api/v1/events')
   assert.equal(defaults.NUXT_PUBLIC_STORAGE_MODE, 'aws')
+  assert.ok(protectedPublishPaths.includes('data/xgboost/model-*.json'))
   assert.equal(frontendEnvironment({ SnapshotCaptureEnabled: 'true' }).NUXT_PUBLIC_PERSISTENCE_PATH, '/state/persistence.json')
   for (const path of ['_nuxt/*', 'raw/*', 'snapshots/*', 'state/*', 'data/operational-adjustments.json', 'data/demand-events.json', 'data/manual-routes.json']) assert.ok(protectedPublishPaths.includes(path))
 })

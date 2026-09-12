@@ -146,6 +146,35 @@ Conditions:
   LoginEnabled: !Equals [!Ref EnableDispatcherLogin, 'true']
 
 Resources:
+  HistoryDataBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: { SSEAlgorithm: AES256 }
+      OwnershipControls:
+        Rules: [{ ObjectOwnership: BucketOwnerEnforced }]
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: archive-raw-snapshots
+            Status: Enabled
+            Prefix: raw/
+            Transitions:
+              - StorageClass: GLACIER_IR
+                TransitionInDays: 30
+            ExpirationInDays: 180
+      Tags:
+        - { Key: project, Value: ctrlcity-youbike }
+        - { Key: environment, Value: !Ref EnvironmentName }
+        - { Key: purpose, Value: private-history-snapshots }
+
   SiteBucket:
     Type: AWS::S3::Bucket
     DeletionPolicy: Delete
@@ -244,6 +273,44 @@ Resources:
     Type: AWS::Serverless::HttpApi
     Properties:
       Description: CtrlCity same-origin API for live data and opt-in AgentCore review.
+      # One OpenAPI body owns all routes: API updates overwrite external routes.
+      DefinitionBody:
+        openapi: 3.0.1
+        info: { title: CtrlCity Operations, version: '1.0' }
+        paths:
+          /api/v1/adjustments:
+            get: &operatorRead
+              responses: { default: { description: Operator document } }
+              x-amazon-apigateway-integration: &operatorIntegration
+                type: aws_proxy
+                httpMethod: POST
+                uri: !GetAtt OperationsApiFunction.Arn
+                payloadFormatVersion: '2.0'
+            put: &operatorWrite
+              Fn::If:
+                - LoginEnabled
+                - responses: { default: { description: Saved operator document } }
+                  security: [{ DispatcherJwt: [openid] }]
+                  x-amazon-apigateway-integration: *operatorIntegration
+                - !Ref AWS::NoValue
+          /api/v1/events:
+            get: *operatorRead
+            put: *operatorWrite
+          /api/v1/manual-routes:
+            get: *operatorRead
+            put: *operatorWrite
+        components:
+          securitySchemes:
+            DispatcherJwt: !If
+              - LoginEnabled
+              - type: oauth2
+                x-amazon-apigateway-authorizer:
+                  type: jwt
+                  identitySource: '$request.header.Authorization'
+                  jwtConfiguration:
+                    issuer: !Sub 'https://cognito-idp.${AWS::Region}.amazonaws.com/${DispatcherUserPool}'
+                    audience: [!Ref DispatcherUserPoolClient]
+              - !Ref AWS::NoValue
       DefaultRouteSettings:
         ThrottlingBurstLimit: 8
         ThrottlingRateLimit: 4
@@ -431,6 +498,7 @@ Resources:
       Environment:
         Variables:
           SITE_BUCKET: !Ref SiteBucket
+          HISTORY_BUCKET: !Ref HistoryDataBucket
           LIVE_FEED_URL: !Ref LiveFeedUrl
       Policies:
         - Statement:
@@ -442,9 +510,12 @@ Resources:
               Effect: Allow
               Action: [s3:GetObject, s3:PutObject]
               Resource:
-                - !Sub '${SiteBucket.Arn}/raw/*'
                 - !Sub '${SiteBucket.Arn}/snapshots/*'
                 - !Sub '${SiteBucket.Arn}/state/*'
+            - Sid: WritePrivateHistoryOnly
+              Effect: Allow
+              Action: s3:PutObject
+              Resource: !Sub '${HistoryDataBucket.Arn}/raw/*'
       Events:
         EveryFiveMinutes:
           Type: ScheduleV2
@@ -577,6 +648,15 @@ Resources:
                 Action: [s3:GetObject, s3:ListBucket, s3:PutObject]
                 Resource: [!GetAtt RawDataBucket.Arn, !Sub '${RawDataBucket.Arn}/*']
               - Effect: Allow
+                Action: s3:ListBucket
+                Resource: !GetAtt HistoryDataBucket.Arn
+                Condition:
+                  StringLike:
+                    s3:prefix: ['raw/*']
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource: !Sub '${HistoryDataBucket.Arn}/raw/*'
+              - Effect: Allow
                 Action: [s3:GetObject, s3:ListBucket, s3:PutObject, s3:DeleteObject]
                 Resource: [!GetAtt SiteBucket.Arn, !Sub '${SiteBucket.Arn}/*']
               - Effect: Allow
@@ -599,6 +679,7 @@ Resources:
         Image: aws/codebuild/standard:7.0
         EnvironmentVariables:
           - { Name: RAW_DATA_BUCKET, Value: !Ref RawDataBucket }
+          - { Name: HISTORY_BUCKET, Value: !Ref HistoryDataBucket }
           - { Name: SITE_BUCKET, Value: !Ref SiteBucket }
           - { Name: DISTRIBUTION_ID, Value: !Ref SiteDistribution }
           - { Name: AWS_STACK, Value: !Ref 'AWS::StackName' }
@@ -650,26 +731,6 @@ Resources:
       UserPoolId: !Ref DispatcherUserPool
       Domain: !Sub '${AWS::StackName}-${AWS::AccountId}'
 
-  DispatcherJwt:
-    Type: AWS::ApiGatewayV2::Authorizer
-    Condition: LoginEnabled
-    Properties:
-      ApiId: !Ref OperationsApi
-      Name: DispatcherJwt
-      AuthorizerType: JWT
-      IdentitySource: ['$request.header.Authorization']
-      JwtConfiguration:
-        Issuer: !Sub 'https://cognito-idp.${AWS::Region}.amazonaws.com/${DispatcherUserPool}'
-        Audience: [!Ref DispatcherUserPoolClient]
-
-  OperatorApiIntegration:
-    Type: AWS::ApiGatewayV2::Integration
-    Properties:
-      ApiId: !Ref OperationsApi
-      IntegrationType: AWS_PROXY
-      IntegrationUri: !GetAtt OperationsApiFunction.Arn
-      PayloadFormatVersion: '2.0'
-
   OperatorApiPermission:
     Type: AWS::Lambda::Permission
     Properties:
@@ -677,57 +738,6 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub 'arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${OperationsApi}/*/*/api/v1/*'
-
-  AdjustmentsGETRoute:
-    Type: AWS::ApiGatewayV2::Route
-    Properties:
-      ApiId: !Ref OperationsApi
-      RouteKey: GET /api/v1/adjustments
-      Target: !Sub 'integrations/${OperatorApiIntegration}'
-
-  AdjustmentsPUTRoute:
-    Type: AWS::ApiGatewayV2::Route
-    Properties:
-      ApiId: !Ref OperationsApi
-      RouteKey: PUT /api/v1/adjustments
-      Target: !Sub 'integrations/${OperatorApiIntegration}'
-      AuthorizationType: !If [LoginEnabled, JWT, NONE]
-      AuthorizerId: !If [LoginEnabled, !Ref DispatcherJwt, !Ref 'AWS::NoValue']
-      AuthorizationScopes: !If [LoginEnabled, [openid], !Ref 'AWS::NoValue']
-
-  EventsGETRoute:
-    Type: AWS::ApiGatewayV2::Route
-    Properties:
-      ApiId: !Ref OperationsApi
-      RouteKey: GET /api/v1/events
-      Target: !Sub 'integrations/${OperatorApiIntegration}'
-
-  EventsPUTRoute:
-    Type: AWS::ApiGatewayV2::Route
-    Properties:
-      ApiId: !Ref OperationsApi
-      RouteKey: PUT /api/v1/events
-      Target: !Sub 'integrations/${OperatorApiIntegration}'
-      AuthorizationType: !If [LoginEnabled, JWT, NONE]
-      AuthorizerId: !If [LoginEnabled, !Ref DispatcherJwt, !Ref 'AWS::NoValue']
-      AuthorizationScopes: !If [LoginEnabled, [openid], !Ref 'AWS::NoValue']
-
-  ManualRoutesGETRoute:
-    Type: AWS::ApiGatewayV2::Route
-    Properties:
-      ApiId: !Ref OperationsApi
-      RouteKey: GET /api/v1/manual-routes
-      Target: !Sub 'integrations/${OperatorApiIntegration}'
-
-  ManualRoutesPUTRoute:
-    Type: AWS::ApiGatewayV2::Route
-    Properties:
-      ApiId: !Ref OperationsApi
-      RouteKey: PUT /api/v1/manual-routes
-      Target: !Sub 'integrations/${OperatorApiIntegration}'
-      AuthorizationType: !If [LoginEnabled, JWT, NONE]
-      AuthorizerId: !If [LoginEnabled, !Ref DispatcherJwt, !Ref 'AWS::NoValue']
-      AuthorizationScopes: !If [LoginEnabled, [openid], !Ref 'AWS::NoValue']
 
   SiteDistribution:
     Type: AWS::CloudFront::Distribution
@@ -838,6 +848,9 @@ Resources:
                 AWS:SourceArn: !Sub 'arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${SiteDistribution}'
 
 Outputs:
+  HistoryDataBucketName:
+    Description: Private raw snapshots; never a CloudFront origin or publish target.
+    Value: !Ref HistoryDataBucket
   ApiFunctionName:
     Description: Lambda function updated by the GitHub deployment role.
     Value: !Ref OperationsApiFunction

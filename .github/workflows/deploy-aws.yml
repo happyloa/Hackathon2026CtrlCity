@@ -45,6 +45,13 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run typecheck
+      - name: Require history infrastructure before updating capture code
+        run: |
+          history_bucket=$(aws cloudformation describe-stacks --stack-name "$AWS_STACK" --query 'Stacks[0].Outputs[?OutputKey==`HistoryDataBucketName`].OutputValue | [0]' --output text)
+          if [ "$history_bucket" = "None" ] || [ -z "$history_bucket" ]; then
+            echo 'Deploy infrastructure first: npm run aws:deploy -- --enable-capture --build-runner --region us-west-2 --yes'
+            exit 1
+          fi
       - name: Deploy API code
         run: |
           function_name=$(aws cloudformation describe-stacks --stack-name "$AWS_STACK" --query 'Stacks[0].Outputs[?OutputKey==`ApiFunctionName`].OutputValue | [0]' --output text)

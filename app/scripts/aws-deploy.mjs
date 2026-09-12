@@ -1,4 +1,5 @@
 import { resolve } from 'node:path'
+import { prepareDeploymentTemplate } from './aws-template.mjs'
 import {
   appDir,
   commandAvailable,
@@ -7,7 +8,6 @@ import {
   requireFile,
   resolveRegion,
   run,
-  templatePath,
 } from './aws-cli-utils.mjs'
 
 try {
@@ -24,7 +24,7 @@ try {
   options.region = resolveRegion(options)
   const sharedSamArgs = [
     '--template-file',
-    templatePath,
+    prepareDeploymentTemplate(Boolean(options['create-harness'])),
     '--region',
     options.region,
     ...(options.profile ? ['--profile', options.profile] : []),
@@ -40,12 +40,12 @@ try {
     `EnableSnapshotCapture=${options['enable-capture'] ? 'true' : 'false'}`,
     `CreateBuildRunner=${options['build-runner'] ? 'true' : 'false'}`,
     `EnableDispatcherLogin=${options['dispatcher-login'] ? 'true' : 'false'}`,
-    `AlertEmail=${options['alert-email'] || ''}`, 
     `EnvironmentName=${options.environment}`,
     `CreateAgentCoreHarness=${options['create-harness'] ? 'true' : 'false'}`,
     `CreateKnowledgeSourceBucket=${options['knowledge-source'] ? 'true' : 'false'}`,
     `AgentCoreHarnessQualifier=${options['harness-qualifier']}`,
   ]
+  if (options['alert-email']) parameters.push(`AlertEmail=${options['alert-email']}`)
   if (options['dispatcher-login']) {
     const siteUrl = options['site-url'] || readStackOutputs(options).SiteUrl
     if (!/^https:\/\/[a-zA-Z0-9.-]+$/.test(siteUrl || '')) throw new Error('Deploy the base stack first, or pass --site-url for Cognito callbacks.')

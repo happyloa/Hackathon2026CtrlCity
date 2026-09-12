@@ -106,6 +106,8 @@ export function createCaptureHandler(dependencies: CaptureDependencies = {}) {
   return async () => {
     const bucket = environmentValue('SITE_BUCKET')?.trim()
     if (!bucket) throw new Error('SITE_BUCKET is not configured')
+    const historyBucket = environmentValue('HISTORY_BUCKET')?.trim()
+    if (!historyBucket || historyBucket === bucket) throw new Error('HISTORY_BUCKET must be a separate private bucket')
 
     const observedAt = alignToBucket(now())
     const raw = await fetchFeed(fetchImpl)
@@ -119,7 +121,7 @@ export function createCaptureHandler(dependencies: CaptureDependencies = {}) {
 
     await Promise.all([
       s3.send(new PutObjectCommand({
-        Bucket: bucket, Key: rawKeyFor(observedAt), Body: gzipSync(rawBody),
+        Bucket: historyBucket, Key: rawKeyFor(observedAt), Body: gzipSync(rawBody),
         ContentType: 'application/json', ContentEncoding: 'gzip', CacheControl: 'private, max-age=0',
       })),
       s3.send(new PutObjectCommand({

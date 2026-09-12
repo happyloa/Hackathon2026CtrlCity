@@ -52,10 +52,12 @@ skills-lock.json
 
 # Local AWS tooling and validation output (never deployment source).
 /.scratch/aws-validation/
+/.scratch/aws-validation-tools/
 /.scratch/sam-cli/
 /.scratch/aws-*.log
 /.scratch/aws-*.json
 /.scratch/aws-*.zip
+/.scratch/aws-*.py
 /.scratch/implement-aws-stages.py
 /.playwright-cli/
 /output/playwright/

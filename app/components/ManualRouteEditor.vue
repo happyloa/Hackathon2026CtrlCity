@@ -74,7 +74,8 @@ function loadPercent(load: number, capacity: number) {
 
     <div v-if="cloud.remote" class="p-3 text-body1">
       <p role="status">{{ cloud.status.value || '正在載入雲端路線…' }}</p>
-      <button v-if="!cloud.accessToken.value" type="button" class="min-h-11 px-3 text-accent" @click="cloud.signIn">登入後可編輯</button>
+      <p v-if="!cloud.enabled">目前開放雲端唯讀，尚未啟用調度登入。</p>
+      <button v-if="cloud.enabled && !cloud.accessToken.value" type="button" class="min-h-11 px-3 text-accent" @click="cloud.signIn">登入後可編輯</button>
       <button type="button" class="min-h-11 px-3 text-accent" :disabled="cloud.pending.value" @click="cloud.reload">重新載入雲端路線</button>
       <button type="button" class="min-h-11 px-3 text-accent" :disabled="!cloud.canEdit.value || !cloud.dirty.value" @click="cloud.save">儲存到雲端</button>
       <button type="button" class="min-h-11 px-3 text-accent" :disabled="!cloud.canEdit.value" @click="cloud.restoreDraft">還原本分頁草稿</button>

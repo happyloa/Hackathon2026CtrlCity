@@ -1,3 +1,4 @@
+import { prepareDeploymentTemplate } from './aws-template.mjs'
 import {
   awsArgs,
   commandAvailable,
@@ -5,7 +6,6 @@ import {
   parseOptions,
   resolveRegion,
   run,
-  templatePath,
 } from './aws-cli-utils.mjs'
 
 try {
@@ -28,7 +28,7 @@ try {
     'validate',
     '--lint',
     '--template-file',
-    templatePath,
+    prepareDeploymentTemplate(Boolean(options['create-harness'])),
     '--region',
     region,
     ...(options.profile ? ['--profile', options.profile] : []),

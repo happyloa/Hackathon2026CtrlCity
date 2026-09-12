@@ -31,6 +31,7 @@ test('aligns to 5-minute buckets and partitions raw keys by Taipei date', () => 
 
 test('handler writes raw, latest and state objects', async () => {
   process.env.SITE_BUCKET = 'site'
+  process.env.HISTORY_BUCKET = 'history'
   const feed = [{ sno: '500201001', sna: 'YouBike2.0_下庄市場', sarea: '八里區', tot_quantity: '20', sbi_quantity: '0', bemp: '20', act: '1', lat: '25.1', lng: '121.4', mday: '20260912T090000' }]
   const puts = []
   const s3 = { send: async (command) => {
@@ -42,6 +43,8 @@ test('handler writes raw, latest and state objects', async () => {
   assert.equal(result.stations, 1)
   assert.deepEqual(puts.map(p => p.Key).sort(), ['raw/2026/09/12/0900.json.gz', 'snapshots/latest.json', 'state/persistence.json'])
   const raw = puts.find(p => p.Key.startsWith('raw/'))
+  assert.equal(raw.Bucket, 'history')
+  assert.ok(puts.filter(p => !p.Key.startsWith('raw/')).every(p => p.Bucket === 'site'))
   assert.deepEqual(JSON.parse(gunzipSync(raw.Body).toString()), feed)
   const state = JSON.parse(puts.find(p => p.Key === 'state/persistence.json').Body)
   assert.equal(state.stations['500201001'].currentState, 'empty_now')

@@ -155,8 +155,9 @@ function windowLabel(item: OperationalAdjustment) {
 
     <section v-if="cloud.remote" class="rounded-xl border border-line bg-panel p-4 sm:p-5">
       <p role="status" class="text-body1">{{ cloud.status.value || '正在讀取雲端資料…' }}</p>
-      <p v-if="!cloud.accessToken.value" class="text-body1">登入後可編輯</p>
-      <button v-if="!cloud.accessToken.value" class="min-h-11 px-3 text-body1 text-accent" @click="cloud.signIn">登入</button>
+      <p v-if="!cloud.enabled" class="text-body1">目前開放雲端唯讀，尚未啟用調度登入。</p>
+      <p v-else-if="!cloud.accessToken.value" class="text-body1">登入後可編輯</p>
+      <button v-if="cloud.enabled && !cloud.accessToken.value" class="min-h-11 px-3 text-body1 text-accent" @click="cloud.signIn">登入</button>
       <button v-else class="min-h-11 px-3 text-body1 text-accent" @click="cloud.signOut">登出</button>
       <button :disabled="!cloud.canEdit.value" class="min-h-11 px-3 text-body1 text-accent" @click="cloud.restoreDraft">還原本分頁草稿</button>
       <p v-if="cloud.authError.value" role="alert">{{ cloud.authError.value }}</p>

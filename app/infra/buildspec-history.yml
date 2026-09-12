@@ -14,7 +14,9 @@ phases:
     commands:
       - mkdir -p "$CTRL_CITY_DATASET_DIR"
       - aws s3 sync "s3://$RAW_DATA_BUCKET/dataset/" "$CTRL_CITY_DATASET_DIR/"
-      - if [ "$SNAPSHOT_CAPTURE_ENABLED" = "true" ]; then node scripts/raw-snapshots-to-csv.mjs --bucket "$SITE_BUCKET" --out "$CTRL_CITY_DATASET_DIR/captured-live.csv"; fi
+      # Never replace the full historical profile with only a few live captures.
+      - node -e 'const fs = require("node:fs"); if (!fs.readdirSync(process.env.CTRL_CITY_DATASET_DIR, { recursive:true }).some(p => p.endsWith(".csv"))) throw new Error("Upload the baseline historical CSV dataset before rebuilding")'
+      - if [ "$SNAPSHOT_CAPTURE_ENABLED" = "true" ]; then node scripts/raw-snapshots-to-csv.mjs --bucket "$HISTORY_BUCKET" --out "$CTRL_CITY_DATASET_DIR/captured-live.csv"; fi
       - node scripts/aws-prepare-history.mjs
   build:
     commands:

@@ -132,8 +132,9 @@ npm run aws:smoke -- --stack ctrlcity-hackathon --region us-west-2
 ### 快照與歷史重建
 
 - 每 5 分鐘擷取。超過 15 分鐘空窗會重設持續時間；checkpoint 最後寫入，重試可補齊 raw/latest。
-- raw 依台北日期分資料夾，內容時間維持 UTC／官方時間；CloudFront 明確禁止讀 raw。
-- raw 30 天後轉 Glacier Instant Retrieval、180 天到期；不永久保留。
+- raw 依台北日期分資料夾，寫入獨立私有 `HistoryDataBucket`；不作為 CloudFront 來源。capture 只有此 bucket 的 `raw/*` 寫入權，CodeBuild 只有讀取權。
+- 歷史 bucket 設定 raw 30 天後轉 Glacier Instant Retrieval、180 天到期。S3 預設小於 128 KB 的物件不轉儲存類別，仍會到期；目前壓縮快照約 105 KB。參考 [AWS Lifecycle 說明](https://docs.aws.amazon.com/AmazonS3/latest/userguide/lifecycle-transition-general-considerations.html)。
+- 舊 site bucket 的 raw 拒絕公開政策、發布排除與生命週期暫時保留，保護尚未刪除的遷移來源；新快照不再寫入 site bucket 的 raw。
 - `/snapshots/*` 與 `/state/*` 使用 60 秒快取（上限 120 秒）。過期持續時間不使用。
 - `aws:publish` 與 CodeBuild 共用發布程式，保留 raw、snapshots、state、三份 operator JSON 及舊 `_nuxt` 資源。
 - 首次啟用登入時以 `IfNoneMatch: *` 初始化排除窗，已存在的雲端版本不會被覆蓋。
@@ -143,10 +144,18 @@ npm run aws:smoke -- --stack ctrlcity-hackathon --region us-west-2
 npm run aws:rebuild -- --stack ctrlcity-hackathon --region us-west-2
 ```
 
-CodeBuild 使用 Node 24、12 GB heap，先讀私有 `dataset/` 與每半小時一筆 raw 快照，再讀雲端排除窗、執行原有資料管線、測試、型別檢查，成功後才發布。來源 zip 每次使用唯一 key，最多一個建置同時執行。產物備份於 raw bucket 的 `artifacts/<UTC時間>/`。
+CodeBuild 使用 Node 24、12 GB heap，先讀 `RawDataBucket/dataset/` 的 CSV 與 `HistoryDataBucket/raw/` 每半小時一筆快照，再讀雲端排除窗、執行原有資料管線、測試、型別檢查，成功後才發布。來源 zip 每次使用唯一 key，最多一個建置同時執行。產物備份於 `RawDataBucket/artifacts/<UTC時間>/`。歷史重建不重新訓練 XGBoost，也不覆寫或刪除另行上傳的 `data/xgboost/model-*.json`。
 CodeBuild 設定 `CTRL_CITY_ROLLING_HISTORY=true`，描述性 ROI 剖面的全期範圍延伸至台北當天；本地預設仍固定一至六月。訓練期一至四月不變，避免污染凍結評估。CSV 轉換會去除官方 YouBike 名稱前綴，使新快照與主辦方 CSV 使用相同站點 ID。
 
-主辦方原始 CSV 的上雲需另確認資料條款；程式不自動上傳 `docs/資料集`。可先僅使用累積的官方快照。若快照不足以產生有效剖面，建置會失敗並保留既有線上版本；先累積足夠觀測資料後再重建。
+本次使用者指定的歷史來源為 `ml/data/_normalized_csv`，共 12 個 UTF-8 CSV，涵蓋 2026 年 1–6 月；使用 `CTRL_CITY_DATASET_DIR` 接入現有管線。本機預設來源仍為 `docs/資料集`，可指定環境變數切換。重建前必須先上傳基礎 CSV；沒有 CSV 時建置會停止，避免用少量即時快照取代完整歷史剖面。
+
+```powershell
+$datasetBucket = aws cloudformation describe-stacks --stack-name ctrlcity-hackathon --region us-west-2 --query 'Stacks[0].Outputs[?OutputKey==`RawDataBucketName`].OutputValue | [0]' --output text
+# 從 repo 根目錄執行，只上傳 CSV，不刪除雲端資料。
+aws s3 sync ml/data/_normalized_csv "s3://$datasetBucket/dataset/" --exclude '*' --include '*.csv' --region us-west-2
+```
+
+雲端重建的 `dashboard.json` 與 ROI 是執行時產物；repo 內的檔案仍是本機開發快照，不會自動被雲端回寫。
 
 ### 調度登入與資料編輯
 
@@ -155,7 +164,8 @@ CodeBuild 設定 `CTRL_CITY_ROLLING_HISTORY=true`，描述性 ROI 剖面的全�
 - 編輯後按「儲存到雲端」。失敗時保留本分頁草稿；412 會鎖住儲存，須重新載入最新版本再編輯。草稿不會自動覆蓋 S3。
 - 排除窗使用歷史管線的站點 ID；品質旗標的「登記排除窗」會依站名與行政區對應。
 - 活動格式：`{schemaVersion:'1.0', events:[{id,name,stationIds,startAt,endAt,note}]}`，起訖為台北 `YYYY-MM-DDTHH:mm`。目前活動為管理紀錄，未加入額外模型修正。
-- PUT 限制 64 KB、完整檔案驗證、access token claims 與 IfMatch／IfNoneMatch；未啟用登入回 503，啟用後匿名寫入由 API Gateway 回 401。
+- PUT 限制 64 KB、完整檔案驗證、access token claims 與 IfMatch／IfNoneMatch；未啟用登入不建立 PUT 路由（404），啟用後匿名寫入由 API Gateway 回 401。公開 GET 不依賴登入是否啟用。
+- 營運 GET／PUT 與 SAM 路由共用 `OperationsApi.DefinitionBody`，避免 API 更新時覆蓋獨立 Route 資源。瀏覽器用戶端將原生 fetch 綁定 globalThis，避免 `Illegal invocation`。
 - 儲存排除窗後執行 `aws:rebuild`，才會讓歷史統計與預測基線套用新排除窗。
 
 建立帳號範例（暫時密碼由管理員安全提供，請勿放入 git）：
@@ -168,6 +178,8 @@ GitHub OIDC 部署 role 需套用更新後的 `infra/github-deploy-policy.json`�
 
 ### 不部署的本地驗證
 
-`npm test` 驗證 Lambda、S3 版本衝突、CSV 相容性與 AWS storage guard；`npm run typecheck`、`sam validate --lint -t infra/template.yaml --region us-west-2`、`sam build` 驗證程式與模板。Lambda 的 SAM build 須設定 `npm_config_ignore_scripts=true`，避免 production dependencies 安裝誤執行 Nuxt postinstall。
+`npm test` 驗證 Lambda、S3 版本衝突、CSV 相容性與 AWS storage guard；`npm run typecheck` 驗證型別。`aws:preflight` 與 `aws:deploy` 先由 `aws-template.mjs` 產生 `.aws-sam/source/template.json`，未要求建立 Harness 時移除選配資源，再執行 SAM lint；避免 us-west-2 對未支援資源類型的檢查阻擋歷史功能部署。Lambda 的 SAM build 設定 `npm_config_ignore_scripts=true`，避免 production dependencies 安裝誤執行 Nuxt postinstall。
+
+`tests/browser/aws-live-storage-check.js` 是正式網站唯讀驗證：封鎖 localStorage 後，確認首頁與三種營運文件均取得雲端 JSON。CI 仍只更新程式與前端，新增歷史基礎設施須先執行 `aws:deploy`；CI 現在會先檢查 `HistoryDataBucketName`，缺少時停止，避免發布不能運作的 capture 程式。
 
 `tests/browser/aws-storage-check.js` 是 Playwright CLI 腳本：對本地 AWS 設定的靜態站（`http://127.0.0.1:4174`）模擬 OIDC/API/快照，將 `window.localStorage` 的 getter 設為立即拋錯，驗證匿名唯讀、PKCE callback、排除窗／活動／路線儲存、412 衝突、跨分頁讀取與過期回退。這是模擬整合驗證，不能代替實際 AWS 部署後的 smoke 與登入測試。

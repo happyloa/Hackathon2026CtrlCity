@@ -39,7 +39,7 @@ try {
       const data = await expectJson(`${baseUrl}/api/v1/${resource}`, { expectedStatus: 200 })
       const field = resource === 'manual-routes' ? 'routes' : resource
       if (!Array.isArray(data[field])) throw new Error(`Invalid ${resource} envelope.`)
-      await expectResponse(`${baseUrl}/api/v1/${resource}`, outputs.DispatcherLoginEnabled === 'true' ? 401 : 503, 'anonymous write guard', {
+      await expectResponse(`${baseUrl}/api/v1/${resource}`, outputs.DispatcherLoginEnabled === 'true' ? 401 : 404, 'anonymous write guard', {
         method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ [field]: [] }),
       })
     }
