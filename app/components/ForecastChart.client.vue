@@ -115,7 +115,7 @@ const chartDescription = computed(() => {
         <text
           v-for="tick in chart.yTicks"
           :key="`y-label-${tick.value}`"
-          class="fill-muted text-base"
+          class="fill-muted text-body1"
           :x="dimensions.left - 7"
           :y="tick.y + 4"
           text-anchor="end"
@@ -131,7 +131,7 @@ const chartDescription = computed(() => {
         <text
           v-for="item in chart.xLabels"
           :key="`x-label-${item.index}`"
-          class="fill-muted text-base"
+          class="fill-muted text-body1"
           :x="chart.x(item.index)"
           :y="dimensions.height - 9"
           text-anchor="middle"
@@ -178,7 +178,7 @@ const chartDescription = computed(() => {
     </svg>
     </div>
 
-    <figcaption class="flex flex-wrap gap-x-3 gap-y-1 text-base leading-5 text-muted">
+    <figcaption class="flex flex-wrap gap-x-3 gap-y-1 text-body1 leading-5 text-muted">
       <span class="inline-flex items-center gap-1"><i class="inline-block w-3.5 border-t-2 border-accent" />可借車</span>
       <span class="inline-flex items-center gap-1"><i class="inline-block w-3.5 border-t-2 border-warning" />可還位</span>
       <span v-if="chart.projected.length" class="inline-flex items-center gap-1"><i class="inline-block w-3.5 border-t-2 border-dashed border-muted" />基線推估</span>

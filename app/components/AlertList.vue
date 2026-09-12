@@ -28,7 +28,7 @@ const visibleAlerts = computed(() => props.compact
   ? props.alerts.slice(0, props.maxItems || 3)
   : props.alerts.slice(0, visibleCount.value))
 const remainingCount = computed(() => Math.max(0, props.alerts.length - visibleAlerts.value.length))
-const allAlertsTarget = computed(() => ({ path: '/stations', query: props.contextQuery || {} }))
+const allAlertsTarget = computed(() => ({ path: '/alerts', query: props.contextQuery || {} }))
 const sectionTitle = computed(() => props.title || (props.kind === 'service' ? '服務異常' : '需注意站點'))
 
 watch(() => props.alerts, () => { visibleCount.value = props.pageSize })
@@ -88,10 +88,10 @@ function scorePartsLabel(alert: Alert) {
   <section :class="embedded ? 'overflow-hidden border-0 bg-transparent shadow-none' : 'panel overflow-hidden'">
     <div v-if="!embedded" class="flex flex-col gap-3 border-b border-line p-4 sm:flex-row sm:items-start sm:justify-between">
       <div>
-        <p class="section-kicker text-base"><component :is="kind === 'service' ? Settings : BellRing" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" /> {{ kind === 'service' ? '營運狀態' : '需注意站點' }}</p>
-        <h2 class="m-0 mt-1 text-xl font-bold tracking-tight text-ink">{{ sectionTitle }}</h2>
+        <p class="section-kicker"><component :is="kind === 'service' ? Settings : BellRing" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" /> {{ kind === 'service' ? '營運狀態' : '需注意站點' }}</p>
+        <h2 class="m-0 mt-1 text-h6 font-bold tracking-tight text-ink">{{ sectionTitle }}</h2>
       </div>
-      <NuxtLink v-if="compact" :to="allAlertsTarget" class="text-link min-h-11 text-base">查看全部 <ArrowUpRight style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" /></NuxtLink>
+      <NuxtLink v-if="compact" :to="allAlertsTarget" class="text-link min-h-11 text-body1">查看全部 <ArrowUpRight style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" /></NuxtLink>
     </div>
 
     <template v-if="visibleAlerts.length">
@@ -102,28 +102,28 @@ function scorePartsLabel(alert: Alert) {
           class="flex flex-wrap items-start gap-3 border-l-4 px-4 py-3"
           :class="kind === 'service' ? 'border-l-line-strong bg-panel-muted' : inventoryRowClasses(alert.priorityScore)"
         >
-          <span class="grid size-10 shrink-0 place-items-center rounded-full bg-panel text-lg" :class="kind === 'service' ? 'text-muted' : priorityClasses(alert.priorityScore)">
+          <span class="grid size-10 shrink-0 place-items-center rounded-full bg-panel text-h6" :class="kind === 'service' ? 'text-muted' : priorityClasses(alert.priorityScore)">
             <component :is="kind === 'service' ? Settings : inventoryIcon(alert.priorityScore)" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />
           </span>
-          <button type="button" class="min-w-0 flex-1 text-left text-base leading-6 text-ink hover:underline" @click="emit('select', alert.stationId)">
+          <button type="button" class="min-w-0 flex-1 text-left text-body1 leading-6 text-ink hover:underline" @click="emit('select', alert.stationId)">
             <strong class="block break-words font-bold">{{ stationNameFor(alert) }}</strong>
             <span class="mt-1 block text-muted">{{ conditionLabel(alert) }} · {{ stationFor(alert)?.district || '行政區未標示' }}</span>
-            <small v-if="kind === 'inventory'" class="mt-1 block text-base leading-6 text-muted">{{ scorePartsLabel(alert) }}</small>
-            <small v-else class="mt-1 block text-base leading-6 text-muted">服務異常，不排入搬運路線。</small>
+            <small v-if="kind === 'inventory'" class="mt-1 block text-body1 leading-6 text-muted">{{ scorePartsLabel(alert) }}</small>
+            <small v-else class="mt-1 block text-body1 leading-6 text-muted">服務異常，不排入搬運路線。</small>
           </button>
-          <div v-if="kind === 'inventory'" class="ml-auto flex w-full items-center justify-between gap-2 text-base sm:w-auto sm:flex-col sm:items-end">
+          <div v-if="kind === 'inventory'" class="ml-auto flex w-full items-center justify-between gap-2 text-body1 sm:w-auto sm:flex-col sm:items-end">
             <span class="rounded-md border bg-panel px-2 py-1 font-bold" :class="priorityClasses(alert.priorityScore)">{{ priorityLabel(alert.priorityScore) }}</span>
-            <strong class="font-mono text-lg text-ink">{{ Math.round(alert.priorityScore) }} 分</strong>
+            <strong class="font-mono text-h6 text-ink">{{ Math.round(alert.priorityScore) }} 分</strong>
           </div>
-          <span v-else class="ml-auto rounded-md border border-line-strong bg-panel px-2 py-1 text-base font-bold text-muted">不排路線</span>
+          <span v-else class="ml-auto rounded-md border border-line-strong bg-panel px-2 py-1 text-body1 font-bold text-muted">不排路線</span>
         </article>
       </div>
       <div v-if="!compact && remainingCount" class="border-t border-line p-3 text-center">
-        <button type="button" class="min-h-11 rounded-md border border-line-strong bg-panel px-4 text-base font-bold text-accent transition-colors hover:bg-panel-muted hover:text-accent-strong" @click="visibleCount += pageSize">顯示更多（尚有 {{ remainingCount }} 站）</button>
+        <button type="button" class="min-h-11 rounded-md border border-line-strong bg-panel px-4 text-body1 font-bold text-accent transition-colors hover:bg-panel-muted hover:text-accent-strong" @click="visibleCount += pageSize">顯示更多（尚有 {{ remainingCount }} 站）</button>
       </div>
     </template>
-    <div v-else class="flex min-h-24 items-center justify-center gap-2 p-4 text-center text-base font-semibold text-positive">
-      <CheckCircle2 class="text-lg" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />
+    <div v-else class="flex min-h-24 items-center justify-center gap-2 p-4 text-center text-body1 font-semibold text-positive">
+      <CheckCircle2 class="icon-md" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />
       <span>{{ emptyMessage }}</span>
     </div>
   </section>

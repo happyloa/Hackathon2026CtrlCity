@@ -38,16 +38,16 @@ const dispatchTarget = computed(() => ({ path: '/dispatch', query: props.context
 <style scoped>
 .route-workspace { overflow: hidden; }
 .route-workspace-heading { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 16px 20px; border-bottom: 1px solid var(--line); }
-.route-workspace-heading p { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; margin-bottom: 5px; }
-.route-workspace-heading p svg { font-size: 16px; color: var(--accent); }
-.route-workspace-heading h2 { font-size: 19px; font-weight: 650; letter-spacing: -.025em; }
-.route-workspace-heading .route-count { font-size: 12px; white-space: nowrap; color: var(--muted); padding-top: 3px; margin-bottom: 0; }
-.route-count b { color: var(--accent); font-size: 15px; font-variant-numeric: tabular-nums; }
+.route-workspace-heading p { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: var(--type-body2); margin-bottom: 5px; }
+.route-workspace-heading p svg { font-size: var(--icon-sm); color: var(--accent); }
+.route-workspace-heading h2 { font-size: var(--type-h6); font-weight: 650; letter-spacing: -.025em; }
+.route-workspace-heading .route-count { font-size: var(--type-body2); white-space: nowrap; color: var(--muted); padding-top: 3px; margin-bottom: 0; }
+.route-count b { color: var(--accent); font-size: var(--type-body1); font-variant-numeric: tabular-nums; }
 .route-primary-action { padding: 0 20px 18px; display: grid; gap: 7px; text-align: center; }
 .route-primary-action .ops-button { min-height: 46px; }
 .route-primary-action .ops-button svg:last-child { margin-left: auto; }
 .route-primary-action .ops-button svg:first-child { margin-right: auto; }
-.route-primary-action > span { font-size: 12px; color: var(--muted); }
-.service-exclusion { display: flex; align-items: center; gap: 7px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; padding: 12px 20px; }
-.service-exclusion svg { color: var(--warning); font-size: 16px; }
+.route-primary-action > span { font-size: var(--type-body2); color: var(--muted); }
+.service-exclusion { display: flex; align-items: center; gap: 7px; border-top: 1px solid var(--line); color: var(--muted); font-size: var(--type-body2); padding: 12px 20px; }
+.service-exclusion svg { color: var(--warning); font-size: var(--icon-sm); }
 </style>

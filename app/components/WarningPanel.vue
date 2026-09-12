@@ -71,7 +71,7 @@ const hasWarnings = computed(() => countsByHorizon.value['30'] > 0 || countsByHo
       <p class="warning-context">各時點分別預測，站點可能重疊；目前空站另列於上方營運摘要。</p>
       <div class="flex flex-wrap gap-2 px-4 pb-3 pt-1" role="group" aria-label="缺車預警時間">
         <button v-for="tab in TABS" :key="tab.key" type="button" :aria-pressed="activeHorizon === tab.key"
-          class="min-h-9 rounded-md border px-3 text-base font-semibold transition-colors" :class="activeHorizon === tab.key
+          class="min-h-9 rounded-md border px-3 text-body1 font-semibold transition-colors" :class="activeHorizon === tab.key
             ? 'border-accent-strong bg-accent text-on-accent'
             : 'border-line bg-panel-muted text-muted hover:border-accent-strong'" @click="activeHorizon = tab.key">
           {{ tab.label }}（{{ forecastAvailable[tab.key] ? countsByHorizon[tab.key] : '—' }}）
@@ -82,21 +82,21 @@ const hasWarnings = computed(() => countsByHorizon.value['30'] > 0 || countsByHo
         <button v-for="item in activeWarnings" :key="item.station.id" type="button"
           class="flex w-full flex-wrap items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-panel-muted"
           @click="emit('select', item.station.id)">
-          <span class="grid size-10 shrink-0 place-items-center rounded-full bg-warning-surface text-lg text-warning">
+          <span class="grid size-10 shrink-0 place-items-center rounded-full bg-warning-surface text-h6 text-warning">
             <TriangleAlert style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />
           </span>
-          <span class="min-w-0 flex-1 text-base leading-6 text-ink">
+          <span class="min-w-0 flex-1 text-body1 leading-6 text-ink">
             <strong class="block break-words font-bold">{{ displayStationName(item.station.name) }}</strong>
             <span class="mt-1 block text-muted">{{ item.station.district || '行政區未標示' }}</span>
           </span>
-          <span class="ml-auto flex w-full items-center justify-between gap-2 text-base sm:w-auto sm:flex-col sm:items-end">
+          <span class="ml-auto flex w-full items-center justify-between gap-2 text-body1 sm:w-auto sm:flex-col sm:items-end">
             <span class="text-muted">預估可借車 <strong class="font-mono text-ink">{{ item.predictedBikesDisplay }}</strong> 台</span>
             <span class="text-muted">建議補 <strong class="font-mono text-ink">{{ item.refillBikes }}</strong> 台</span>
           </span>
         </button>
       </div>
-      <div v-else class="flex min-h-24 items-center justify-center gap-2 border-t border-line p-4 text-center text-base font-semibold text-positive">
-        <component class="text-lg" :is="forecastAvailable[activeHorizon] ? CheckCircle2 : Info" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />{{ forecastAvailable[activeHorizon] ? '這個時點已對照的站點，沒有預測缺車情形。' : '這個時點沒有可用預測，請先查看即時站況。' }}
+      <div v-else class="flex min-h-24 items-center justify-center gap-2 border-t border-line p-4 text-center text-body1 font-semibold text-positive">
+        <component class="icon-md" :is="forecastAvailable[activeHorizon] ? CheckCircle2 : Info" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />{{ forecastAvailable[activeHorizon] ? '這個時點已對照的站點，沒有預測缺車情形。' : '這個時點沒有可用預測，請先查看即時站況。' }}
       </div>
     </div>
   </section>
@@ -109,20 +109,20 @@ const hasWarnings = computed(() => countsByHorizon.value['30'] > 0 || countsByHo
 .forecast-unavailable .warning-symbol { color: var(--muted); background: var(--panel-muted); }
 .warning-trigger { display: flex; align-items: center; gap: 14px; padding: 11px 16px; width: 100%; text-align: left; }
 .warning-trigger:hover { background: color-mix(in srgb, var(--warning) 4%, transparent); }
-.warning-symbol { display: grid; place-items: center; width: 36px; height: 36px; flex-shrink: 0; border-radius: 8px; color: var(--positive); background: var(--positive-surface); font-size: 21px; }
+.warning-symbol { display: grid; place-items: center; width: 36px; height: 36px; flex-shrink: 0; border-radius: 8px; color: var(--positive); background: var(--positive-surface); font-size: var(--icon-md); }
 .has-warnings .warning-symbol { color: var(--warning); background: color-mix(in srgb, var(--warning) 12%, transparent); }
-.warning-heading { font-size: 15px; font-weight: 650; }
-.warning-heading small { display: block; font-size: 12px; font-weight: 400; color: var(--muted); margin-top: 2px; }
-.warning-figures { display: flex; flex-wrap: wrap; gap: 10px 24px; margin-left: 18px; color: var(--muted); font-size: 14px; }
+.warning-heading { font-size: var(--type-body1); font-weight: 650; }
+.warning-heading small { display: block; font-size: var(--type-body2); font-weight: 400; color: var(--muted); margin-top: 2px; }
+.warning-figures { display: flex; flex-wrap: wrap; gap: 10px 24px; margin-left: 18px; color: var(--muted); font-size: var(--type-body2); }
 .warning-figures > span { white-space: nowrap; }
 .warning-figures b { font-weight: 500; }
-.warning-figures strong { margin-left: 9px; font-size: 21px; color: var(--ink); font-weight: 650; font-variant-numeric: tabular-nums; }
+.warning-figures strong { margin-left: 9px; font-size: var(--type-h6); color: var(--ink); font-weight: 650; font-variant-numeric: tabular-nums; }
 .has-warnings .warning-figures strong { color: var(--warning); }
-.warning-action { display: inline-flex; align-items: center; justify-content: end; gap: 9px; margin-left: auto; font-size: 14px; font-weight: 550; white-space: nowrap; }
+.warning-action { display: inline-flex; align-items: center; justify-content: end; gap: 9px; margin-left: auto; font-size: var(--type-body2); font-weight: 550; white-space: nowrap; }
 .warning-action svg { transition: transform .15s; }
 .is-expanded { transform: rotate(180deg); }
 .warning-content { background: var(--panel); border-top: 1px solid var(--line); }
 .warning-content > .divide-y { max-height: 380px; overflow-y: auto; }
-.warning-context { padding: 14px 16px 10px; font-size: 13px; color: var(--muted); }
-@media (max-width: 640px) { .warning-trigger { padding: 14px; gap: 10px; flex-wrap: wrap; } .warning-symbol { width: 32px; height: 32px; } .warning-heading small { display: none; } .warning-heading { font-size: 14px; } .warning-figures { order: 4; width: 100%; margin-left: 42px; gap: 12px; } .warning-figures strong { margin-left: 3px; } .warning-action { font-size: 13px; } }
+.warning-context { padding: 14px 16px 10px; font-size: var(--type-body2); color: var(--muted); }
+@media (max-width: 640px) { .warning-trigger { padding: 14px; gap: 10px; flex-wrap: wrap; } .warning-symbol { width: 32px; height: 32px; } .warning-heading small { display: none; } .warning-heading { font-size: var(--type-body2); } .warning-figures { order: 4; width: 100%; margin-left: 42px; gap: 12px; } .warning-figures strong { margin-left: 3px; } }
 </style>

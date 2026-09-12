@@ -150,21 +150,21 @@ onMounted(() => { void revealSelectedStop() })
 }
 .flow-header { flex-shrink: 0; padding: 20px 20px 17px; border-bottom: 1px solid var(--line); }
 .flow-title-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.flow-eyebrow { display: flex; align-items: center; gap: 6px; margin: 0 0 5px; color: var(--muted); font-size: 12px; }
-.flow-title-row h2 { margin: 0; font-size: 22px; line-height: 1.25; font-weight: 650; letter-spacing: -.025em; }
-.flow-priority { display: grid; justify-items: end; gap: 3px; color: var(--muted); font-size: 11px; }
-.flow-priority strong { color: var(--ink); font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.flow-eyebrow { display: flex; align-items: center; gap: 6px; margin: 0 0 5px; color: var(--muted); font-size: var(--type-body2); }
+.flow-title-row h2 { margin: 0; font-size: var(--type-h6); line-height: 1.25; font-weight: 650; letter-spacing: -.025em; }
+.flow-priority { display: grid; justify-items: end; gap: 3px; color: var(--muted); font-size: var(--type-body2); }
+.flow-priority strong { color: var(--ink); font-size: var(--type-body1); font-weight: 600; font-variant-numeric: tabular-nums; }
 .flow-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 18px 0 15px; }
 .flow-metrics > div + div { border-left: 1px solid var(--line); padding-left: 14px; }
-.flow-metrics dt { color: var(--muted); font-size: 11px; margin-bottom: 4px; }
-.flow-metrics dd { margin: 0; font-size: clamp(21px, 2vw, 26px); line-height: 1.2; font-weight: 600; font-variant-numeric: tabular-nums; }
-.flow-metrics dd small { margin-left: 4px; color: var(--muted); font-size: 11px; font-weight: 400; }
-.flow-capacity p { display: flex; justify-content: space-between; gap: 12px; margin: 0 0 6px; color: var(--muted); font-size: 11px; }
+.flow-metrics dt { color: var(--muted); font-size: var(--type-body2); margin-bottom: 4px; }
+.flow-metrics dd { margin: 0; font-size: var(--type-h5); line-height: 1.2; font-weight: 600; font-variant-numeric: tabular-nums; }
+.flow-metrics dd small { margin-left: 4px; color: var(--muted); font-size: var(--type-body2); font-weight: 400; }
+.flow-capacity p { display: flex; justify-content: space-between; gap: 12px; margin: 0 0 6px; color: var(--muted); font-size: var(--type-body2); }
 .flow-capacity strong { color: var(--ink); font-weight: 550; font-variant-numeric: tabular-nums; }
 .flow-capacity strong span { color: var(--muted); font-weight: 400; }
 .flow-capacity-track { height: 5px; border-radius: 10px; background: var(--panel-muted); overflow: hidden; }
 .flow-capacity-track > span { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
-.flow-instruction { display: flex; align-items: center; gap: 6px; flex-shrink: 0; padding: 11px 20px 0; color: var(--muted); font-size: 11px; }
+.flow-instruction { display: flex; align-items: center; gap: 6px; flex-shrink: 0; padding: 11px 20px 0; color: var(--muted); font-size: var(--type-body2); }
 .flow-scroll { min-height: 0; flex: 1; overflow-y: auto; overscroll-behavior-y: contain; padding: 15px 16px 18px; scrollbar-gutter: stable; }
 .flow-stops { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
 .flow-stop { --stop-color: var(--dispatch-mixed, var(--warning)); display: grid; position: relative; grid-template-columns: 42px minmax(0, 1fr); align-items: start; gap: 10px; min-width: 0; }
@@ -173,31 +173,31 @@ onMounted(() => { void revealSelectedStop() })
 .flow-stop:not(:last-child)::before { position: absolute; content: ''; width: 2px; top: 40px; bottom: -19px; left: 18px; background: color-mix(in srgb, var(--stop-color) 35%, var(--line)); }
 .flow-marker { z-index: 1; display: block; width: 42px; height: 42px; margin-top: 6px; filter: drop-shadow(0 1px 1px rgb(0 0 0 / 60%)); }
 .map-route-stop-pin { display: block; width: 38px; height: 38px; }
-.map-route-stop-number { z-index: 1; top: 7px; left: calc(50% - 2px); width: 16px; height: 16px; transform: translateX(-50%); font-size: 10px; line-height: 1; white-space: nowrap; }
+.map-route-stop-number { z-index: 1; top: 7px; left: calc(50% - 2px); width: 16px; height: 16px; transform: translateX(-50%); font-size: var(--marker-label); line-height: 1; white-space: nowrap; }
 .flow-stop-card { min-width: 0; border: 1px solid var(--line); border-radius: 9px; background: color-mix(in srgb, var(--panel-muted) 17%, var(--panel)); overflow: hidden; }
 .flow-stop.is-selected .flow-stop-card { border-color: var(--stop-color); box-shadow: inset 3px 0 0 var(--stop-color); background: color-mix(in srgb, var(--stop-color) 6%, var(--panel)); }
 .flow-stop-select { display: block; width: 100%; min-height: 44px; padding: 12px; border: 0; text-align: left; background: transparent; color: inherit; cursor: pointer; }
 .flow-stop-select:hover { background: color-mix(in srgb, var(--stop-color) 7%, transparent); }
 .flow-stop-topline { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 6px; }
-.flow-action { display: inline-flex; align-items: center; gap: 5px; color: var(--stop-color); font-size: 11px; font-weight: 600; }
-.flow-endpoint { color: var(--muted); font-size: 10px; border-left: 1px solid var(--line); padding-left: 6px; }
-.flow-selected-label { margin-left: auto; color: var(--muted); font-size: 10px; }
-.flow-station-name { display: block; font-size: 14px; line-height: 1.5; font-weight: 600; overflow-wrap: anywhere; }
-.flow-station-context { display: block; color: var(--muted); font-size: 11px; line-height: 1.6; margin-top: 2px; }
+.flow-action { display: inline-flex; align-items: center; gap: 5px; color: var(--stop-color); font-size: var(--type-body2); font-weight: 600; }
+.flow-endpoint { color: var(--muted); font-size: var(--type-body2); border-left: 1px solid var(--line); padding-left: 6px; }
+.flow-selected-label { margin-left: auto; color: var(--muted); font-size: var(--type-body2); }
+.flow-station-name { display: block; font-size: var(--type-body2); line-height: 1.5; font-weight: 600; overflow-wrap: anywhere; }
+.flow-station-context { display: block; color: var(--muted); font-size: var(--type-body2); line-height: 1.6; margin-top: 2px; }
 .flow-stop-bottomline { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; margin-top: 10px; }
-.flow-quantities { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 11px; }
+.flow-quantities { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: var(--type-body2); }
 .flow-quantities > span { display: inline-flex; gap: 3px; align-items: baseline; padding: 3px 6px; border: 1px solid color-mix(in srgb, currentColor 18%, transparent); border-radius: 4px; background: color-mix(in srgb, currentColor 7%, transparent); }
 .flow-quantity-pickup { color: var(--dispatch-pickup, var(--accent)); }
 .flow-quantity-dropoff { color: var(--dispatch-dropoff, var(--danger)); }
-.flow-quantities b { font-size: 13px; font-weight: 650; font-variant-numeric: tabular-nums; }
-.flow-load { color: var(--muted); font-size: 10px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.flow-quantities b { font-size: var(--type-body2); font-weight: 650; font-variant-numeric: tabular-nums; }
+.flow-load { color: var(--muted); font-size: var(--type-body2); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .flow-load b { color: var(--ink); font-weight: 600; }
 .flow-stop-load-track { display: block; height: 3px; overflow: hidden; margin-top: 7px; border-radius: 6px; background: var(--panel-muted); }
 .flow-stop-load-track > span { display: block; height: 100%; background: color-mix(in srgb, var(--stop-color) 62%, transparent); border-radius: inherit; }
-.flow-inspect { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; min-height: 44px; padding: 8px 12px; border: 0; border-top: 1px solid color-mix(in srgb, var(--stop-color) 22%, var(--line)); color: var(--muted); background: transparent; font-size: 12px; font-weight: 500; cursor: pointer; }
+.flow-inspect { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; min-height: 44px; padding: 8px 12px; border: 0; border-top: 1px solid color-mix(in srgb, var(--stop-color) 22%, var(--line)); color: var(--muted); background: transparent; font-size: var(--type-body2); font-weight: 500; cursor: pointer; }
 .flow-inspect > svg:last-child { margin-left: auto; }
 .flow-inspect:hover { color: var(--ink); background: var(--panel-muted); }
-.flow-footer { display: flex; flex-shrink: 0; flex-wrap: wrap; justify-content: space-between; gap: 6px; padding: 11px 20px; border-top: 1px solid var(--line); color: var(--muted); font-size: 10px; }
+.flow-footer { display: flex; flex-shrink: 0; flex-wrap: wrap; justify-content: space-between; gap: 6px; padding: 11px 20px; border-top: 1px solid var(--line); color: var(--muted); font-size: var(--type-body2); }
 .flow-stop-select:focus-visible, .flow-inspect:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; border-radius: 6px; }
 .flow-scroll:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
 @media (max-width: 1100px) {

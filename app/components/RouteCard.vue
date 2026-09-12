@@ -57,13 +57,13 @@ function stopPinColor(stop: DispatchRoutePlan['stops'][number]) {
     <template v-else>
     <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div class="min-w-0">
-        <span class="inline-flex items-center gap-2 text-base font-bold text-accent">
+        <span class="inline-flex items-center gap-2 text-body1 font-bold text-accent">
           <Route :size="18" :stroke-width="2" aria-hidden="true" /> 路線 {{ index + 1 }}
         </span>
-        <h3 class="m-0 mt-1 text-lg font-bold text-ink">{{ route.stops.length }} 站 · 搬運 {{ route.totalTransferBikes }} 台
+        <h3 class="m-0 mt-1 text-h6 font-bold text-ink">{{ route.stops.length }} 站 · 搬運 {{ route.totalTransferBikes }} 台
         </h3>
       </div>
-      <div class="flex flex-wrap gap-2 text-base text-muted sm:justify-end">
+      <div class="flex flex-wrap gap-2 text-body1 text-muted sm:justify-end">
         <span class="rounded-md border border-line bg-panel-muted px-2 py-1">約 {{ route.totalDistanceKm.toFixed(1) }}
           km</span>
         <span class="rounded-md border border-line bg-panel-muted px-2 py-1">載量 {{ route.peakVehicleLoad }}/{{
@@ -106,7 +106,7 @@ function stopPinColor(stop: DispatchRoutePlan['stops'][number]) {
           <span class="route-list-stop-number absolute grid place-items-center rounded-full font-mono font-bold text-black"
             :style="{ backgroundColor: stopPinColor(stop) }">{{ stop.sequence }}</span>
         </span>
-        <button type="button" class="route-stop-button min-w-0 flex-1 text-left text-base leading-6 hover:underline"
+        <button type="button" class="route-stop-button min-w-0 flex-1 text-left text-body1 leading-6 hover:underline"
           :aria-label="`查看第 ${stop.sequence} 站 ${stop.stationName} 詳情`"
           @click="emit('select', stop.stationId)">
           <strong class="block break-words text-ink">{{ stop.stationName }}</strong>
@@ -114,7 +114,7 @@ function stopPinColor(stop: DispatchRoutePlan['stops'][number]) {
             stop.distanceFromPreviousKm.toFixed(1) }} km</template></span>
         </button>
         <div
-          class="flex w-full items-center justify-between gap-2 pl-11 text-base sm:w-auto sm:shrink-0 sm:flex-col sm:items-end sm:pl-0 sm:text-right">
+          class="flex w-full items-center justify-between gap-2 pl-11 text-body1 sm:w-auto sm:shrink-0 sm:flex-col sm:items-end sm:pl-0 sm:text-right">
           <span class="inline-flex items-center gap-2">
             <span class="inline-flex items-center gap-0.5" aria-hidden="true">
               <img v-if="stop.action !== 'pickup'" src="/animations/dropoff.svg" alt="" width="21" height="28"
@@ -125,7 +125,7 @@ function stopPinColor(stop: DispatchRoutePlan['stops'][number]) {
             <span class="inline-flex px-2 py-1 font-bold" :class="actionClasses(stop.action)">{{
               actionLabel(stop.action) }}</span>
           </span>
-          <small class="mt-1 block text-base text-muted">
+          <small class="mt-1 block text-body1 text-muted">
             <template v-if="stop.dropoffBikes">卸車 {{ stop.dropoffBikes }}</template>
             <template v-if="stop.dropoffBikes && stop.pickupBikes">／</template>
             <template v-if="stop.pickupBikes">取車 {{ stop.pickupBikes }}</template>
@@ -143,36 +143,36 @@ function stopPinColor(stop: DispatchRoutePlan['stops'][number]) {
 <style scoped>
 .route-preview { padding: 18px 20px 14px; }
 .compact-route-title { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-.compact-route-title h3 { font-size: 16px; font-weight: 650; }
-.compact-route-title > span { font-size: 12px; color: var(--muted); }
-.compact-route-title b { color: var(--warning); font-size: 13px; font-variant-numeric: tabular-nums; }
+.compact-route-title h3 { font-size: var(--type-body1); font-weight: 650; }
+.compact-route-title > span { font-size: var(--type-body2); color: var(--muted); }
+.compact-route-title b { color: var(--warning); font-size: var(--type-body2); font-variant-numeric: tabular-nums; }
 .compact-route-metrics { display: flex; align-items: center; flex-wrap: wrap; gap: 11px; padding: 11px 0 15px; }
-.compact-route-metrics strong { font-size: 25px; line-height: 1.2; font-weight: 550; font-variant-numeric: tabular-nums; }
-.compact-route-metrics small { font-size: 13px; font-weight: 400; color: var(--muted); margin-left: 5px; }
+.compact-route-metrics strong { font-size: var(--type-h5); line-height: 1.2; font-weight: 550; font-variant-numeric: tabular-nums; }
+.compact-route-metrics small { font-size: var(--type-body2); font-weight: 400; color: var(--muted); margin-left: 5px; }
 .route-metric-divider { height: 20px; width: 1px; background: var(--line); }
-.route-estimate { font-size: 12px; color: var(--muted); margin-left: auto; }
+.route-estimate { font-size: var(--type-body2); color: var(--muted); margin-left: auto; }
 .route-stops { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
 .route-stops .route-full-stops { margin-top: 0; padding: 12px; }
 .route-endpoint { display: flex; width: 100%; align-items: center; gap: 11px; padding: 13px 12px; text-align: left; background: color-mix(in srgb, var(--panel-muted) 28%, var(--panel)); }
 .route-endpoint + .route-endpoint { border-top: 1px dashed var(--line); }
 .route-endpoint:hover { background: var(--panel-muted); }
-.route-endpoint-gap { display: flex; align-items: center; gap: 11px; margin: 0; padding: 2px 12px; color: var(--muted); font-size: 12px; background: color-mix(in srgb, var(--panel-muted) 28%, var(--panel)); }
-.route-endpoint-gap > span { width: 26px; text-align: center; font-size: 18px; line-height: 20px; }
+.route-endpoint-gap { display: flex; align-items: center; gap: 11px; margin: 0; padding: 2px 12px; color: var(--muted); font-size: var(--type-body2); background: color-mix(in srgb, var(--panel-muted) 28%, var(--panel)); }
+.route-endpoint-gap > span { width: 26px; text-align: center; font-size: var(--type-body1); line-height: 20px; }
 .endpoint-content { min-width: 0; flex: 1; }
-.endpoint-content small { display: block; color: var(--muted); font-size: 12px; line-height: 1.4; margin-bottom: 3px; }
-.endpoint-content strong { display: block; font-size: 14px; font-weight: 550; line-height: 1.5; overflow-wrap: anywhere; }
+.endpoint-content small { display: block; color: var(--muted); font-size: var(--type-body2); line-height: 1.4; margin-bottom: 3px; }
+.endpoint-content strong { display: block; font-size: var(--type-body2); font-weight: 550; line-height: 1.5; overflow-wrap: anywhere; }
 .route-endpoint > svg { color: var(--muted); flex-shrink: 0; }
-.route-capacity { display: flex; justify-content: space-between; gap: 10px; color: var(--muted); font-size: 12px; padding: 10px 0 5px; }
+.route-capacity { display: flex; justify-content: space-between; gap: 10px; color: var(--muted); font-size: var(--type-body2); padding: 10px 0 5px; }
 .route-expand { display: flex; width: 100%; min-height: 48px; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; border-bottom: 1px solid var(--line); background: var(--panel-muted); color: var(--ink); text-align: left; }
 .route-expand:hover { background: color-mix(in srgb, var(--accent) 10%, var(--panel)); }
-.route-expand-title { font-size: 14px; font-weight: 650; }
+.route-expand-title { font-size: var(--type-body2); font-weight: 650; }
 .route-expand-title > span { font-weight: 400; color: var(--muted); }
-.route-expand-action { display: inline-flex; align-items: center; gap: 8px; flex-shrink: 0; color: var(--accent); font-size: 13px; font-weight: 550; }
+.route-expand-action { display: inline-flex; align-items: center; gap: 8px; flex-shrink: 0; color: var(--accent); font-size: var(--type-body2); font-weight: 550; }
 .route-expand-action > svg { transition: transform 160ms ease; }
 .route-stop-button { min-height: 44px; }
 .route-list-stop-marker { display: block; width: 42px; height: 42px; }
 .route-list-stop-pin { display: block; width: 38px; height: 38px; }
-.route-list-stop-number { top: 7px; left: calc(50% - 2px); width: 16px; height: 16px; transform: translateX(-50%); font-size: 10px; line-height: 1; white-space: nowrap; }
+.route-list-stop-number { top: 7px; left: calc(50% - 2px); width: 16px; height: 16px; transform: translateX(-50%); font-size: var(--marker-label); line-height: 1; white-space: nowrap; }
 .route-expand:focus-visible, .route-endpoint:focus-visible, .route-stop-button:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; border-radius: 4px; }
 @media (prefers-reduced-motion: reduce) { .route-expand-action > svg { transition: none; } }
 </style>

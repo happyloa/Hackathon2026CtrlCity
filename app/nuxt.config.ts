@@ -44,7 +44,7 @@ export default defineNuxtConfig({
       autoSubfolderIndex: false,
       // Not linked from the sidebar, so the link crawler (starting at "/")
       // never discovers them on its own — list them explicitly.
-      routes: ['/admin/roi', '/admin/adjustments'],
+      routes: ['/admin/roi', '/admin/adjustments', '/design-system'],
     },
   },
 })

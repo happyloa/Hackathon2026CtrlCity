@@ -141,11 +141,11 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="grid min-w-0 gap-1.5 text-base font-bold text-muted">
+  <div class="grid min-w-0 gap-1.5 text-body1 font-bold text-muted">
     <span>{{ label }}</span>
     <button
       ref="triggerRef"
-      class="flex min-h-11 w-full items-center justify-between gap-2.5 rounded-md border border-line-strong bg-panel px-2.5 py-2 text-left text-base font-extrabold text-ink transition-colors hover:border-accent-strong disabled:cursor-not-allowed disabled:opacity-60"
+      class="flex min-h-11 w-full items-center justify-between gap-2.5 rounded-md border border-line-strong bg-panel px-2.5 py-2 text-left text-body1 font-extrabold text-ink transition-colors hover:border-accent-strong disabled:cursor-not-allowed disabled:opacity-60"
       type="button"
       :disabled="disabled || !options.length"
       :aria-haspopup="'dialog'"
@@ -154,7 +154,7 @@ onBeforeUnmount(() => {
       @click="open"
     >
       <span class="min-w-0 truncate">{{ selectedLabel }}</span>
-      <ChevronDown class="shrink-0 text-xl text-accent-strong" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />
+      <ChevronDown class="shrink-0 icon-md text-accent-strong" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />
     </button>
 
     <Teleport to="body">
@@ -163,18 +163,18 @@ onBeforeUnmount(() => {
         <section ref="dialogRef" class="modal-picker-dialog flex min-h-0 max-h-full w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-line-strong bg-panel text-ink shadow-2xl outline-none transition-transform duration-150" role="dialog" aria-modal="true" :aria-labelledby="dialogTitleId" tabindex="-1">
           <header class="flex items-start justify-between gap-4 border-b border-line p-4 sm:p-5">
             <div>
-              <span class="mb-1 block text-base font-bold text-muted">{{ label }}</span>
-              <h2 :id="dialogTitleId" class="m-0 text-xl font-bold leading-tight text-ink sm:text-2xl">{{ dialogTitle }}</h2>
+              <span class="mb-1 block text-body1 font-bold text-muted">{{ label }}</span>
+              <h2 :id="dialogTitleId" class="m-0 text-h6 font-bold leading-tight text-ink sm:text-h5">{{ dialogTitle }}</h2>
             </div>
             <button class="grid h-11 w-11 shrink-0 place-items-center rounded-md border border-line bg-panel-muted p-0 text-ink transition-colors hover:border-accent-strong hover:bg-accent-strong hover:text-on-accent" type="button" aria-label="關閉選單" @click="close()">
-              <X class="text-2xl" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />
+              <X class="icon-lg" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />
             </button>
           </header>
 
           <label v-if="options.length > 8" class="mx-3 mt-3 flex min-h-11 items-center gap-2 rounded-md border border-line-strong bg-surface px-3 text-muted focus-within:border-accent-strong sm:mx-4 sm:mt-4">
-            <Search class="shrink-0 text-xl text-accent-strong" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />
+            <Search class="shrink-0 icon-md text-accent-strong" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />
             <span class="sr-only">搜尋{{ label }}</span>
-            <input ref="searchRef" v-model="searchQuery" class="min-w-0 w-full bg-transparent py-2 text-base text-ink outline-none placeholder:text-muted" type="search" :placeholder="`搜尋${label}`" autocomplete="off" />
+            <input ref="searchRef" v-model="searchQuery" class="min-w-0 w-full bg-transparent py-2 text-body1 text-ink outline-none placeholder:text-muted" type="search" :placeholder="`搜尋${label}`" autocomplete="off" />
           </label>
 
           <div class="grid min-h-0 flex-1 gap-2 overflow-y-auto p-3 sm:p-4" role="listbox" :aria-label="`${label}選項`">
@@ -182,7 +182,7 @@ onBeforeUnmount(() => {
               v-for="(option, index) in visibleOptions"
               :key="option.value || '__all__'"
               :ref="element => setOptionRef(element, index)"
-              class="flex min-h-12 items-center justify-between gap-3 rounded-md border px-3 py-2.5 text-left text-base font-bold transition-colors focus-visible:border-accent-strong"
+              class="flex min-h-12 items-center justify-between gap-3 rounded-md border px-3 py-2.5 text-left text-body1 font-bold transition-colors focus-visible:border-accent-strong"
               :class="option.value === modelValue
                 ? 'border-accent-strong bg-accent-strong text-on-accent hover:bg-accent-strong'
                 : 'border-line bg-surface text-ink hover:border-accent-strong hover:bg-panel-muted'"
@@ -195,9 +195,9 @@ onBeforeUnmount(() => {
               @keydown="onOptionKeydown($event, index)"
             >
               <span>{{ option.label }}</span>
-              <CheckCircle2 v-if="option.value === modelValue" class="shrink-0 text-xl text-current" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />
+              <CheckCircle2 v-if="option.value === modelValue" class="shrink-0 icon-md text-current" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />
             </button>
-            <p v-if="!visibleOptions.length" class="m-3 text-center text-base text-muted">找不到符合的選項。</p>
+            <p v-if="!visibleOptions.length" class="m-3 text-center text-body1 text-muted">找不到符合的選項。</p>
           </div>
         </section>
       </div>

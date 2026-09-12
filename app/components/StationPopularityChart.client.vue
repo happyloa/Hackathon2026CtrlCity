@@ -100,12 +100,12 @@ watch([() => props.station.id, selectedWeekday], () => { void loadPopularity() }
     <div class="p-3">
       <div class="flex flex-wrap items-center justify-between gap-2">
         <span class="group relative inline-flex" tabindex="0" aria-label="熱門度說明">
-          <CircleHelp class="text-lg text-muted" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />
+          <CircleHelp class="icon-md text-muted" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />
           <span
-            class="pointer-events-none absolute left-1/2 top-full z-10 mt-1 hidden w-64 -translate-x-1/2 rounded-md border border-line-strong bg-panel p-2 text-sm font-medium leading-5 text-muted shadow-lg group-hover:block group-focus:block">依歷史平均庫存比例呈現：可還位越多代表借車越熱門，可借車越多代表還車越熱門。平均值只採用常態分布
+            class="pointer-events-none absolute left-1/2 top-full z-10 mt-1 hidden w-64 max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-md border border-line-strong bg-panel p-2 text-body2 font-medium leading-5 text-muted shadow-lg group-hover:block group-focus:block">依歷史平均庫存比例呈現：可還位越多代表借車越熱門，可借車越多代表還車越熱門。平均值只採用常態分布
             μ±1σ 範圍內的中央約 68% 觀測。</span>
         </span>
-        <label class="inline-flex items-center gap-2 text-base font-bold text-muted">
+        <label class="inline-flex items-center gap-2 text-body1 font-bold text-muted">
           <select v-model.number="selectedWeekday"
             class="min-h-10 rounded-md border border-line-strong bg-panel px-2.5 py-1.5 font-bold text-ink outline-none focus:border-accent-strong"
             aria-label="選擇熱門度星期">
@@ -114,11 +114,11 @@ watch([() => props.station.id, selectedWeekday], () => { void loadPopularity() }
         </label>
       </div>
 
-      <div v-if="pending" class="grid min-h-48 place-items-center text-base font-bold text-muted" role="status">正在載入熱門度統計…
+      <div v-if="pending" class="grid min-h-48 place-items-center text-body1 font-bold text-muted" role="status">正在載入熱門度統計…
       </div>
-      <div v-else-if="error" class="grid min-h-32 place-items-center text-center text-base font-bold text-warning"
+      <div v-else-if="error" class="grid min-h-32 place-items-center text-center text-body1 font-bold text-warning"
         role="status">{{ error }}</div>
-      <div v-else-if="!chart.hasData" class="grid min-h-32 place-items-center text-center text-base font-bold text-muted">
+      <div v-else-if="!chart.hasData" class="grid min-h-32 place-items-center text-center text-body1 font-bold text-muted">
         此站在所選星期沒有足夠的歷史樣本。</div>
       <figure v-else class="mt-2 flex flex-col gap-1">
         <svg class="block h-auto w-full" :viewBox="`0 0 ${dimensions.width} ${dimensions.height}`" role="img"
@@ -129,12 +129,12 @@ watch([() => props.station.id, selectedWeekday], () => { void loadPopularity() }
           <g aria-hidden="true">
             <line v-for="tick in chart.yTicks" :key="`grid-${tick.value}`" class="stroke-line" :x1="dimensions.left"
               :x2="dimensions.width - dimensions.right" :y1="tick.y" :y2="tick.y" stroke-width="1" />
-            <text v-for="tick in chart.yTicks" :key="`y-label-${tick.value}`" class="fill-muted text-base"
+            <text v-for="tick in chart.yTicks" :key="`y-label-${tick.value}`" class="fill-muted text-body1"
               :x="dimensions.left - 7" :y="tick.y + 4" text-anchor="end">{{ formatEstimate(tick.value) }}</text>
             <line class="stroke-line-strong" :x1="dimensions.left" :x2="dimensions.width - dimensions.right"
               :y1="dimensions.top + plotHeight" :y2="dimensions.top + plotHeight" stroke-width="1" />
             <template v-for="point in chart.points" :key="`x-label-${point.hour}`">
-              <text v-if="point.hour % 3 === 0" class="fill-muted text-base" :x="point.x"
+              <text v-if="point.hour % 3 === 0" class="fill-muted text-body1" :x="point.x"
                 :y="dimensions.height - 12" text-anchor="middle">{{ point.hour }}時</text>
             </template>
           </g>
@@ -159,7 +159,7 @@ watch([() => props.station.id, selectedWeekday], () => { void loadPopularity() }
             </circle>
           </g>
         </svg>
-        <figcaption class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm leading-5 text-muted">
+        <figcaption class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-body2 leading-5 text-muted">
           <span class="flex flex-wrap gap-x-3 gap-y-1">
             <span class="inline-flex items-center gap-1"><i class="inline-block w-3.5 border-t-2 border-info" />借車熱門度</span>
             <span class="inline-flex items-center gap-1"><i class="inline-block w-3.5 border-t-2 border-warning" />還車熱門度</span>

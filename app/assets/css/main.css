@@ -1,5 +1,223 @@
 @import "tailwindcss";
 
+/* ===========================================================================
+ * Typography scale
+ * ---------------------------------------------------------------------------
+ * The design system allows exactly nine type sizes. Nothing else may ship.
+ *
+ *   Display  72px   H1 48px   H2 40px   H3 32px   H4 28px
+ *   H5       24px   H6 20px   Body1 16px          Body2 14px
+ *
+ * Three layers keep that promise while still giving the site real RWD:
+ *
+ *   1. `--scale-*`  the nine steps. Immutable: size + the line-height and
+ *                   tracking that belong to that size. Never redefined.
+ *   2. `--type-*`   the nine *roles*. Each points at a `--scale-*` step and
+ *                   is re-pointed at a SMALLER step on narrower viewports.
+ *                   Because a role can only ever point at a step, every
+ *                   rendered size at every viewport is one of the nine.
+ *   3. `--text-*`   the Tailwind bridge, so `text-h2` / `text-body2` exist as
+ *                   utilities and inherit the responsive step-down for free.
+ *
+ * Tailwind's own font-size scale is deleted below, so `text-xs`, `text-sm`,
+ * `text-base`, `text-lg`, `text-xl` … no longer resolve to anything. That is
+ * deliberate: an off-scale size cannot be written by accident. Raw CSS should
+ * use `font-size: var(--type-h3)` and never a literal px value --
+ * `npm run type:validate` fails the build on either mistake.
+ * ======================================================================== */
+
+@theme {
+  /* Remove Tailwind's built-in text sizes (text-xs … text-9xl) entirely. */
+  --text-*: initial;
+}
+
+:root {
+  /* --- Layer 1: the nine immutable steps ------------------------------- */
+  --scale-display: 72px;
+  --scale-display-lh: 1.05;
+  --scale-display-ls: -0.03em;
+
+  --scale-h1: 48px;
+  --scale-h1-lh: 1.1;
+  --scale-h1-ls: -0.025em;
+
+  --scale-h2: 40px;
+  --scale-h2-lh: 1.15;
+  --scale-h2-ls: -0.022em;
+
+  --scale-h3: 32px;
+  --scale-h3-lh: 1.2;
+  --scale-h3-ls: -0.018em;
+
+  --scale-h4: 28px;
+  --scale-h4-lh: 1.25;
+  --scale-h4-ls: -0.015em;
+
+  --scale-h5: 24px;
+  --scale-h5-lh: 1.3;
+  --scale-h5-ls: -0.012em;
+
+  --scale-h6: 20px;
+  --scale-h6-lh: 1.4;
+  --scale-h6-ls: -0.008em;
+
+  --scale-body1: 16px;
+  --scale-body1-lh: 1.6;
+  --scale-body1-ls: 0em;
+
+  --scale-body2: 14px;
+  --scale-body2-lh: 1.55;
+  --scale-body2-ls: 0em;
+
+  /* --- Layer 2: roles, at the widest viewport (>= 1280px) -------------- */
+  --type-display: var(--scale-display);
+  --type-display-lh: var(--scale-display-lh);
+  --type-display-ls: var(--scale-display-ls);
+
+  --type-h1: var(--scale-h1);
+  --type-h1-lh: var(--scale-h1-lh);
+  --type-h1-ls: var(--scale-h1-ls);
+
+  --type-h2: var(--scale-h2);
+  --type-h2-lh: var(--scale-h2-lh);
+  --type-h2-ls: var(--scale-h2-ls);
+
+  --type-h3: var(--scale-h3);
+  --type-h3-lh: var(--scale-h3-lh);
+  --type-h3-ls: var(--scale-h3-ls);
+
+  --type-h4: var(--scale-h4);
+  --type-h4-lh: var(--scale-h4-lh);
+  --type-h4-ls: var(--scale-h4-ls);
+
+  --type-h5: var(--scale-h5);
+  --type-h5-lh: var(--scale-h5-lh);
+  --type-h5-ls: var(--scale-h5-ls);
+
+  --type-h6: var(--scale-h6);
+  --type-h6-lh: var(--scale-h6-lh);
+  --type-h6-ls: var(--scale-h6-ls);
+
+  --type-body1: var(--scale-body1);
+  --type-body1-lh: var(--scale-body1-lh);
+  --type-body1-ls: var(--scale-body1-ls);
+
+  --type-body2: var(--scale-body2);
+  --type-body2-lh: var(--scale-body2-lh);
+  --type-body2-ls: var(--scale-body2-ls);
+}
+
+/**
+ * Laptop / tablet (<= 1279px): headings drop one step, body text does not.
+ * 72px of Display is a poster size; it has no business inside a 900px column.
+ * Body1/Body2 hold still on purpose -- shrinking reading text to fit a small
+ * screen is the one thing responsive type must never do.
+ */
+@media (max-width: 1279px) {
+  :root {
+    --type-display: var(--scale-h1);
+    --type-display-lh: var(--scale-h1-lh);
+    --type-display-ls: var(--scale-h1-ls);
+
+    --type-h1: var(--scale-h2);
+    --type-h1-lh: var(--scale-h2-lh);
+    --type-h1-ls: var(--scale-h2-ls);
+
+    --type-h2: var(--scale-h3);
+    --type-h2-lh: var(--scale-h3-lh);
+    --type-h2-ls: var(--scale-h3-ls);
+
+    --type-h3: var(--scale-h4);
+    --type-h3-lh: var(--scale-h4-lh);
+    --type-h3-ls: var(--scale-h4-ls);
+
+    --type-h4: var(--scale-h5);
+    --type-h4-lh: var(--scale-h5-lh);
+    --type-h4-ls: var(--scale-h5-ls);
+
+    --type-h5: var(--scale-h6);
+    --type-h5-lh: var(--scale-h6-lh);
+    --type-h5-ls: var(--scale-h6-ls);
+  }
+}
+
+/**
+ * Phone (<= 640px): headings drop a second step. H6 is the floor for headings
+ * and Body1/Body2 never move, so the phone renders only five of the nine
+ * steps -- 40 / 32 / 28 / 24 / 20 plus 16 and 14.
+ */
+@media (max-width: 640px) {
+  :root {
+    --type-display: var(--scale-h2);
+    --type-display-lh: var(--scale-h2-lh);
+    --type-display-ls: var(--scale-h2-ls);
+
+    --type-h1: var(--scale-h3);
+    --type-h1-lh: var(--scale-h3-lh);
+    --type-h1-ls: var(--scale-h3-ls);
+
+    --type-h2: var(--scale-h4);
+    --type-h2-lh: var(--scale-h4-lh);
+    --type-h2-ls: var(--scale-h4-ls);
+
+    --type-h3: var(--scale-h5);
+    --type-h3-lh: var(--scale-h5-lh);
+    --type-h3-ls: var(--scale-h5-ls);
+
+    --type-h4: var(--scale-h6);
+    --type-h4-lh: var(--scale-h6-lh);
+    --type-h4-ls: var(--scale-h6-ls);
+  }
+}
+
+/**
+ * Icon + marker metrics. NOT type, and deliberately outside the nine steps:
+ * `font-size` on these elements sizes the `1em` box of an inline SVG, or a
+ * numeric label painted inside a fixed-diameter map marker. Sizing a 20px
+ * Leaflet pin's label on a 14px text step would overflow the pin, so map and
+ * chart labels are the one documented exception and carry their own tokens.
+ */
+:root {
+  --icon-sm: 16px;
+  --icon-md: 20px;
+  --icon-lg: 24px;
+  --icon-xl: 32px;
+  --marker-label: 10px;
+  --marker-label-lg: 11px;
+}
+
+@theme inline {
+  /* --- Layer 3: Tailwind utilities (text-display … text-body2) --------- */
+  --text-display: var(--type-display);
+  --text-display--line-height: var(--type-display-lh);
+  --text-display--letter-spacing: var(--type-display-ls);
+  --text-h1: var(--type-h1);
+  --text-h1--line-height: var(--type-h1-lh);
+  --text-h1--letter-spacing: var(--type-h1-ls);
+  --text-h2: var(--type-h2);
+  --text-h2--line-height: var(--type-h2-lh);
+  --text-h2--letter-spacing: var(--type-h2-ls);
+  --text-h3: var(--type-h3);
+  --text-h3--line-height: var(--type-h3-lh);
+  --text-h3--letter-spacing: var(--type-h3-ls);
+  --text-h4: var(--type-h4);
+  --text-h4--line-height: var(--type-h4-lh);
+  --text-h4--letter-spacing: var(--type-h4-ls);
+  --text-h5: var(--type-h5);
+  --text-h5--line-height: var(--type-h5-lh);
+  --text-h5--letter-spacing: var(--type-h5-ls);
+  --text-h6: var(--type-h6);
+  --text-h6--line-height: var(--type-h6-lh);
+  --text-h6--letter-spacing: var(--type-h6-ls);
+  --text-body1: var(--type-body1);
+  --text-body1--line-height: var(--type-body1-lh);
+  --text-body1--letter-spacing: var(--type-body1-ls);
+  --text-body2: var(--type-body2);
+  --text-body2--line-height: var(--type-body2-lh);
+  --text-body2--letter-spacing: var(--type-body2-ls);
+}
+
+
 @theme inline {
   --font-sans:
     "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", ui-sans-serif,
@@ -83,10 +301,47 @@
 
 @layer base {
   html {
-    @apply min-w-80 bg-canvas font-sans text-base text-ink antialiased;
+    @apply min-w-80 bg-canvas font-sans text-body1 text-ink antialiased;
   }
   body {
-    @apply m-0 min-w-80 bg-canvas leading-6;
+    @apply m-0 min-w-80 bg-canvas;
+  }
+  /**
+   * Headings inherit the scale from their level, so plain semantic markup is
+   * already on-system and `<h1>`-`<h6>` never need a size class. Weight and
+   * margin are reset here because the scale owns size/line-height/tracking.
+   */
+  h1 {
+    @apply text-h1;
+  }
+  h2 {
+    @apply text-h2;
+  }
+  h3 {
+    @apply text-h3;
+  }
+  h4 {
+    @apply text-h4;
+  }
+  h5 {
+    @apply text-h5;
+  }
+  h6 {
+    @apply text-h6;
+  }
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply m-0 font-semibold text-balance;
+  }
+  p {
+    @apply m-0;
+  }
+  small {
+    @apply text-body2;
   }
   #__nuxt {
     @apply min-h-svh;
@@ -113,24 +368,89 @@
 }
 
 @layer components {
+  /**
+   * Semantic type classes. Use these when the element is not a heading tag
+   * (a metric figure, an eyebrow, a caption) but still needs a scale step.
+   * They carry weight/tracking defaults so a step reads correctly at any of
+   * the viewports it steps through.
+   */
+  .type-display {
+    @apply text-display font-bold tabular-nums;
+  }
+  .type-h1 {
+    @apply text-h1 font-bold;
+  }
+  .type-h2 {
+    @apply text-h2 font-semibold;
+  }
+  .type-h3 {
+    @apply text-h3 font-semibold;
+  }
+  .type-h4 {
+    @apply text-h4 font-semibold;
+  }
+  .type-h5 {
+    @apply text-h5 font-semibold;
+  }
+  .type-h6 {
+    @apply text-h6 font-semibold;
+  }
+  .type-body1 {
+    @apply text-body1 font-normal;
+  }
+  .type-body2 {
+    @apply text-body2 font-normal;
+  }
+  /** Body2 in its most common role: a muted caption under real content. */
+  .type-caption {
+    @apply text-body2 font-medium text-muted;
+  }
+  /** Body2 as a label: wide tracking, never a shrunken Body2. */
+  .type-overline {
+    @apply text-body2 font-semibold uppercase tracking-[0.12em] text-muted;
+  }
+  /** Numeric readouts: a scale step, but locked to tabular figures. */
+  .type-metric {
+    @apply tabular-nums tracking-[-0.02em];
+  }
+
+  /**
+   * Icon boxes. Inline SVGs in this app are drawn at `width/height: 1em`, so
+   * their size is a `font-size` -- but an icon is not type, and forcing a
+   * 20px glyph onto the 24px H5 step just makes it wrong. These four sit on
+   * their own 16/20/24/32 ladder; see the `--icon-*` tokens in main.css.
+   */
+  .icon-sm {
+    font-size: var(--icon-sm);
+  }
+  .icon-md {
+    font-size: var(--icon-md);
+  }
+  .icon-lg {
+    font-size: var(--icon-lg);
+  }
+  .icon-xl {
+    font-size: var(--icon-xl);
+  }
+
   .panel {
     @apply rounded-xl border border-line bg-panel shadow-sm;
   }
   .section-kicker,
   .eyebrow {
-    @apply inline-flex items-center gap-1.5 text-base font-semibold tracking-wide text-accent;
+    @apply inline-flex items-center gap-1.5 text-body2 font-semibold tracking-[0.06em] text-accent;
   }
   .text-link {
     @apply inline-flex items-center gap-1 font-semibold text-accent transition-colors hover:text-accent-strong;
   }
   .loading-board {
-    @apply flex min-h-48 items-center justify-center gap-2 rounded-xl border border-line bg-panel p-6 text-center font-semibold text-muted;
+    @apply flex min-h-48 items-center justify-center gap-2 rounded-xl border border-line bg-panel p-6 text-center text-body1 font-semibold text-muted;
   }
   .error-board {
     @apply border-danger bg-danger-surface text-danger;
   }
   .live-inline-error {
-    @apply flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-warning bg-warning-surface px-3 py-2 text-base font-semibold text-warning;
+    @apply flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-warning bg-warning-surface px-3 py-2 text-body2 font-semibold text-warning;
   }
 }
 
@@ -166,14 +486,14 @@
   color: var(--ink);
   background: var(--panel);
   border-color: var(--line);
-  font-size: 1.5rem;
+  font-size: var(--icon-lg);
   line-height: 2.125rem;
 }
 .geographic-map .leaflet-control-attribution {
   padding: 0.1875rem 0.375rem;
   color: var(--muted);
   background: color-mix(in srgb, var(--panel) 94%, transparent);
-  font-size: 1rem;
+  font-size: var(--type-body2);
 }
 .geographic-map .leaflet-control-attribution a {
   color: var(--accent-strong);
@@ -186,7 +506,7 @@
   border-color: var(--line-strong);
   border-radius: 0.5rem;
   box-shadow: none;
-  font-size: 1rem;
+  font-size: var(--type-body2);
 }
 .geographic-map .leaflet-tooltip strong,
 .geographic-map .leaflet-tooltip span {

@@ -32,10 +32,10 @@ const arrowClasses = {
 
 <template>
   <section class="overflow-hidden">
-    <button class="flex min-h-11 w-full items-center gap-3 p-4 text-left text-base font-bold text-ink transition-colors hover:bg-panel-muted" :class="expanded ? disclosureClasses.open : disclosureClasses.closed" type="button" :aria-expanded="expanded" @click="expanded = !expanded">
-      <span class="flex min-w-0 flex-1 items-center gap-2"><component v-if="disclosureIcon" class="shrink-0 text-lg text-accent" :is="disclosureIcon" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" /> <span class="break-words">{{ title }}</span></span>
-      <small v-if="description" class="hidden min-w-0 text-right text-base font-semibold text-muted sm:block">{{ description }}</small>
-      <ChevronDown class="shrink-0 text-lg text-accent transition-transform" :class="expanded ? arrowClasses.open : arrowClasses.closed" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />
+    <button class="flex min-h-11 w-full items-center gap-3 p-4 text-left text-body1 font-bold text-ink transition-colors hover:bg-panel-muted" :class="expanded ? disclosureClasses.open : disclosureClasses.closed" type="button" :aria-expanded="expanded" @click="expanded = !expanded">
+      <span class="flex min-w-0 flex-1 items-center gap-2"><component v-if="disclosureIcon" class="shrink-0 icon-md text-accent" :is="disclosureIcon" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" /> <span class="break-words">{{ title }}</span></span>
+      <small v-if="description" class="hidden min-w-0 text-right text-body1 font-semibold text-muted sm:block">{{ description }}</small>
+      <ChevronDown class="shrink-0 icon-md text-accent transition-transform" :class="expanded ? arrowClasses.open : arrowClasses.closed" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />
     </button>
     <Transition name="disclosure">
       <div v-if="expanded">

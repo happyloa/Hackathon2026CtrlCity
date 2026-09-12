@@ -72,18 +72,18 @@ const riskLabel = computed(() => {
  */
 const riskBadgeClass = computed(() => {
   if (props.station?.serviceStatus !== 'operational') {
-    return 'inline-flex rounded-full bg-panel-muted px-2.5 py-0.5 text-base font-bold text-muted'
+    return 'inline-flex rounded-full bg-panel-muted px-2.5 py-0.5 text-body2 font-bold text-muted'
   }
   if (isLive.value && !hasMatchedBaseline.value) {
-    return 'inline-flex rounded-full bg-warning px-2.5 py-0.5 text-base font-bold text-warning-surface'
+    return 'inline-flex rounded-full bg-warning px-2.5 py-0.5 text-body2 font-bold text-warning-surface'
   }
   if (forecast.value?.level === 'critical') {
-    return 'inline-flex rounded-full bg-danger px-2.5 py-0.5 text-base font-bold text-danger-surface'
+    return 'inline-flex rounded-full bg-danger px-2.5 py-0.5 text-body2 font-bold text-danger-surface'
   }
   if (forecast.value?.level === 'high' || forecast.value?.level === 'medium') {
-    return 'inline-flex rounded-full bg-warning px-2.5 py-0.5 text-base font-bold text-warning-surface'
+    return 'inline-flex rounded-full bg-warning px-2.5 py-0.5 text-body2 font-bold text-warning-surface'
   }
-  return 'inline-flex rounded-full bg-positive px-2.5 py-0.5 text-base font-bold text-positive-surface'
+  return 'inline-flex rounded-full bg-positive px-2.5 py-0.5 text-body2 font-bold text-positive-surface'
 })
 
 const totalDockCount = computed(() => props.station?.totalDocks || 0)
@@ -239,16 +239,16 @@ onBeforeUnmount(() => {
           class="station-detail pointer-events-auto max-h-full w-full overflow-y-auto rounded-xl border border-line bg-panel p-4 pb-6 text-ink shadow-2xl outline-none sm:h-svh sm:max-w-lg sm:rounded-none sm:border-y-0 sm:border-r-0 sm:p-5"
           role="dialog" aria-modal="false" aria-labelledby="station-detail-title" tabindex="-1">
           <button type="button"
-            class="mb-3 inline-flex h-11 min-w-11 items-center justify-center gap-2 rounded-md border border-line bg-panel-muted px-3 text-sm font-semibold text-ink transition-colors hover:border-accent-strong hover:bg-accent-strong hover:text-on-accent"
+            class="mb-3 inline-flex h-11 min-w-11 items-center justify-center gap-2 rounded-md border border-line bg-panel-muted px-3 text-body2 font-semibold text-ink transition-colors hover:border-accent-strong hover:bg-accent-strong hover:text-on-accent"
             :aria-label="isDocked ? '返回搬運路線' : '關閉站點詳情'" @click="closePanel">
-            <ArrowLeft v-if="isDocked" style="width: 1em; height: 1em" class="text-xl" aria-hidden="true" />
-            <X v-else style="width: 1em; height: 1em" class="text-xl" aria-hidden="true" />
+            <ArrowLeft v-if="isDocked" style="width: 1em; height: 1em" class="icon-md" aria-hidden="true" />
+            <X v-else style="width: 1em; height: 1em" class="icon-md" aria-hidden="true" />
             <span v-if="docked">{{ isDocked ? '返回搬運路線' : '關閉站點詳情' }}</span>
           </button>
-          <div class="flex flex-wrap items-center justify-between gap-2 text-base font-bold text-muted"><span>{{ isLive
+          <div class="flex flex-wrap items-center justify-between gap-2 text-body1 font-bold text-muted"><span>{{ isLive
             ? '即時站況' : '歷史站況' }}</span><span :class="riskBadgeClass">{{ riskLabel }}</span></div>
-          <h3 id="station-detail-title" class="mt-2 text-2xl font-bold tracking-tight text-ink">{{ stationName }}</h3>
-          <p class="mt-1 flex items-center gap-1 text-base text-muted">
+          <h3 id="station-detail-title" class="mt-2 text-h5 font-bold tracking-tight text-ink">{{ stationName }}</h3>
+          <p class="mt-1 flex items-center gap-1 text-body1 text-muted">
             <MapPin class="size-4 shrink-0 text-accent-strong" :stroke-width="2" /> {{ station.district ||
               '行政區未提供' }} · {{ station.city }}
           </p>
@@ -263,16 +263,16 @@ onBeforeUnmount(() => {
               <circle cx="70" cy="70" :r="donut.radius" fill="none" class="stroke-danger" stroke-width="14"
                 stroke-linecap="round" :stroke-dasharray="`${donut.dockLength} ${donut.circumference}`"
                 :stroke-dashoffset="-donut.bikeLength" transform="rotate(-90 70 70)" />
-              <text x="70" y="66" text-anchor="middle" class="fill-ink text-3xl font-extrabold">{{
+              <text x="70" y="66" text-anchor="middle" class="fill-ink text-h3 font-extrabold">{{
                 station.availableBikes }}</text>
-              <text x="70" y="88" text-anchor="middle" class="fill-muted text-sm font-semibold">{{
+              <text x="70" y="88" text-anchor="middle" class="fill-muted text-body2 font-semibold">{{
                 station.availableBikes }} 車／{{ station.totalDocks }} 位</text>
             </svg>
             <div class="grid w-full grid-cols-2 gap-2 text-center">
-              <div><span class="text-base font-bold text-muted">可借車</span><strong
-                  class="block font-mono text-xl text-accent">{{ station.availableBikes }}</strong></div>
-              <div><span class="text-base font-bold text-muted">可還位</span><strong
-                  class="block font-mono text-xl text-danger">{{ station.availableDocks }}</strong></div>
+              <div><span class="text-body1 font-bold text-muted">可借車</span><strong
+                  class="block font-mono text-h6 text-accent">{{ station.availableBikes }}</strong></div>
+              <div><span class="text-body1 font-bold text-muted">可還位</span><strong
+                  class="block font-mono text-h6 text-danger">{{ station.availableDocks }}</strong></div>
             </div>
           </div>
 
@@ -296,74 +296,74 @@ onBeforeUnmount(() => {
             <div class="p-3">
               <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
                 <div class="grid min-w-0 gap-0.5 rounded-md border border-line bg-panel p-2"><span
-                    class="text-base font-bold text-muted">現在</span><strong
-                    class="font-mono text-base leading-5 text-ink">{{ station.availableBikes }} 車／{{
+                    class="text-body1 font-bold text-muted">現在</span><strong
+                    class="font-mono text-body1 leading-5 text-ink">{{ station.availableBikes }} 車／{{
                       station.availableDocks }} 位</strong></div>
                 <div class="grid min-w-0 gap-0.5 rounded-md border border-line bg-panel p-2"><span
-                    class="text-base font-bold text-muted">歷史基線</span><strong
-                    class="font-mono text-base leading-5 text-ink">{{ baselineComparison.baselineBikes }} 車／{{
+                    class="text-body1 font-bold text-muted">歷史基線</span><strong
+                    class="font-mono text-body1 leading-5 text-ink">{{ baselineComparison.baselineBikes }} 車／{{
                       baselineComparison.baselineDocks }} 位</strong></div>
                 <div class="grid min-w-0 gap-0.5 rounded-md border border-line bg-panel p-2"><span
-                    class="text-base font-bold text-muted">{{ detailHorizon }} 分鐘</span><strong
-                    class="font-mono text-base leading-5 text-ink">{{ baselineComparison.predictedBikes }} 車／{{
+                    class="text-body1 font-bold text-muted">{{ detailHorizon }} 分鐘</span><strong
+                    class="font-mono text-body1 leading-5 text-ink">{{ baselineComparison.predictedBikes }} 車／{{
                       baselineComparison.predictedDocks }} 位</strong></div>
               </div>
-              <p class="mt-2 text-base font-extrabold leading-6 text-accent-strong">{{ baselineComparison.delta }}</p>
+              <p class="mt-2 text-body1 font-extrabold leading-6 text-accent-strong">{{ baselineComparison.delta }}</p>
             </div>
           </DisclosurePanel>
 
           <div v-if="!baselineComparison" class="mt-4 grid gap-1 rounded-md border border-line bg-panel-muted p-3">
-            <span class="inline-flex items-center gap-1.5 text-base font-extrabold text-accent-strong">
-              <component :is="isLive ? Zap : ChartNoAxesColumn" style="width: 1em; height: 1em" class="text-lg" aria-hidden="true" /> {{
+            <span class="inline-flex items-center gap-1.5 text-body1 font-extrabold text-accent-strong">
+              <component :is="isLive ? Zap : ChartNoAxesColumn" style="width: 1em; height: 1em" class="icon-md" aria-hidden="true" /> {{
                 forecastHeadline }}
             </span>
-            <strong class="text-lg text-ink">{{ forecastDescription }}</strong>
-            <small class="text-base leading-6 text-muted">{{ forecastCaption }}</small>
+            <strong class="text-h6 text-ink">{{ forecastDescription }}</strong>
+            <small class="text-body1 leading-6 text-muted">{{ forecastCaption }}</small>
           </div>
 
           <section v-if="needsReturnGuidance"
             class="mt-3 rounded-md border border-line border-l-4 border-l-info bg-panel-muted p-3" aria-label="附近替代還車站">
-            <div class="flex items-center justify-between gap-2 text-base font-extrabold text-ink">
+            <div class="flex items-center justify-between gap-2 text-body1 font-extrabold text-ink">
               <span class="inline-flex items-center gap-1.5">
                 <MapPinned class="size-4 text-info" :stroke-width="2" /> 替代還車站
               </span>
-              <small class="text-base font-bold text-muted">600m 內</small>
+              <small class="text-body1 font-bold text-muted">600m 內</small>
             </div>
             <div v-if="returnStations.length" class="mt-2 grid gap-1.5">
               <button v-for="option in returnStations" :key="option.stationId"
-                class="flex w-full items-center justify-between gap-2 rounded-md border border-line bg-panel px-2 py-2 text-left text-base text-ink transition-colors hover:border-accent-strong hover:bg-surface"
+                class="flex w-full items-center justify-between gap-2 rounded-md border border-line bg-panel px-2 py-2 text-left text-body1 text-ink transition-colors hover:border-accent-strong hover:bg-surface"
                 type="button" @click="emit('select', option.stationId)">
                 <span class="grid min-w-0 gap-0.5"><b class="truncate">{{ option.name }}</b><small
-                    class="text-base text-muted">{{ option.distanceMeters }}m · {{ option.district }}</small></span>
-                <strong class="shrink-0 font-mono text-base text-info">{{ option.availableDocks }} 位</strong>
+                    class="text-body1 text-muted">{{ option.distanceMeters }}m · {{ option.district }}</small></span>
+                <strong class="shrink-0 font-mono text-body1 text-info">{{ option.availableDocks }} 位</strong>
               </button>
             </div>
-            <p v-else class="mt-2 text-base text-muted">600m 內沒有合適的替代站。</p>
+            <p v-else class="mt-2 text-body1 text-muted">600m 內沒有合適的替代站。</p>
           </section>
 
           <section v-if="needsBorrowGuidance"
             class="mt-3 rounded-md border border-line border-l-4 border-l-accent bg-panel-muted p-3" aria-label="附近替代借車站">
-            <div class="flex items-center justify-between gap-2 text-base font-extrabold text-ink">
+            <div class="flex items-center justify-between gap-2 text-body1 font-extrabold text-ink">
               <span class="inline-flex items-center gap-1.5">
                 <Bike class="size-4 text-accent" :stroke-width="2" /> 替代借車站
               </span>
-              <small class="text-base font-bold text-muted">600m 內</small>
+              <small class="text-body1 font-bold text-muted">600m 內</small>
             </div>
             <div v-if="borrowStations.length" class="mt-2 grid gap-1.5">
               <button v-for="option in borrowStations" :key="option.stationId"
-                class="flex w-full items-center justify-between gap-2 rounded-md border border-line bg-panel px-2 py-2 text-left text-base text-ink transition-colors hover:border-accent-strong hover:bg-surface"
+                class="flex w-full items-center justify-between gap-2 rounded-md border border-line bg-panel px-2 py-2 text-left text-body1 text-ink transition-colors hover:border-accent-strong hover:bg-surface"
                 type="button" @click="emit('select', option.stationId)">
                 <span class="grid min-w-0 gap-0.5"><b class="truncate">{{ option.name }}</b><small
-                    class="text-base text-muted">{{ option.distanceMeters }}m · {{ option.district }}</small></span>
-                <strong class="shrink-0 font-mono text-base text-accent">{{ option.availableBikes }} 台</strong>
+                    class="text-body1 text-muted">{{ option.distanceMeters }}m · {{ option.district }}</small></span>
+                <strong class="shrink-0 font-mono text-body1 text-accent">{{ option.availableBikes }} 台</strong>
               </button>
             </div>
-            <p v-else class="mt-2 text-base text-muted">600m 內沒有合適的替代站。</p>
+            <p v-else class="mt-2 text-body1 text-muted">600m 內沒有合適的替代站。</p>
           </section>
 
           <DisclosurePanel v-if="!isLive" class="mt-3 rounded-md border border-line" title="最近 6 小時庫存趨勢">
             <div class="m-3">
-              <div class="flex flex-wrap items-center justify-between gap-2 text-base font-bold text-muted">
+              <div class="flex flex-wrap items-center justify-between gap-2 text-body1 font-bold text-muted">
                 <span>歷史＋基線推估</span><i class="inline-flex items-center gap-1.5 not-italic"><b
                     class="h-2.5 w-2.5 rounded-full bg-accent" />可借車 <b
                     class="ml-1 h-2.5 w-2.5 rounded-full bg-warning" />可還位</i>
@@ -377,19 +377,19 @@ onBeforeUnmount(() => {
             class="mt-3 rounded-md border border-line" title="判斷依據">
             <div class="grid gap-2 p-3">
               <span v-for="reason in forecast?.reasons" :key="reason"
-                class="flex items-start gap-1.5 text-base leading-6 text-muted">
-                <CheckCheck style="width: 1em; height: 1em" class="mt-0.5 shrink-0 text-lg text-accent-strong" aria-hidden="true" /> {{ reason }}
+                class="flex items-start gap-1.5 text-body1 leading-6 text-muted">
+                <CheckCheck style="width: 1em; height: 1em" class="mt-0.5 shrink-0 icon-md text-accent-strong" aria-hidden="true" /> {{ reason }}
               </span>
               <span v-for="flag in station.qualityFlags" :key="flag"
-                class="flex items-start gap-1.5 text-base leading-6 text-warning">
-                <Info style="width: 1em; height: 1em" class="mt-0.5 shrink-0 text-lg" aria-hidden="true" /> {{ flag }}
+                class="flex items-start gap-1.5 text-body1 leading-6 text-warning">
+                <Info style="width: 1em; height: 1em" class="mt-0.5 shrink-0 icon-md" aria-hidden="true" /> {{ flag }}
               </span>
             </div>
           </DisclosurePanel>
           <NuxtLink v-if="!isLive" :to="detailTarget"
-            class="mt-4 inline-flex items-center gap-1 text-base font-bold text-accent transition-colors hover:text-accent-strong">
+            class="mt-4 inline-flex items-center gap-1 text-body1 font-bold text-accent transition-colors hover:text-accent-strong">
             開啟完整站點視圖
-            <ArrowRight style="width: 1em; height: 1em" class="text-lg" aria-hidden="true" />
+            <ArrowRight style="width: 1em; height: 1em" class="icon-md" aria-hidden="true" />
           </NuxtLink>
         </aside>
       </div>

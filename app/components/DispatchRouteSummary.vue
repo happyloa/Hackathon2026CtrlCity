@@ -78,15 +78,15 @@ onBeforeUnmount(() => { if (isObservingRoute.value) emit('observeRoute', null) }
 </template>
 
 <style scoped>
-.route-horizon-label { display: flex; justify-content: space-between; gap: 10px; color: var(--muted); font-size: 13px; padding: 16px 20px 8px; }
-.route-horizon-label small { font-size: 12px; }
+.route-horizon-label { display: flex; justify-content: space-between; gap: 10px; color: var(--muted); font-size: var(--type-body2); padding: 16px 20px 8px; }
+.route-horizon-label small { font-size: var(--type-body2); }
 .route-horizons { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; border: 1px solid var(--line); border-radius: 7px; padding: 3px; margin: 0 20px; background: var(--canvas); }
-.route-horizons button { min-height: 38px; padding: 7px; border-radius: 4px; font-size: 14px; color: var(--muted); font-weight: 500; }
+.route-horizons button { min-height: 38px; padding: 7px; border-radius: 4px; font-size: var(--type-body2); color: var(--muted); font-weight: 500; }
 .route-horizons button:hover { color: var(--ink); }
 .route-horizons button.is-active { background: var(--panel-muted); color: var(--ink); box-shadow: 0 1px 3px #0002; }
 .route-selection-row { padding: 16px 20px 0; }
 .route-selector { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
-.route-selector button { min-height: 40px; flex-shrink: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; font-size: 13px; color: var(--muted); }
+.route-selector button { min-height: 40px; flex-shrink: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; font-size: var(--type-body2); color: var(--muted); }
 .route-selector button:hover { border-color: var(--accent); }
 .route-selector button.is-selected { color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--panel)); border-color: color-mix(in srgb, var(--accent) 60%, var(--line)); }
 .observe-route-action { padding: 0 20px 12px; }
@@ -94,7 +94,7 @@ onBeforeUnmount(() => { if (isObservingRoute.value) emit('observeRoute', null) }
 .observe-route-action .is-observing { color: var(--accent); border-color: var(--accent); }
 .observing-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
 .route-empty { display: grid; justify-items: center; gap: 8px; text-align: center; padding: 30px 22px; color: var(--muted); }
-.route-empty > svg { font-size: 27px; }
-.route-empty strong { font-size: 15px; font-weight: 550; color: var(--ink); }
-.route-empty p { font-size: 13px; line-height: 1.6; }
+.route-empty > svg { font-size: var(--icon-lg); }
+.route-empty strong { font-size: var(--type-body1); font-weight: 550; color: var(--ink); }
+.route-empty p { font-size: var(--type-body2); line-height: 1.6; }
 </style>

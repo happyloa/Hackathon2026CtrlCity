@@ -37,7 +37,7 @@ const clockLabel = computed(() => digits.value.map(part => part.join('')).join('
       <div class="flex gap-0.5">
         <FlipClockDigit v-for="(digit, digitIndex) in group" :key="digitIndex" :digit="digit" />
       </div>
-      <span v-if="groupIndex < digits.length - 1" class="text-lg font-bold text-muted" aria-hidden="true">:</span>
+      <span v-if="groupIndex < digits.length - 1" class="text-h6 font-bold text-muted" aria-hidden="true">:</span>
     </template>
   </div>
 </template>

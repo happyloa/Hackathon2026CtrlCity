@@ -652,22 +652,22 @@ onBeforeUnmount(() => {
       <div
         class="map-search flex min-h-10 min-w-0 flex-1 basis-64 items-center gap-1.5 rounded-md border border-line-strong bg-panel px-2.5 text-ink"
         role="search">
-        <Search class="shrink-0 text-xl text-accent-strong" style="width: 1em; height: 1em" :stroke-width="2"
+        <Search class="shrink-0 icon-md text-accent-strong" style="width: 1em; height: 1em" :stroke-width="2"
           aria-hidden="true" />
         <input v-model="stationQuery"
-          class="min-w-0 w-full bg-transparent py-1.5 text-base text-ink outline-none placeholder:text-muted"
+          class="min-w-0 w-full bg-transparent py-1.5 text-body1 text-ink outline-none placeholder:text-muted"
           type="text" inputmode="search" enterkeyhint="search" placeholder="搜尋站名或行政區" aria-label="搜尋站名或行政區" />
         <button v-if="stationQuery"
           class="grid h-8 w-8 shrink-0 place-items-center rounded text-muted transition-colors hover:bg-accent-strong hover:text-on-accent"
           type="button" aria-label="清除站點搜尋" @click="stationQuery = ''">
-          <X class="text-xl" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />
+          <X class="icon-md" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />
         </button>
       </div>
       <div class="map-actions flex items-center gap-2">
         <button type="button"
-          class="map-reset inline-flex min-h-11 items-center gap-1.5 rounded-md border border-line-strong bg-panel px-2.5 py-1.5 text-base font-semibold text-muted transition-colors hover:border-accent hover:bg-accent"
+          class="map-reset inline-flex min-h-11 items-center gap-1.5 rounded-md border border-line-strong bg-panel px-2.5 py-1.5 text-body1 font-semibold text-muted transition-colors hover:border-accent hover:bg-accent"
           :aria-label="`重新對焦${district || '新北市全域'}`" :title="`重新對焦${district || '新北市全域'}`" @click="fitCurrentScope">
-          <LocateFixed class="text-lg" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" /> <span
+          <LocateFixed class="icon-md" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" /> <span
             class="map-reset-label">重新對焦</span>
         </button>
       </div>
@@ -677,16 +677,16 @@ onBeforeUnmount(() => {
       class="map-search-results mx-3.5 mb-3 grid grid-cols-2 gap-1.5 rounded-lg border border-line bg-panel-muted p-2"
       role="region" aria-label="站點搜尋結果" aria-live="polite">
       <button v-for="station in searchResults" :key="station.id"
-        class="flex min-h-13 items-center justify-between gap-2 rounded-md border border-line bg-panel px-2.5 py-2 text-left text-base text-ink transition-colors hover:border-accent-strong hover:bg-surface"
+        class="flex min-h-13 items-center justify-between gap-2 rounded-md border border-line bg-panel px-2.5 py-2 text-left text-body1 text-ink transition-colors hover:border-accent-strong hover:bg-surface"
         type="button" @click="chooseSearchResult(station.id)">
         <span class="grid min-w-0 gap-0.5"><strong class="truncate">{{ displayStationName(station.name)
-        }}</strong><small class="text-base text-muted">{{ station.district || '新北市' }}</small></span>
-        <b class="shrink-0 whitespace-nowrap font-mono text-base text-accent-strong">{{ station.availableBikes }} 車／{{
+        }}</strong><small class="text-body1 text-muted">{{ station.district || '新北市' }}</small></span>
+        <b class="shrink-0 whitespace-nowrap font-mono text-body1 text-accent-strong">{{ station.availableBikes }} 車／{{
           station.availableDocks }} 位</b>
       </button>
-      <p v-if="!searchResults.length" class="col-span-full m-1 text-center text-base text-muted">找不到符合的站點。</p>
+      <p v-if="!searchResults.length" class="col-span-full m-1 text-center text-body1 text-muted">找不到符合的站點。</p>
       <p v-else-if="mappedStations.length > searchResults.length"
-        class="col-span-full m-1 text-center text-base text-muted">另有 {{ mappedStations.length - searchResults.length }}
+        class="col-span-full m-1 text-center text-body2 text-muted">另有 {{ mappedStations.length - searchResults.length }}
         站，請輸入更完整的站名或行政區。</p>
     </div>
 
@@ -717,10 +717,10 @@ onBeforeUnmount(() => {
             routeStopSequenceLabel(marker) }}</span>
       </div>
       <div v-if="hoveredRouteStopMarker"
-        class="map-route-stop-pill pointer-events-none absolute flex items-center gap-1.5 rounded-full border border-line-strong bg-panel px-3 py-1.5 text-base leading-none text-ink shadow-lg"
+        class="map-route-stop-pill pointer-events-none absolute flex items-center gap-1.5 rounded-full border border-line-strong bg-panel px-3 py-1.5 text-body1 leading-none text-ink shadow-lg"
         :style="{ left: `${hoveredRouteStopMarker.x}px`, top: `${hoveredRouteStopMarker.y}px` }">
         <span
-          class="grid size-5 shrink-0 place-items-center rounded-full bg-accent font-mono text-[11px] font-bold text-on-accent">{{
+          class="grid size-5 shrink-0 place-items-center rounded-full bg-accent font-mono text-body2 font-bold text-on-accent">{{
             hoveredRouteStopMarker.stops.map(stop => stop.sequence).join('・')}}</span>
         <strong class="truncate">{{ routeStopMarkerName(hoveredRouteStopMarker) }}</strong>
         <span class="whitespace-nowrap text-muted">
@@ -733,7 +733,7 @@ onBeforeUnmount(() => {
         </span>
       </div>
       <div v-if="hoveredStation && hoverPoint"
-        class="map-hover-card pointer-events-none absolute grid gap-0.5 rounded-md border border-line-strong bg-panel px-2.5 py-2 text-base leading-snug text-ink shadow-lg"
+        class="map-hover-card pointer-events-none absolute grid gap-0.5 rounded-md border border-line-strong bg-panel px-2.5 py-2 text-body1 leading-snug text-ink shadow-lg"
         :style="{ left: `${hoverPoint.x}px`, top: `${hoverPoint.y}px` }">
         <strong class="truncate">{{ displayStationName(hoveredStation.name) }}</strong>
         <span class="text-muted">{{ hoveredStation.district || '新北市' }}・可借 {{ hoveredStation.availableBikes }}・可還 {{
@@ -741,14 +741,14 @@ onBeforeUnmount(() => {
         <span class="text-muted">{{ hoveredSeverityLabel }}</span>
       </div>
       <div v-if="clickedGroupPoint && clickedGroupStations.length"
-        class="map-group-card absolute grid max-w-72 gap-1.5 rounded-lg border border-line-strong bg-panel p-3 text-base leading-snug text-ink shadow-lg"
+        class="map-group-card absolute grid max-w-72 gap-1.5 rounded-lg border border-line-strong bg-panel p-3 text-body1 leading-snug text-ink shadow-lg"
         :style="{ left: `${clickedGroupPoint.x}px`, top: `${clickedGroupPoint.y}px` }" @click.stop>
         <div class="flex items-start justify-between gap-2">
           <strong>這一帶由 {{ clickedGroupStations.length }} 站服務</strong>
           <button type="button"
             class="grid h-6 w-6 shrink-0 place-items-center rounded text-muted transition-colors hover:bg-accent-strong hover:text-on-accent"
             aria-label="關閉鄰近群清單" @click="closeClickedGroup">
-            <X class="text-lg" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />
+            <X class="icon-md" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />
           </button>
         </div>
         <ul class="grid max-h-56 gap-1 overflow-y-auto">
@@ -765,29 +765,29 @@ onBeforeUnmount(() => {
         </ul>
       </div>
       <p v-if="!allMappedStations.length"
-        class="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 rounded-lg border border-line-strong bg-panel p-3 text-base font-bold text-ink">
+        class="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 rounded-lg border border-line-strong bg-panel p-3 text-body1 font-bold text-ink">
         目前沒有可定位的站點資料。</p>
     </div>
     <div class="map-caption grid gap-2 px-4 pt-3">
       <p class="map-visible-count">{{ headerCount }}{{ headerLabel }}<span>點選站點查看庫存與預測</span></p>
-      <!-- <p class="inline-flex items-center gap-1.5 text-base font-semibold text-muted">
-        <Info class="text-xl text-accent-strong" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />
+      <!-- <p class="inline-flex items-center gap-1.5 text-body1 font-semibold text-muted">
+        <Info class="icon-md text-accent-strong" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />
         綠底代表有服務涵蓋，顏色越深表示越需要處置；放大到街道層級會看到逐站標記，點選標記查看該站資料；點選色斑其餘範圍會展開該處鄰近群的站點清單
       </p> -->
-      <p v-if="baselineNotice" class="flex flex-wrap items-start gap-1.5 text-base font-semibold"
+      <p v-if="baselineNotice" class="flex flex-wrap items-start gap-1.5 text-body1 font-semibold"
         :class="hasBaselineLoadError ? 'text-warning' : 'text-muted'">
-        <component class="mt-0.5 shrink-0 text-xl" :class="hasBaselineLoadError ? 'text-warning' : 'text-accent-strong'"
+        <component class="mt-0.5 shrink-0 icon-md" :class="hasBaselineLoadError ? 'text-warning' : 'text-accent-strong'"
           :is="hasBaselineLoadError ? TriangleAlert : Info" style="width: 1em; height: 1em" :stroke-width="2"
           aria-hidden="true" />
         <span>{{ baselineNotice }}</span>
         <button v-if="hasBaselineLoadError" type="button"
-          class="inline-flex min-h-8 shrink-0 items-center gap-1 rounded-md border border-line-strong bg-transparent px-2 py-1 text-base font-bold text-accent-strong transition-colors hover:border-accent-strong hover:bg-panel-muted hover:text-ink"
+          class="inline-flex min-h-8 shrink-0 items-center gap-1 rounded-md border border-line-strong bg-transparent px-2 py-1 text-body1 font-bold text-accent-strong transition-colors hover:border-accent-strong hover:bg-panel-muted hover:text-ink"
           @click="emit('retryBaseline')">
-          <RefreshCw class="text-lg" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" /> 重新比對
+          <RefreshCw class="icon-md" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" /> 重新比對
         </button>
       </p>
       <div v-if="routeStops && routeStops.length"
-        class="flex flex-wrap gap-x-3 gap-y-1.5 text-base font-semibold text-muted" aria-label="路線觀察圖例">
+        class="flex flex-wrap gap-x-3 gap-y-1.5 text-body1 font-semibold text-muted" aria-label="路線觀察圖例">
         <span class="inline-flex min-w-0 items-center gap-1.5 leading-snug">
           <i class="h-2.5 w-2.5 shrink-0 rounded-full border border-line-strong"
             style="background-color: #3ecf8e" />取車：薄荷綠
@@ -797,7 +797,7 @@ onBeforeUnmount(() => {
             style="background-color: #ff6f61" />卸車：珊瑚紅
         </span>
       </div>
-      <div class="flex flex-wrap gap-x-3 gap-y-1.5 text-base font-semibold text-muted" aria-label="嚴重度圖例">
+      <div class="flex flex-wrap gap-x-3 gap-y-1.5 text-body1 font-semibold text-muted" aria-label="嚴重度圖例">
         <span v-for="entry in SEVERITY_LEGEND" :key="entry.severity"
           class="inline-flex min-w-0 items-center gap-1.5 leading-snug">
           <i class="h-2.5 w-2.5 shrink-0 rounded-full border border-line-strong"
@@ -883,7 +883,7 @@ onBeforeUnmount(() => {
   width: 16px;
   height: 16px;
   transform: translateX(-50%);
-  font-size: 10px;
+  font-size: var(--marker-label);
   line-height: 1;
   white-space: nowrap;
 }
@@ -993,24 +993,24 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: var(--type-body2);
   color: var(--muted);
   margin-bottom: 5px;
 }
 
 .map-eyebrow svg {
   color: var(--accent);
-  font-size: 16px;
+  font-size: var(--icon-sm);
 }
 
 .map-heading-refined h2 {
-  font-size: 19px;
+  font-size: var(--type-h6);
   font-weight: 650;
   letter-spacing: -.025em;
 }
 
 .map-view-state {
-  font-size: 12px;
+  font-size: var(--type-body2);
   color: var(--muted);
   white-space: nowrap;
 }
@@ -1051,17 +1051,17 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
   justify-content: space-between;
   gap: 4px 12px;
-  font-size: 12px;
+  font-size: var(--type-body2);
   color: var(--muted);
   padding-bottom: 4px;
 }
 
 .map-visible-count>span {
-  font-size: 12px;
+  font-size: var(--type-body2);
 }
 
 .home-risk-map .map-caption [aria-label] {
-  font-size: 12px;
+  font-size: var(--type-body2);
   font-weight: 400;
 }
 
@@ -1072,7 +1072,7 @@ onBeforeUnmount(() => {
   }
 
   .map-heading-refined h2 {
-    font-size: 18px;
+    font-size: var(--type-body1);
   }
 
   .home-risk-map .map-height {

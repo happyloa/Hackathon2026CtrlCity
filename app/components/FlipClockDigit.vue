@@ -4,7 +4,7 @@ defineProps<{ digit: string }>()
 
 <template>
   <span
-    class="relative inline-grid h-9 w-8 place-items-center overflow-hidden rounded-md bg-panel-muted font-mono text-3xl font-extrabold text-ink shadow-sm"
+    class="relative inline-grid h-9 w-8 place-items-center overflow-hidden rounded-md bg-panel-muted font-mono text-h3 font-extrabold text-ink shadow-sm"
     aria-hidden="true">
     <Transition name="flip-digit">
       <span :key="digit" class="absolute inset-0 grid place-items-center">{{ digit }}</span>

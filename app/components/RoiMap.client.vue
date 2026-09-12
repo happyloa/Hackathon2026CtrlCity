@@ -157,7 +157,7 @@ watch(() => [props.points, props.selectedId, props.metric], () => render(), { de
       role="application"
       aria-label="站點統計地圖"
     />
-    <div class="mt-2 flex flex-wrap items-center gap-3 text-base text-muted">
+    <div class="mt-2 flex flex-wrap items-center gap-3 text-body1 text-muted">
       <span class="font-bold">{{ metric === 'emptyRate' ? '缺車率' : '滿柱率' }}</span>
       <span v-for="band in BANDS" :key="band.label" class="inline-flex items-center gap-1.5">
         <span class="inline-block size-3 rounded-full" :style="{ backgroundColor: band.colour }" />

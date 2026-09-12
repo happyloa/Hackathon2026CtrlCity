@@ -226,11 +226,11 @@ watch([selectedDistrict, selectedWeekday, selectedSlot, selectedStationId], () =
     <section class="rounded-xl border border-line bg-panel p-4 sm:p-5">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div class="min-w-0">
-          <h2 class="m-0 text-xl font-bold">預測來源</h2>
-          <p class="mt-1 text-base leading-6 text-muted">切換後，首頁的示警與派遣路徑會改用所選來源的預測結果。</p>
+          <h2 class="m-0 text-h6 font-bold">預測來源</h2>
+          <p class="mt-1 text-body1 leading-6 text-muted">切換後，首頁的示警與派遣路徑會改用所選來源的預測結果。</p>
         </div>
         <div
-          class="inline-flex min-h-11 items-center rounded-lg border border-line bg-surface p-1 text-base font-bold"
+          class="inline-flex min-h-11 items-center rounded-lg border border-line bg-surface p-1 text-body1 font-bold"
           role="group"
           aria-label="預測來源"
         >
@@ -248,7 +248,7 @@ watch([selectedDistrict, selectedWeekday, selectedSlot, selectedStationId], () =
           >XGBoost</button>
         </div>
       </div>
-      <p v-if="predictionMode === 'xgboost'" class="mt-3 mb-0 text-base text-muted">
+      <p v-if="predictionMode === 'xgboost'" class="mt-3 mb-0 text-body1 text-muted">
         <template v-if="xgboost.error.value">{{ xgboost.error.value }}</template>
         <template v-else-if="xgboost.pending.value">正在載入 XGBoost 推論結果…</template>
         <template v-else-if="xgboost.payload.value">
@@ -261,21 +261,21 @@ watch([selectedDistrict, selectedWeekday, selectedSlot, selectedStationId], () =
     <!-- F1 Dashboard -->
     <section class="rounded-xl border border-line bg-panel p-4 sm:p-5">
       <div class="min-w-0">
-        <h2 class="m-0 text-xl font-bold">預測品質 F1 對照</h2>
-        <p class="mt-1 text-base leading-6 text-muted">
+        <h2 class="m-0 text-h6 font-bold">預測品質 F1 對照</h2>
+        <p class="mt-1 text-body1 leading-6 text-muted">
           規則基線是固定目標值（6月保留測試集，不受下方篩選影響）；模型 F1 依所選時段與範圍換算，待 XGBoost 完成後顯示。
         </p>
       </div>
 
       <div v-if="baselineF1" class="mt-4">
-        <h3 class="m-0 text-base font-bold text-muted">
+        <h3 class="m-0 text-body1 font-bold text-muted">
           規則基線{{
             baselineF1.scope === 'station' ? `（${selectedStation?.station.name}）`
             : baselineF1.scope === 'district' ? `（${selectedDistrict}）`
             : '（全站）'
           }} · 60分鐘 · 6月測試集
         </h3>
-        <p v-if="baselineF1.scope === 'station'" class="mt-1 mb-0 text-base text-muted">
+        <p v-if="baselineF1.scope === 'station'" class="mt-1 mb-0 text-body1 text-muted">
           這是該站自己的數字（樣本 {{ baselineF1.samples.toLocaleString() }} 筆），不是行政區平均——同一區的其他站可能差很多。
           <template v-if="baselineF1.actualEvents === 0">
             這站在6月的評估時段內完全沒發生過缺車/滿柱事件（可能是雙0停運時段太多、或是本來就很少缺車），Precision/Recall 是 0/0 的邊界情況，不代表基線預測失準。
@@ -318,7 +318,7 @@ watch([selectedDistrict, selectedWeekday, selectedSlot, selectedStationId], () =
       </div>
 
       <div class="mt-5">
-        <h3 class="m-0 text-base font-bold text-muted">
+        <h3 class="m-0 text-body1 font-bold text-muted">
           XGBoost 模型 F1{{
             modelF1Rows.some(r => r.scope === 'station') ? `（${selectedStation?.station.name}）`
             : selectedDistrict ? `（${selectedDistrict}）` : '（全站）'
@@ -330,17 +330,17 @@ watch([selectedDistrict, selectedWeekday, selectedSlot, selectedStationId], () =
             :key="row.horizon"
             class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line bg-surface px-3 py-2"
           >
-            <span class="text-base font-bold">{{ row.horizon }} 分鐘</span>
-            <span v-if="row.metrics" class="text-base">
+            <span class="text-body1 font-bold">{{ row.horizon }} 分鐘</span>
+            <span v-if="row.metrics" class="text-body1">
               Precision {{ percent(row.metrics.precision) }} · Recall {{ percent(row.metrics.recall) }} · F1 {{ percent(row.metrics.f1) }}
             </span>
-            <span v-else-if="row.scope === null && selectedStation" class="text-base text-muted">
+            <span v-else-if="row.scope === null && selectedStation" class="text-body1 text-muted">
               尚未產生（這個視野的鄰站特徵模型還沒訓練，只有60分鐘有單站數字）
             </span>
-            <span v-else class="text-base text-muted">尚未產生 · 等待 Step 5-7 XGBoost 訓練與評估完成</span>
+            <span v-else class="text-body1 text-muted">尚未產生 · 等待 Step 5-7 XGBoost 訓練與評估完成</span>
           </div>
         </div>
-        <p class="mt-2 mb-0 text-base text-muted">
+        <p class="mt-2 mb-0 text-body1 text-muted">
           <template v-if="modelF1Rows.some(r => r.scope === 'station')">
             這是該站自己的數字，不是行政區平均。單站樣本量比行政區小很多，分數會比較不穩定，尤其該站幾乎沒發生過事件時，Precision/Recall 可能落在 0/0 這種邊界情況（不代表模型失準）。
           </template>
@@ -357,16 +357,16 @@ watch([selectedDistrict, selectedWeekday, selectedSlot, selectedStationId], () =
     <section class="rounded-xl border border-line bg-panel p-4 sm:p-5">
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div class="min-w-0">
-          <h2 class="m-0 text-xl font-bold">歷史營運統計</h2>
-          <p class="mt-1 text-base leading-6 text-muted">
+          <h2 class="m-0 text-h6 font-bold">歷史營運統計</h2>
+          <p class="mt-1 text-body1 leading-6 text-muted">
             {{ meta.period }}，依星期與半小時時段彙總。分母僅計營運中時段。
           </p>
         </div>
         <span
           v-if="meta.adjustmentsApplied"
-          class="inline-flex items-center gap-2 rounded-lg bg-surface px-3 py-2 text-base font-semibold text-muted"
+          class="inline-flex items-center gap-2 rounded-lg bg-surface px-3 py-2 text-body1 font-semibold text-muted"
         >
-          <Icon class="text-xl text-accent" icon="solar:shield-check-outline" />
+          <Icon class="icon-md text-accent" icon="solar:shield-check-outline" />
           已套用 {{ meta.adjustmentsApplied }} 筆營運調整
         </span>
       </div>
@@ -378,7 +378,7 @@ watch([selectedDistrict, selectedWeekday, selectedSlot, selectedStationId], () =
         <ModalPicker v-model="selectedSlot" label="時段" :options="SLOT_OPTIONS" />
       </div>
 
-      <p v-if="shardError" class="mt-3 rounded-md border border-warning bg-warning-surface px-3 py-2 text-base">
+      <p v-if="shardError" class="mt-3 rounded-md border border-warning bg-warning-surface px-3 py-2 text-body1">
         {{ shardError }}
       </p>
     </section>
@@ -386,14 +386,14 @@ watch([selectedDistrict, selectedWeekday, selectedSlot, selectedStationId], () =
     <section class="rounded-xl border border-line bg-panel p-4 sm:p-5">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div class="min-w-0">
-          <h3 class="m-0 text-lg font-bold">{{ scopeLabel }} · {{ weekdayNames[weekday] }} {{ slotLabel }}</h3>
-          <p class="mt-1 mb-0 text-base text-muted">點選地圖上的站點可切換到該站的統計。</p>
+          <h3 class="m-0 text-h6 font-bold">{{ scopeLabel }} · {{ weekdayNames[weekday] }} {{ slotLabel }}</h3>
+          <p class="mt-1 mb-0 text-body1 text-muted">點選地圖上的站點可切換到該站的統計。</p>
         </div>
         <div class="flex gap-2">
           <button
             v-for="option in [{ key: 'emptyRate', label: '缺車率' }, { key: 'fullRate', label: '滿柱率' }]"
             :key="option.key"
-            class="inline-flex min-h-11 items-center rounded-lg border px-3 text-base font-bold transition-colors"
+            class="inline-flex min-h-11 items-center rounded-lg border px-3 text-body1 font-bold transition-colors"
             :class="mapMetric === option.key
               ? 'border-accent bg-accent text-on-accent'
               : 'border-line bg-surface text-muted hover:border-accent-strong'"
@@ -404,7 +404,7 @@ watch([selectedDistrict, selectedWeekday, selectedSlot, selectedStationId], () =
       </div>
 
       <div class="mt-4">
-        <p v-if="shardLoading" class="mb-2 text-base text-muted">載入站點資料中…</p>
+        <p v-if="shardLoading" class="mb-2 text-body1 text-muted">載入站點資料中…</p>
         <RoiMap
           :points="mapPoints"
           :selected-id="selectedStationId"
@@ -443,20 +443,20 @@ watch([selectedDistrict, selectedWeekday, selectedSlot, selectedStationId], () =
       />
     </section>
 
-    <p v-else class="rounded-xl border border-line bg-panel p-5 text-base text-muted">
+    <p v-else class="rounded-xl border border-line bg-panel p-5 text-body1 text-muted">
       這個範圍在所選時段沒有可用觀測。
     </p>
 
     <section class="rounded-xl border border-line bg-panel p-4 sm:p-5">
       <div class="flex flex-wrap items-baseline justify-between gap-2">
-        <h3 class="m-0 text-lg font-bold">{{ weekdayNames[weekday] }} 全日走勢</h3>
-        <p v-if="dayPeak" class="m-0 text-base text-muted">
+        <h3 class="m-0 text-h6 font-bold">{{ weekdayNames[weekday] }} 全日走勢</h3>
+        <p v-if="dayPeak" class="m-0 text-body1 text-muted">
           缺車最嚴重：<strong class="text-ink">{{ dayPeak.label }}</strong> {{ percent(dayPeak.rate) }}
         </p>
       </div>
 
       <div
-        class="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 rounded-lg border border-line-strong bg-surface px-3 py-2 text-base"
+        class="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 rounded-lg border border-line-strong bg-surface px-3 py-2 text-body1"
         aria-live="polite"
       >
         <strong class="text-ink">{{ readout.label }}</strong>
@@ -473,8 +473,8 @@ watch([selectedDistrict, selectedWeekday, selectedSlot, selectedStationId], () =
       <div class="mt-3 space-y-4 overflow-x-auto">
         <div v-for="row in dayRows" :key="row.key" class="min-w-184">
           <div class="flex items-baseline justify-between gap-2 pb-1">
-            <strong class="text-base">{{ row.label }}</strong>
-            <span class="text-base text-muted">
+            <strong class="text-body1">{{ row.label }}</strong>
+            <span class="text-body1 text-muted">
               <template v-if="row.peak > 0">此列滿刻度 {{ percent(row.peak) }}（{{ row.peakLabel }}）</template>
               <template v-else>這一天完全沒有發生</template>
             </span>
@@ -500,14 +500,14 @@ watch([selectedDistrict, selectedWeekday, selectedSlot, selectedStationId], () =
               <span class="flex h-24 w-full flex-col justify-end">
                 <span class="w-full rounded-t-sm" :class="row.barClass" :style="{ height: `${(value / row.scale) * 100}%` }" />
               </span>
-              <span class="mt-1 block text-center text-xs" :class="index % 4 === 0 ? 'text-muted' : 'text-transparent'">
+              <span class="mt-1 block text-center text-body2" :class="index % 4 === 0 ? 'text-muted' : 'text-transparent'">
                 {{ index % 4 === 0 ? SLOT_OPTIONS[index]!.label.slice(0, 2) : '·' }}
               </span>
             </button>
           </div>
         </div>
       </div>
-      <p class="mt-2 text-base text-muted">
+      <p class="mt-2 text-body1 text-muted">
         兩列各自獨立縮放，高度不可互相比較 —— 缺車在全系統約為滿柱的 9 倍，共用刻度會讓滿柱那列縮成一條線。點選長條可切換時段。
       </p>
     </section>
@@ -519,7 +519,7 @@ watch([selectedDistrict, selectedWeekday, selectedSlot, selectedStationId], () =
       icon="solar:calendar-outline"
     >
       <div class="overflow-x-auto p-4 sm:p-5">
-        <table class="w-full min-w-152 border-collapse text-base">
+        <table class="w-full min-w-152 border-collapse text-body1">
           <thead>
             <tr class="border-b border-line text-left text-muted">
               <th class="py-2 pr-3 font-bold">星期</th>
@@ -546,7 +546,7 @@ watch([selectedDistrict, selectedWeekday, selectedSlot, selectedStationId], () =
             </tr>
           </tbody>
         </table>
-        <p v-if="selectedStation && shardLoading" class="mt-2 mb-0 text-base text-muted">
+        <p v-if="selectedStation && shardLoading" class="mt-2 mb-0 text-body1 text-muted">
           正在載入其餘星期的站點資料…
         </p>
       </div>
@@ -559,16 +559,16 @@ watch([selectedDistrict, selectedWeekday, selectedSlot, selectedStationId], () =
       icon="solar:list-outline"
     >
       <div class="p-4 sm:p-5">
-      <p v-if="!selectedStation" class="m-0 text-base text-muted">
+      <p v-if="!selectedStation" class="m-0 text-body1 text-muted">
         逐日紀錄是單一站點的原始讀數，請先在上方選擇站點。
       </p>
-      <p v-else-if="detailLoading" class="m-0 text-base text-muted">載入逐日紀錄中…</p>
-      <p v-else-if="detailMissing" class="m-0 text-base text-muted">
+      <p v-else-if="detailLoading" class="m-0 text-body1 text-muted">載入逐日紀錄中…</p>
+      <p v-else-if="detailMissing" class="m-0 text-body1 text-muted">
         明細尚未產生。這些檔案不進版控，請執行 <code class="rounded bg-surface px-1">npm run data:profile</code> 後重試。
       </p>
       <template v-else>
         <div class="overflow-x-auto">
-          <table class="w-full min-w-152 border-collapse text-base">
+          <table class="w-full min-w-152 border-collapse text-body1">
             <thead>
               <tr class="border-b border-line text-left text-muted">
                 <th class="py-2 pr-3 font-bold">日期</th>
@@ -597,7 +597,7 @@ watch([selectedDistrict, selectedWeekday, selectedSlot, selectedStationId], () =
             </tbody>
           </table>
         </div>
-        <p class="mt-3 mb-0 text-base text-muted">
+        <p class="mt-3 mb-0 text-body1 text-muted">
           共 {{ detailRecords.length }} 筆，其中缺車 {{ detailRecords.filter(r => r.availableBikes === 0).length }} 次、滿柱
           {{ detailRecords.filter(r => r.availableDocks === 0).length }} 次。停運（可借與可還皆為 0）的時段不會出現在這裡。
         </p>
@@ -606,7 +606,7 @@ watch([selectedDistrict, selectedWeekday, selectedSlot, selectedStationId], () =
     </DisclosurePanel>
 
     <DisclosurePanel class="panel" title="這些數字怎麼算的" icon="solar:info-circle-outline">
-      <ul class="m-0 grid gap-2 p-4 pl-9 text-base leading-6 text-muted sm:p-5 sm:pl-10">
+      <ul class="m-0 grid gap-2 p-4 pl-9 text-body1 leading-6 text-muted sm:p-5 sm:pl-10">
         <li v-for="(text, key) in meta.definitions" :key="key">{{ text }}</li>
         <li>資料涵蓋 {{ activeScope?.stationCount?.toLocaleString() ?? 0 }} 站，{{ meta.period }}。</li>
       </ul>

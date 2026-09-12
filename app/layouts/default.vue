@@ -33,6 +33,7 @@ const navigation = [
 const adminLabels: Record<string, string> = {
   "/admin/roi": "營運ROI",
   "/admin/adjustments": "營運調整",
+  "/design-system": "字級設計系統",
 };
 
 const activeLabel = computed(
@@ -134,7 +135,7 @@ const navigationTarget = (path: string) => ({
 
 .nav-caption {
   margin: 0 24px 12px;
-  font-size: 12px;
+  font-size: var(--type-body2);
   color: var(--muted);
   letter-spacing: .12em;
 }
@@ -154,14 +155,14 @@ const navigationTarget = (path: string) => ({
   color: var(--muted);
   border-radius: 7px;
   text-decoration: none;
-  font-size: 14px;
+  font-size: var(--type-body2);
   font-weight: 550;
   border: 1px solid transparent;
   transition: background .15s;
 }
 
 .ctrlcity-navigation a>svg {
-  font-size: 20px;
+  font-size: var(--icon-md);
 }
 
 .ctrlcity-navigation a.is-active {
@@ -177,7 +178,7 @@ const navigationTarget = (path: string) => ({
 
 .ctrlcity-navigation .nav-arrow {
   margin-left: auto;
-  font-size: 15px;
+  font-size: var(--icon-sm);
   opacity: 0;
 }
 
@@ -195,19 +196,19 @@ const navigationTarget = (path: string) => ({
 }
 
 .sidebar-footer>svg {
-  font-size: 21px;
+  font-size: var(--icon-md);
   color: var(--accent);
 }
 
 .sidebar-footer strong {
-  font-size: 12px;
+  font-size: var(--type-body2);
   font-weight: 550;
 }
 
 .sidebar-footer small {
   display: block;
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--type-body2);
   margin-top: 3px;
 }
 
@@ -307,25 +308,30 @@ const navigationTarget = (path: string) => ({
 }
 
 .header-heading p {
-  font-size: 12px;
+  font-size: var(--type-body2);
   letter-spacing: .12em;
   color: var(--muted);
   margin-bottom: 7px;
 }
 
+/**
+ * The page title is the H3 role, so it steps 32 -> 28 -> 24 on its own and
+ * needs no per-breakpoint size. Line-height and tracking come from the scale
+ * too; only the flex layout for the trailing badge is local.
+ */
 .header-heading h1 {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 14px;
-  font-size: 28px;
-  line-height: 1.3;
+  font-size: var(--type-h3);
+  line-height: var(--type-h3-lh);
+  letter-spacing: var(--type-h3-ls);
   font-weight: 650;
-  letter-spacing: -.035em;
 }
 
 .header-badge {
-  font-size: 12px;
+  font-size: var(--type-body2);
   font-weight: 500;
   letter-spacing: .03em;
   color: var(--accent);
@@ -344,7 +350,7 @@ const navigationTarget = (path: string) => ({
   border: 1px solid var(--line);
   border-radius: 7px;
   color: var(--muted);
-  font-size: 13px;
+  font-size: var(--type-body2);
 }
 
 .header-theme:hover {
@@ -353,7 +359,7 @@ const navigationTarget = (path: string) => ({
 }
 
 .header-theme svg {
-  font-size: 19px;
+  font-size: var(--icon-md);
 }
 
 @keyframes sidebar-liquid-metal {
@@ -438,7 +444,7 @@ const navigationTarget = (path: string) => ({
     justify-content: flex-start;
     padding: 10px 12px;
     flex-shrink: 0;
-    font-size: 14px;
+    font-size: var(--type-body2);
   }
 
   .sidebar-is-collapsed .ctrlcity-navigation a>span {
@@ -457,7 +463,6 @@ const navigationTarget = (path: string) => ({
   }
 
   .header-heading h1 {
-    font-size: 24px;
     gap: 8px;
   }
 
@@ -468,10 +473,6 @@ const navigationTarget = (path: string) => ({
   .header-theme {
     width: 44px;
     justify-content: center;
-  }
-
-  .header-badge {
-    font-size: 12px;
   }
 }
 
