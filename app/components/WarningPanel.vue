@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { BellRing, CheckCircle2, ChevronDown, Info, TriangleAlert } from '@lucide/vue'
 import { refillAmountFor } from '~/shared/operational-policy.mjs'
-import { buildLiveOperations } from '~/shared/live-operations'
+import { shortageWarningsFor } from '~/shared/shortage-warnings'
 import { displayStationName, type DashboardSummary, type HorizonKey, type StationRisk } from '~/shared/ops'
 
 const props = defineProps<{
@@ -27,10 +27,9 @@ const activeHorizon = ref<HorizonKey>('30')
  * it's something to dispatch for right now.
  */
 function warningsFor(horizon: HorizonKey) {
-  const alerts = buildLiveOperations(props.stations, props.asOf, { horizon }).alerts
+  const alerts = shortageWarningsFor(props.stations, props.asOf, horizon)
   const stationLookup = new Map(props.stations.map(station => [station.id, station]))
   return alerts
-    .filter(alert => alert.condition === 'empty_forecast')
     .map((alert) => {
       const station = stationLookup.get(alert.stationId)!
       const predictedBikes = Math.max(0, station.forecast.horizons[horizon].predictedBikes)

@@ -2,6 +2,7 @@
 import { ArrowRight, Bike, Info, LoaderCircle, RefreshCw, Route as RouteIcon, TriangleAlert } from '@lucide/vue'
 import { buildDispatchRoutePlans, type DispatchRouteStop } from '~/shared/dispatch-route-planner'
 import { buildLiveOperations, buildLiveOperationsForHorizon } from '~/shared/live-operations'
+import { shortageWarningsFor } from '~/shared/shortage-warnings'
 import { overrideStationsWithXgboost } from '~/shared/xgboost-overrides'
 import { briefingFacts, summarize } from '~/composables/useLiveDashboard'
 import { usePredictionMode } from '~/composables/usePredictionMode'
@@ -110,6 +111,7 @@ const currentPlanning = computed(() => {
   return buildDispatchRoutePlans(operations.dispatches, dashboard.value.stations)
 })
 const currentTransferCount = computed(() => currentPlanning.value.routes.reduce((sum, item) => sum + item.totalTransferBikes, 0))
+const shortageCount60 = computed(() => dashboard.value ? shortageWarningsFor(dashboard.value.stations, dashboard.value.meta.asOf, '60').length : 0)
 const hasForecast = computed(() => dashboard.value?.stations.some(station => station.serviceStatus === 'operational' && station.forecast.horizons['60'].baselineStatus === 'matched') ?? false)
 const dataStatus = computed(() => live.error.value ? '資料更新中斷' : live.pending.value ? '正在同步' : dashboard.value ? '官方即時站況' : '等待資料')
 
@@ -131,14 +133,14 @@ function focusDispatchQueue(event: MouseEvent) {
       </a>
       <div class="overview-metric metric-risk">
         <div class="metric-label"><span>60 分鐘高風險</span><TriangleAlert style="width: 1em; height: 1em" aria-hidden="true" /></div>
-        <div class="metric-value">{{ hasForecast ? dashboard?.summary.highRiskNext60m : '—' }}<span>站</span></div>
-        <div class="metric-bottom"><span>{{ hasForecast ? '已對照站點的預測風險' : '預測暫不可用' }}</span><span class="metric-tag">預測</span></div>
+        <div class="metric-value">{{ hasForecast ? shortageCount60 : '—' }}<span>站</span></div>
+        <div class="metric-bottom"><span>{{ hasForecast ? '預測缺車 · 不含目前空站' : '預測暫不可用' }}</span><span class="metric-tag">預測</span></div>
       </div>
-      <div class="overview-metric metric-inventory">
+      <NuxtLink :to="{ path: '/stations', query: contextQuery }" class="overview-metric metric-inventory" aria-label="目前空站／滿站，前往站點總覽">
         <div class="metric-label"><span>目前空站／滿站</span><Bike style="width: 1em; height: 1em" aria-hidden="true" /></div>
         <div class="metric-value inventory-value"><span class="empty-count">{{ dashboard?.summary.emptyNow ?? '—' }}</span><i>/</i>{{ dashboard?.summary.fullNow ?? '—' }}<span>站</span></div>
         <div class="metric-bottom"><span>無車可借／無位可還</span><span class="metric-tag">即時</span></div>
-      </div>
+      </NuxtLink>
     </section>
 
     <WarningPanel v-if="dashboard" :stations="dashboard.stations" :as-of="dashboard.meta.asOf"
@@ -197,7 +199,8 @@ function focusDispatchQueue(event: MouseEvent) {
 .metric-routes { --metric-color: var(--accent); background: color-mix(in srgb, var(--accent) 5%, var(--panel)); text-decoration: none; transition: border-color .15s; }
 .metric-routes:hover { border-color: var(--accent); }
 .metric-risk { --metric-color: var(--warning); }
-.metric-inventory { --metric-color: var(--danger); }
+.metric-inventory { --metric-color: var(--danger); color: var(--ink); text-decoration: none; transition: border-color .15s; }
+.metric-inventory:hover, .metric-inventory:focus-visible { border-color: var(--danger); }
 .metric-label, .metric-bottom { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .metric-label { font-size: 15px; font-weight: 600; color: var(--muted); }
 .metric-label svg { color: var(--metric-color); font-size: 23px; }
