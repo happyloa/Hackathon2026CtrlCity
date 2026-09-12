@@ -1,0 +1,67 @@
+name: Deploy AWS demo
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: aws-demo-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      AWS_REGION: us-west-2
+      AWS_STACK: ctrlcity-hackathon
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check deployment configuration
+        env:
+          DEPLOY_ROLE: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+        run: |
+          if [ -z "$DEPLOY_ROLE" ]; then
+            echo 'Set repository variable AWS_DEPLOY_ROLE_ARN to the GitHub OIDC deployment role.'
+            exit 1
+          fi
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - run: npm ci
+      - run: npm test
+      - run: npm run typecheck
+      - name: Deploy API code
+        run: |
+          function_name=$(aws cloudformation describe-stacks --stack-name "$AWS_STACK" --query 'Stacks[0].Outputs[?OutputKey==`ApiFunctionName`].OutputValue | [0]' --output text)
+          node scripts/build-aws-api.mjs
+          (cd .aws-sam/api && zip -q ../api.zip handler.cjs)
+          aws lambda update-function-code --function-name "$function_name" --zip-file fileb://.aws-sam/api.zip --query 'LastUpdateStatus' --output text
+          aws lambda wait function-updated-v2 --function-name "$function_name"
+      - run: npm run aws:publish -- --stack "$AWS_STACK" --region "$AWS_REGION"
+      - name: Wait for CloudFront deployment and invalidations
+        run: |
+          distribution=$(aws cloudformation describe-stacks --stack-name "$AWS_STACK" --query 'Stacks[0].Outputs[?OutputKey==`DistributionId`].OutputValue | [0]' --output text)
+          aws cloudfront wait distribution-deployed --id "$distribution"
+          for invalidation in $(aws cloudfront list-invalidations --distribution-id "$distribution" --query 'InvalidationList.Items[?Status==`InProgress`].Id' --output text); do
+            aws cloudfront wait invalidation-completed --distribution-id "$distribution" --id "$invalidation"
+          done
+      - run: npm run aws:smoke -- --stack "$AWS_STACK" --region "$AWS_REGION"
+      - name: Show demo URL
+        run: |
+          url=$(aws cloudformation describe-stacks --stack-name "$AWS_STACK" --query 'Stacks[0].Outputs[?OutputKey==`SiteUrl`].OutputValue | [0]' --output text)
+          printf 'Demo URL: %s\n' "$url" >> "$GITHUB_STEP_SUMMARY"

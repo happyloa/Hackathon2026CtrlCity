@@ -148,14 +148,21 @@ async function proxyLiveStations(fetchImpl: typeof fetch): Promise<HttpApiRespon
   const liveFeedUrl = environmentValue('LIVE_FEED_URL')?.trim() || DEFAULT_LIVE_FEED_URL
 
   try {
-    const upstream = await fetchImpl(liveFeedUrl, {
+    const signal = AbortSignal.timeout(12_000)
+    const fetchUpstream = () => fetchImpl(liveFeedUrl, {
       headers: {
         accept: 'application/json',
         'cache-control': 'no-cache',
         'user-agent': 'CtrlCity-YouBike-Demo/1.0',
       },
       cache: 'no-store',
-      signal: AbortSignal.timeout(12_000),
+      signal,
+    })
+    // The overseas connection occasionally resets. Retry once within the
+    // original deadline; never substitute historical data for a live feed.
+    const upstream = await fetchUpstream().catch((error) => {
+      if (signal.aborted) throw error
+      return fetchUpstream()
     })
 
     if (!upstream.ok) {

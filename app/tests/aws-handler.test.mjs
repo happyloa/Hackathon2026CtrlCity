@@ -21,6 +21,33 @@ const validRequest = {
   ],
 }
 
+test('retries one interrupted live-feed connection and returns the official response', async () => {
+  let calls = 0
+  const signals = []
+  const handler = createLambdaHandler({ fetchImpl: async (_url, options) => {
+    signals.push(options.signal)
+    if (++calls === 1) throw new TypeError('fetch failed')
+    return new Response('[{"sno":"500101001"}]', { headers: { 'content-type': 'application/json' } })
+  } })
+  const response = await handler(event('GET', '/api/v1/live-stations'))
+  assert.equal(calls, 2)
+  assert.equal(signals[0], signals[1], 'Retries share the original timeout budget')
+  assert.equal(response.statusCode, 200)
+  assert.deepEqual(JSON.parse(response.body), [{ sno: '500101001' }])
+})
+
+test('stops after one retry when the official live feed remains unreachable', async () => {
+  let calls = 0
+  const handler = createLambdaHandler({ fetchImpl: async () => {
+    calls++
+    throw new TypeError('fetch failed')
+  } })
+  const response = await handler(event('GET', '/api/v1/live-stations'))
+  assert.equal(calls, 2)
+  assert.equal(response.statusCode, 502)
+  assert.equal(JSON.parse(response.body).error.code, 'LIVE_FEED_UNAVAILABLE')
+})
+
 function event(method, path, body) {
   return {
     rawPath: path,

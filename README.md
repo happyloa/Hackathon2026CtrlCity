@@ -1,6 +1,8 @@
 # CtrlCity｜新北市 YouBike 營運工作台
 
-以新北市官方即時站況對照主辦方六個月歷史資料，產生 60 分鐘空／滿站風險、可解釋優先分數與多站搬運路線。公開 Demo：<https://hackathon2026ctrlcity.pages.dev>
+以新北市官方即時站況對照主辦方六個月歷史資料，產生 60 分鐘空／滿站風險、可解釋優先分數與多站搬運路線。
+
+競賽 AWS Demo：<https://d1j270xi5vh8gd.cloudfront.net> · Cloudflare Demo：<https://hackathon2026ctrlcity.pages.dev>
 
 ## Demo 主線
 
@@ -53,9 +55,9 @@ npm run build
 
 ## AWS 正式環境
 
-程式已備妥私有 S3、CloudFront、HTTP API／Lambda、選配 AgentCore Harness 與獨立知識文件 bucket。預設不建立知識來源、不啟用 Agent，也不會在本機驗證時建立任何 AWS 資源。
+競賽 AWS 版本部署於 `us-west-2`，使用私有 S3、CloudFront、HTTP API／Lambda。推送 `main` 後，GitHub Actions 使用 OIDC 自動更新前端及 API；Cloudflare Pages 由既有 Git Integration 獨立部署。Agent 與知識來源預設關閉。
 
-正式帳號到手後，先依 [AWS 技術交接](app/aws/README.md)執行 preflight，再部署、發布與 smoke test。帳號、region、核准模型與 Harness／Knowledge Base 權限尚未確認前，不應執行部署。
+部署設定、權限範圍與基礎設施更新方式見 [AWS 技術交接](app/aws/README.md)。
 
 ## 資料與文件
 

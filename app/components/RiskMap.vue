@@ -608,6 +608,8 @@ function focusSelectedStation() {
 async function initialiseMap() {
   if (!mapElement.value || leafletMap) return
   leaflet = await import('leaflet')
+  // Navigation can unmount this component while the module is downloading.
+  if (!mapElement.value || leafletMap) return
   leafletMap = leaflet.map(mapElement.value, {
     attributionControl: false,
     preferCanvas: true,

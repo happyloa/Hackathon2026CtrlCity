@@ -31,7 +31,8 @@ try {
   ]
 
   run('sam', ['validate', '--lint', ...sharedSamArgs])
-  run('sam', ['build', ...sharedSamArgs])
+  // SAM installs production dependencies for Lambda, not the Nuxt frontend.
+  run('sam', ['build', ...sharedSamArgs], { env: { npm_config_ignore_scripts: 'true' } })
   const builtTemplate = resolve(appDir, '.aws-sam', 'build', 'template.yaml')
   requireFile(builtTemplate, 'SAM built template')
 
