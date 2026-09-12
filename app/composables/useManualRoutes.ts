@@ -1,4 +1,3 @@
-import { parseManualRoutesFile } from '~/shared/manual-route-storage'
 import { DEFAULT_DISPATCH_ROUTE_POLICY } from '~/shared/parameters.mjs'
 import { taipeiTimeLabel, type ManualRoute, type ManualRouteStopInput } from '~/shared/manual-route-planner'
 
@@ -43,11 +42,18 @@ export interface CreateManualRouteOptions {
  * User-authored dispatch routes: independent of `buildDispatchRoutePlans`'s
  * auto-generated output (see `manual-route-planner.ts`), so a live data
  * refresh never rewrites or discards one -- an operator's own routing stays
- * exactly as they left it until they edit or delete it themselves. Local
- * builds persist in the browser; AWS uses the authenticated S3 document API.
+ * exactly as they left it until they edit or delete it themselves.
+ *
+ * Always browser-local, on every deployment. These routes exist to be built in
+ * a few seconds and handed to Google Maps for navigation, so gating them behind
+ * a cloud sign-in and an explicit "save to cloud" step made the quick path
+ * impossible on AWS while the identical feature stayed one click away locally.
+ * They are one operator's working notes, not shared operational state -- the
+ * documents that *are* shared (`useOperationalAdjustments`, `useDemandEvents`)
+ * keep the authenticated S3 path.
  */
 export function useManualRoutes() {
-  const browserStorage = useBrowserStorage()
+  const browserStorage = useBrowserStorage({ authored: true })
   const routes = useState<ManualRoute[]>(STATE_KEY, () => [])
   const loaded = useState<boolean>(`${STATE_KEY}:loaded`, () => false)
   // Shared across every useManualRoutes() caller, so the route comparison
@@ -61,11 +67,7 @@ export function useManualRoutes() {
     editorExpanded.value = true
   }
 
-  const endpoint = String(useRuntimeConfig().public.manualRoutesEndpoint || '')
-  const cloud = useOperatorDocument(endpoint, parseManualRoutesFile, () => routes.value, value => { routes.value = value }, value => ({ schemaVersion: '1.0', routes: value }))
-
   function persist() {
-    if (cloud.remote) { cloud.markDirty(); return }
     if (!import.meta.client) return
     try {
       browserStorage.setItem(STORAGE_KEY, JSON.stringify(routes.value))
@@ -77,7 +79,6 @@ export function useManualRoutes() {
 
   function load() {
     if (!import.meta.client || loaded.value) return
-    if (cloud.remote) { if (!cloud.ready.value) void cloud.reload(); return }
     loaded.value = true
     try {
       const raw = browserStorage.getItem(STORAGE_KEY)
@@ -96,7 +97,6 @@ export function useManualRoutes() {
   }
 
   function createRoute(options: CreateManualRouteOptions = {}): ManualRoute {
-    if (!cloud.canEdit.value) throw new Error('登入並載入雲端路線後可編輯')
     const now = new Date().toISOString()
     const route: ManualRoute = {
       id: createId('manual-route'),
@@ -113,13 +113,11 @@ export function useManualRoutes() {
   }
 
   function removeRoute(routeId: string) {
-    if (!cloud.canEdit.value) return
     routes.value = routes.value.filter(route => route.id !== routeId)
     persist()
   }
 
   function renameRoute(routeId: string, label: string) {
-    if (!cloud.canEdit.value) return
     const trimmed = label.trim()
     if (!trimmed) return
     routes.value = routes.value.map(route => (route.id === routeId ? touch({ ...route, label: trimmed }) : route))
@@ -127,21 +125,18 @@ export function useManualRoutes() {
   }
 
   function setVehicleCapacity(routeId: string, vehicleCapacity: number) {
-    if (!cloud.canEdit.value) return
     const capacity = Math.max(1, Math.round(vehicleCapacity) || 1)
     routes.value = routes.value.map(route => (route.id === routeId ? touch({ ...route, vehicleCapacity: capacity }) : route))
     persist()
   }
 
   function setScheduledAt(routeId: string, scheduledAt: string) {
-    if (!cloud.canEdit.value) return
     if (!/^\d{2}:\d{2}$/.test(scheduledAt)) return
     routes.value = routes.value.map(route => (route.id === routeId ? touch({ ...route, scheduledAt }) : route))
     persist()
   }
 
   function addStop(routeId: string, stationId: string) {
-    if (!cloud.canEdit.value) return
     routes.value = routes.value.map((route) => {
       if (route.id !== routeId) return route
       const stop: ManualRouteStopInput = { id: createId('stop'), stationId, pickupBikes: 0, dropoffBikes: 0 }
@@ -151,7 +146,6 @@ export function useManualRoutes() {
   }
 
   function removeStop(routeId: string, stopId: string) {
-    if (!cloud.canEdit.value) return
     routes.value = routes.value.map(route => (route.id === routeId
       ? touch({ ...route, stops: route.stops.filter(stop => stop.id !== stopId) })
       : route))
@@ -159,7 +153,6 @@ export function useManualRoutes() {
   }
 
   function updateStop(routeId: string, stopId: string, patch: Partial<Pick<ManualRouteStopInput, 'pickupBikes' | 'dropoffBikes'>>) {
-    if (!cloud.canEdit.value) return
     routes.value = routes.value.map((route) => {
       if (route.id !== routeId) return route
       return touch({
@@ -177,7 +170,6 @@ export function useManualRoutes() {
   }
 
   function moveStop(routeId: string, stopId: string, direction: -1 | 1) {
-    if (!cloud.canEdit.value) return
     routes.value = routes.value.map((route) => {
       if (route.id !== routeId) return route
       const index = route.stops.findIndex(stop => stop.id === stopId)
@@ -192,7 +184,6 @@ export function useManualRoutes() {
   }
 
   return {
-    cloud,
     routes,
     activeRouteId,
     editorExpanded,

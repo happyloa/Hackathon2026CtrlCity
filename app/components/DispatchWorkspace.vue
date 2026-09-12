@@ -205,11 +205,6 @@ async function handleEditRoute() {
     routeId = choice.manualRouteId
   } else {
     const scheduledAt = taipeiTimeLabel(Date.now() + HORIZON_MINUTES[activeHorizon.value] * 60_000)
-    if (!manualRoutesApi.cloud.canEdit.value) {
-      manualRoutesApi.editorExpanded.value = true
-      document.getElementById('manual-route-editor')?.scrollIntoView({ behavior: 'smooth' })
-      return
-    }
     const route = manualRoutesApi.createRoute({
       label: `路線 ${String(choice.number).padStart(2, '0')} 編輯版`,
       vehicleCapacity: choice.plan.vehicleCapacity,

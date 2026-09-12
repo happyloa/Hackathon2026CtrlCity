@@ -1,5 +1,6 @@
 import { createBrowserStorage } from '~/shared/browser-storage'
 
-export function useBrowserStorage() {
-  return createBrowserStorage(String(useRuntimeConfig().public.storageMode), () => window.localStorage)
+/** Pass `{ authored: true }` for content the operator typed, not data derived from the feed. */
+export function useBrowserStorage(options: { authored?: boolean } = {}) {
+  return createBrowserStorage(String(useRuntimeConfig().public.storageMode), () => window.localStorage, options)
 }
