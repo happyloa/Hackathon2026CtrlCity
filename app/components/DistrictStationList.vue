@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ArrowUpRight, Check, ChevronDown, CircleHelp, ListFilter, Search, Settings, TriangleAlert, Wrench } from '@lucide/vue'
 import { displayStationName, type Alert, type StationRisk } from '~/shared/ops'
-import { durationPriorityBonus } from '~/shared/operational-policy.mjs'
 import { compareStationValues, stationOverviewStatus, stationStatusDurationMinutes } from '~/shared/station-overview'
 
 const props = withDefaults(defineProps<{
@@ -99,9 +98,9 @@ function priority(station: StationRisk) {
   if (status !== 'empty' && status !== 'full') return null
   const alert = alertLookup.value.get(station.id)
   if (!alert) return null
-  const parts = alert.scoreParts
-  const base = parts.forecast + parts.current + parts.gap + parts.quality
-  return Math.round(Math.min(100, base + durationPriorityBonus(durations.value.get(station.id))))
+  // The alert already carries every band and tie-breaker; recomputing a
+  // duration bonus here would double-count the band it is already in.
+  return Math.round(Math.min(100, alert.priorityScore))
 }
 function rowStyle(station: StationRisk) {
   const score = priority(station)

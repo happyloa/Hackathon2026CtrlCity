@@ -30,6 +30,9 @@ export const DEFAULT_DISPATCH_ROUTE_POLICY: Readonly<DispatchRoutePolicyShape>
 
 export const ALERT_PRIORITY_THRESHOLDS: Readonly<{ immediate: number; high: number }>
 
+/** Band floors for how long a station has been short; highest minutes first. */
+export const SUSTAINED_SHORTAGE_TIERS: readonly Readonly<{ minutes: number; score: number }>[]
+
 export const NEAR_EMPTY_BIKES: number
 
 export const XGBOOST_ALERT_THRESHOLD: number

@@ -141,6 +141,11 @@ function createLiveDashboard(
         ? carried!.stateMinutes
         : stationStatusDurationMinutes(station, snapshotsFor(station.id), Date.now())
 
+    // The unified 缺車 clock: unlike the clock above it keeps running while a
+    // station sits at 1 or 2 bikes, which is what the priority bands rank on.
+    // Only the scheduler can answer it, so it stays null without those runs.
+    station.shortageDurationMinutes = describesThisReading ? carried!.lowBikesMinutes ?? null : null
+
     if (describesThisReading) {
       const hour = new Date(Date.parse(response.meta.asOf) + 8 * 3600000).getUTCHours()
       if (hour >= 6 && carried!.unchangedMinutes >= 180) station.qualityFlags.push(`疑似壞車／感測異常：庫存已 ${Math.floor(carried!.unchangedMinutes / 60)} 小時未變化，請現場查驗。`)

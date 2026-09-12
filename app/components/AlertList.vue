@@ -80,7 +80,7 @@ function inventoryIcon(score: number) {
 
 function scorePartsLabel(alert: Alert) {
   const parts = alert.scoreParts
-  return `60 分風險 ${parts.forecast}・當下空滿 ${parts.current}・缺口 ${parts.gap}・基線 ${parts.quality}・維持時間 ${parts.duration ?? 0}`
+  return `持續缺車 ${parts.duration ?? 0}・當下空滿 ${parts.current}・60 分風險 ${parts.forecast}・缺口 ${parts.gap}・基線 ${parts.quality}`
 }
 </script>
 

@@ -78,6 +78,14 @@ export interface PredictionCoverage {
 
 export interface StationRisk {
   statusDurationMinutes?: number | null
+  /**
+   * How long available bikes have stayed below `NEAR_EMPTY_BIKES` without a
+   * break -- the unified 缺車 clock, so it counts a station sitting at 1 or 2
+   * bikes, not only one at exactly zero like `statusDurationMinutes`. Drives
+   * the priority bands in `scoreAlertPriority`. Absent on deployments whose
+   * scheduler does not publish the runs.
+   */
+  shortageDurationMinutes?: number | null
   id: string
   name: string
   city: string
@@ -108,7 +116,8 @@ export interface Alert {
   /** Explainable 0-100 ordering score; service anomalies deliberately use 0. */
   priorityScore: number
   scoreParts: {
-    duration?: number
+    /** Band floor from the sustained-shortage tiers; 0 when nothing is running. */
+    duration: number
     forecast: number
     current: number
     gap: number

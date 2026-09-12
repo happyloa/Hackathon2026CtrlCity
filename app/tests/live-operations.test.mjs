@@ -92,12 +92,13 @@ test('current empty station creates a stable critical alert with an explicit saf
   assert.equal(first.alerts[0].condition, 'empty_now')
   assert.equal(first.alerts[0].severity, 'critical')
   assert.equal(first.alerts[0].riskScore, 0.9)
-  assert.equal(first.alerts[0].priorityScore, 83.5)
+  assert.equal(first.alerts[0].priorityScore, 41.6)
   assert.deepEqual(first.alerts[0].scoreParts, {
-    forecast: 22.5,
-    current: 50,
-    gap: 7.5,
-    quality: 3.5,
+    duration: 0,
+    forecast: 10.8,
+    current: 25,
+    gap: 3,
+    quality: 2.8,
   })
   assert.equal(first.alerts[0].dispatchEligible, true)
   assert.ok(first.alerts[0].priorityScore < 100)
@@ -130,7 +131,7 @@ test('officially inactive stations are surfaced for review but never used for di
   const serviceAlert = plan.alerts.find(alert => alert.stationId === 'official-inactive-source')
   assert.equal(serviceAlert.condition, 'unavailable')
   assert.equal(serviceAlert.priorityScore, 0)
-  assert.deepEqual(serviceAlert.scoreParts, { forecast: 0, current: 0, gap: 0, quality: 0 })
+  assert.deepEqual(serviceAlert.scoreParts, { duration: 0, forecast: 0, current: 0, gap: 0, quality: 0 })
   assert.equal(serviceAlert.dispatchEligible, false)
   assert.equal(plan.dispatches.length, 0)
 })
@@ -180,11 +181,15 @@ test('alert priority is additive, monotonic, bounded, and only saturates when ev
   }
 
   assert.equal(scoreAlertPriority(base).priorityScore, 0)
-  assert.equal(scoreAlertPriority({ ...base, riskScore: 1 }).priorityScore, 25)
-  assert.equal(scoreAlertPriority({ ...base, currentFailure: true }).priorityScore, 50)
-  assert.equal(scoreAlertPriority({ ...base, gap: 8 }).priorityScore, 20)
-  assert.equal(scoreAlertPriority({ ...base, quality: 1 }).priorityScore, 5)
-  assert.equal(scoreAlertPriority({ ...base, riskScore: 1, currentFailure: true, gap: 8, quality: 1 }).priorityScore, 100)
+  assert.equal(scoreAlertPriority({ ...base, riskScore: 1 }).priorityScore, 12)
+  assert.equal(scoreAlertPriority({ ...base, currentFailure: true }).priorityScore, 25)
+  assert.equal(scoreAlertPriority({ ...base, gap: 8 }).priorityScore, 8)
+  assert.equal(scoreAlertPriority({ ...base, quality: 1 }).priorityScore, 4)
+  assert.equal(scoreAlertPriority({ ...base, shortageMinutes: 30 }).priorityScore, 50)
+  assert.equal(scoreAlertPriority({ ...base, shortageMinutes: 60 }).priorityScore, 75)
+  assert.equal(scoreAlertPriority({
+    ...base, riskScore: 1, currentFailure: true, gap: 8, quality: 1, shortageMinutes: 60,
+  }).priorityScore, 99)
 
   const ordinary = scoreAlertPriority({ ...base, riskScore: 0.7, currentFailure: true, gap: 3, quality: 0.7 })
   const higherRisk = scoreAlertPriority({ ...base, riskScore: 0.8, currentFailure: true, gap: 3, quality: 0.7 })
@@ -192,7 +197,7 @@ test('alert priority is additive, monotonic, bounded, and only saturates when ev
   assert.ok(ordinary.priorityScore < 100)
   assert.ok(higherRisk.priorityScore > ordinary.priorityScore)
   assert.ok(largerGap.priorityScore > ordinary.priorityScore)
-  assert.equal(scoreAlertPriority({ ...base, gap: 80, quality: 5 }).priorityScore, 25)
+  assert.equal(scoreAlertPriority({ ...base, gap: 80, quality: 5 }).priorityScore, 12)
 })
 
 test('any current empty or full failure outranks the strongest forecast-only alert', () => {
@@ -209,9 +214,28 @@ test('any current empty or full failure outranks the strongest forecast-only ale
     quality: 1,
   })
 
-  assert.equal(currentFailure.priorityScore, 55)
-  assert.equal(forecastOnlyMaximum.priorityScore, 50)
+  assert.equal(currentFailure.priorityScore, 27)
+  assert.equal(forecastOnlyMaximum.priorityScore, 24)
   assert.ok(currentFailure.priorityScore > forecastOnlyMaximum.priorityScore)
+})
+
+test('sustained shortage bands are strictly ordered and never overlap', () => {
+  // The guarantee the bands exist for: no combination of forecast confidence,
+  // gap or baseline quality can lift an alert past the band above it.
+  const weakest = extra => scoreAlertPriority({ riskScore: 0, currentFailure: false, gap: 0, quality: 0, ...extra }).priorityScore
+  const strongest = extra => scoreAlertPriority({ riskScore: 1, currentFailure: false, gap: 8, quality: 1, ...extra }).priorityScore
+
+  const forecast = [weakest({}), strongest({})]
+  const current = [weakest({ currentFailure: true }), strongest({ currentFailure: true })]
+  // A sustained run bands the alert on its own: a station sitting at one or
+  // two bikes for an hour ranks with the empty ones, not below them.
+  const thirty = [weakest({ shortageMinutes: 30 }), strongest({ currentFailure: true, shortageMinutes: 59 })]
+  const sixty = [weakest({ shortageMinutes: 60 }), strongest({ currentFailure: true, shortageMinutes: 600 })]
+
+  assert.deepEqual([forecast, current, thirty, sixty], [[0, 24], [25, 49], [50, 74], [75, 99]])
+  for (const [lower, upper] of [[forecast, current], [current, thirty], [thirty, sixty]]) {
+    assert.ok(lower[1] < upper[0], `${lower[1]} 必須低於 ${upper[0]}`)
+  }
 })
 
 test('forecast full risk creates a full-station alert before the station is physically full', () => {
@@ -640,16 +664,21 @@ test('"60" keeps every station already picked up at "30", even if that station\'
   assert.deepEqual(sixty.dispatches.map(dispatch => dispatch.toStationId), [recovering.id])
 })
 
-test('duration raises current shortage priority with a ten-point cap', () => {
+test('a sustained shortage lifts the alert a whole band, not a few points', () => {
   const base = { riskScore: 0.6, currentFailure: true, gap: 3, quality: 1 }
   const original = scoreAlertPriority(base).priorityScore
-  assert.equal(scoreAlertPriority({ ...base, durationMinutes: 30 }).priorityScore, original + 5)
-  assert.equal(scoreAlertPriority({ ...base, durationMinutes: 180 }).priorityScore, original + 10)
-  assert.equal(scoreAlertPriority({ ...base, durationMinutes: null }).priorityScore, original)
-  assert.equal(scoreAlertPriority({ ...base, durationMinutes: -10 }).priorityScore, original)
-  assert.equal(scoreAlertPriority({ ...base, riskScore: 1, gap: 8, durationMinutes: 60 }).priorityScore, 100)
-  assert.equal(scoreAlertPriority({ ...base, currentFailure: false, durationMinutes: 60 }).priorityScore,
-    scoreAlertPriority({ ...base, currentFailure: false }).priorityScore)
+  assert.equal(scoreAlertPriority({ ...base, shortageMinutes: 29 }).priorityScore, original)
+  // The band replaces the "currently short" floor rather than stacking on it.
+  assert.equal(scoreAlertPriority({ ...base, shortageMinutes: 30 }).priorityScore, original + 25)
+  assert.equal(scoreAlertPriority({ ...base, shortageMinutes: 59 }).priorityScore, original + 25)
+  assert.equal(scoreAlertPriority({ ...base, shortageMinutes: 60 }).priorityScore, original + 50)
+  assert.equal(scoreAlertPriority({ ...base, shortageMinutes: 600 }).priorityScore, original + 50)
+  assert.equal(scoreAlertPriority({ ...base, shortageMinutes: null }).priorityScore, original)
+  assert.equal(scoreAlertPriority({ ...base, shortageMinutes: -10 }).priorityScore, original)
+
+  // The empty-only clock is the fallback when the scheduler publishes no runs.
+  assert.equal(scoreAlertPriority({ ...base, durationMinutes: 60 }).priorityScore, original + 50)
+  assert.equal(scoreAlertPriority({ ...base, shortageMinutes: 0, durationMinutes: 60 }).priorityScore, original)
 })
 
 test('longer continuous shortage is prioritized by the live planner', () => {

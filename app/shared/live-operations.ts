@@ -61,6 +61,8 @@ interface DispatchEdge extends DispatchCandidate {
 
 export interface AlertPriorityInput {
   durationMinutes?: number | null
+  /** Unified 缺車 run; takes precedence over `durationMinutes` for banding. */
+  shortageMinutes?: number | null
   riskScore: number
   currentFailure: boolean
   gap: number
@@ -224,7 +226,7 @@ function actionableAlert(
         durationMinutes: station.statusDurationMinutes ?? 0,
         riskScore,
         priorityScore: 0,
-        scoreParts: { forecast: 0, current: 0, gap: 0, quality: 0 },
+        scoreParts: { duration: 0, forecast: 0, current: 0, gap: 0, quality: 0 },
         dispatchEligible: false,
         status: 'open',
         reasons: ['服務狀態異常，已排除預測與路線。'],
@@ -278,6 +280,9 @@ function actionableAlert(
     gap,
     quality: alertDataQuality(station, forecast),
     durationMinutes: station.statusDurationMinutes,
+    // The unified 缺車 clock bands the alert; the empty-only clock is the
+    // fallback for deployments without the scheduler's published runs.
+    shortageMinutes: station.shortageDurationMinutes ?? station.statusDurationMinutes,
   })
 
   return {

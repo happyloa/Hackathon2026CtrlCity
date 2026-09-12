@@ -120,10 +120,15 @@ export const DEFAULT_LIVE_OPERATION_POLICY = Object.freeze({
    */
   maximumAlerts: 80,
   /**
-   * Cap on dispatch recommendations returned per run.
-   * 每次規劃回傳的調度建議數量上限。
+   * Cap on dispatch recommendations returned per run. This is the binding
+   * constraint on how many struggling stations get help: with ~100 actionable
+   * alerts in an evening, a cap of 16 meant most stations that had already run
+   * out never appeared in a route at all, however high they scored.
+   * 每次規劃回傳的調度建議數量上限。這是「有多少站點真的被救到」的決定性限制：
+   * 傍晚時段可派遣告警約 100 筆，上限 16 會讓多數「已經沒車」的站點無論分數多高
+   * 都排不進任何路線。
    */
-  maximumDispatches: 16,
+  maximumDispatches: 40,
 })
 
 /**
@@ -166,12 +171,40 @@ export const DEFAULT_DISPATCH_ROUTE_POLICY = Object.freeze({
 })
 
 /**
+ * How long a station must have been short of bikes before it outranks
+ * everything below it. `scoreAlertPriority` turns these into a band floor, so
+ * the ordering is structural rather than the outcome of tuning weights:
+ *
+ *   已缺車 >= 60 分   75-99   最優先
+ *   已缺車 >= 30 分   50-74
+ *   目前缺車／滿柱     25-49   (still short, but not yet 30 minutes)
+ *   預測缺車／滿柱      0-24
+ *
+ * A predicted shortage can therefore never outrank an observed one, and an
+ * hour-long shortage can never be displaced by a half-hour one. The minutes
+ * are the unified 缺車 run (`NEAR_EMPTY_BIKES`), the same clock the homepage
+ * 即時缺車 >=30/>=60 lists and the opening alarm read.
+ *
+ * 站點必須缺車多久才會壓過下一層。`scoreAlertPriority` 把這些轉成分數的樓地板，
+ * 讓排序來自結構而不是權重微調：預測永遠不可能壓過已發生的缺車，半小時的缺車也
+ * 永遠不可能壓過一小時的。分鐘數取自統一的缺車判定（`NEAR_EMPTY_BIKES`），與首頁
+ * 「即時缺車 ≥30／≥60 分鐘」清單和開啟時的警示同一個時鐘。
+ */
+export const SUSTAINED_SHORTAGE_TIERS = Object.freeze([
+  { minutes: 60, score: 75 },
+  { minutes: 30, score: 50 },
+])
+
+/**
  * Alert list UI buckets (`AlertList.vue`), scored 0-100 by `scoreAlertPriority`.
- * 告警清單 UI 分級門檻（`AlertList.vue`），對應 `scoreAlertPriority` 產出的 0-100 分數。
+ * Aligned with the bands above: 「立即關注」starts where a shortage has lasted
+ * 30 minutes, 「高優先」where a station has already run out.
+ * 告警清單 UI 分級門檻（`AlertList.vue`），對應 `scoreAlertPriority` 產出的 0-100
+ * 分數，並對齊上面的分層：「立即關注」自缺車滿 30 分鐘起，「高優先」自目前已缺車起。
  */
 export const ALERT_PRIORITY_THRESHOLDS = Object.freeze({
-  immediate: 55,
-  high: 30,
+  immediate: 50,
+  high: 25,
 })
 
 /**

@@ -112,11 +112,14 @@ export function eventDrivenOperations(
       startedAt: observedAt,
       durationMinutes: 0,
       riskScore,
-      priorityScore: rounded(riskScore * 25 + (remainingGap > 0 ? 50 : 0) + Math.min(20, remainingGap / 8 * 20), 1),
+      priorityScore: rounded(riskScore * 12 + Math.min(8, remainingGap / 8 * 8), 1),
       scoreParts: {
-        forecast: rounded(riskScore * 25),
-        current: remainingGap > 0 ? 50 : 0,
-        gap: rounded(Math.min(1, remainingGap / 8) * 20),
+        // An anticipated event is a forecast, so it stays inside the forecast
+        // band: it must not displace a station that has already run out.
+        duration: 0,
+        forecast: rounded(riskScore * 12),
+        current: 0,
+        gap: rounded(Math.min(1, remainingGap / 8) * 8),
         quality: 0,
       },
       dispatchEligible: allocations.length > 0,

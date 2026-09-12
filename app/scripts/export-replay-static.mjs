@@ -224,7 +224,7 @@ function normalizeAlert(raw, stations, asOf) {
         gap,
         quality: alertDataQuality(station, forecast),
       })
-    : { priorityScore: 0, scoreParts: { forecast: 0, current: 0, gap: 0, quality: 0 } }
+    : { priorityScore: 0, scoreParts: { duration: 0, forecast: 0, current: 0, gap: 0, quality: 0 } }
 
   return {
     id: text(source.id, 'alert_' + stationId),

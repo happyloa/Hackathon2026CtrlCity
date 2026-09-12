@@ -1,5 +1,5 @@
 export type { LiveOperationPolicyShape as OperationalPolicyShape } from './parameters.d.mts'
-export { DEFAULT_LIVE_OPERATION_POLICY, ALERT_PRIORITY_THRESHOLDS } from './parameters.d.mts'
+export { DEFAULT_LIVE_OPERATION_POLICY, ALERT_PRIORITY_THRESHOLDS, SUSTAINED_SHORTAGE_TIERS } from './parameters.d.mts'
 
 export type SeverityLevel =
   | 'service_disruption'
@@ -40,13 +40,15 @@ export function durationPriorityBonus(minutes: number | null | undefined): numbe
 
 export function scoreAlertPriority(input: {
   durationMinutes?: number | null
+  /** Unified 缺車 run; takes precedence over `durationMinutes` for banding. */
+  shortageMinutes?: number | null
   riskScore: number
   currentFailure: boolean
   gap: number
   quality: number
 }): {
   priorityScore: number
-  scoreParts: { forecast: number; current: number; gap: number; quality: number; duration?: number }
+  scoreParts: { duration: number; forecast: number; current: number; gap: number; quality: number }
 }
 
 export function alertDataQuality(
