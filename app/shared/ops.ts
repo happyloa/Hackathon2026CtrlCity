@@ -77,6 +77,7 @@ export interface PredictionCoverage {
 }
 
 export interface StationRisk {
+  statusDurationMinutes?: number | null
   id: string
   name: string
   city: string
@@ -107,6 +108,7 @@ export interface Alert {
   /** Explainable 0-100 ordering score; service anomalies deliberately use 0. */
   priorityScore: number
   scoreParts: {
+    duration?: number
     forecast: number
     current: number
     gap: number

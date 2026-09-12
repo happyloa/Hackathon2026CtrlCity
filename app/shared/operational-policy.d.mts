@@ -36,14 +36,17 @@ export function refillAmountFor(
   options?: { safetyStockRatio?: number; minimumSafetyStock?: number },
 ): number
 
+export function durationPriorityBonus(minutes: number | null | undefined): number
+
 export function scoreAlertPriority(input: {
+  durationMinutes?: number | null
   riskScore: number
   currentFailure: boolean
   gap: number
   quality: number
 }): {
   priorityScore: number
-  scoreParts: { forecast: number; current: number; gap: number; quality: number }
+  scoreParts: { forecast: number; current: number; gap: number; quality: number; duration?: number }
 }
 
 export function alertDataQuality(

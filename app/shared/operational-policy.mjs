@@ -74,12 +74,20 @@ export function refillAmountFor(station, inventory, options = {}) {
   return Math.max(0, Math.ceil(safetyStock - currentInventory))
 }
 
+export function durationPriorityBonus(minutes) {
+  return rounded(clamp(finite(minutes) / 6, 0, 10))
+}
+
 export function scoreAlertPriority(input) {
   const scoreParts = {
     forecast: rounded(clamp(finite(input.riskScore), 0, 1) * 25),
     current: input.currentFailure ? 50 : 0,
     gap: rounded(clamp(finite(input.gap) / 8, 0, 1) * 20),
     quality: rounded(clamp(finite(input.quality), 0, 1) * 5),
+  }
+  const base = Object.values(scoreParts).reduce((sum, value) => sum + value, 0)
+  if (input.currentFailure && input.durationMinutes > 0) {
+    scoreParts.duration = rounded(Math.min(100 - base, durationPriorityBonus(input.durationMinutes)))
   }
   return {
     priorityScore: rounded(Object.values(scoreParts).reduce((sum, value) => sum + value, 0)),

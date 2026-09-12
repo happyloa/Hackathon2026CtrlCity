@@ -1,3 +1,4 @@
+import { stationStatusDurationMinutes } from '~/shared/station-overview'
 import { buildLiveOperations } from '~/shared/live-operations'
 import { lowBikesPersistedIds } from '~/composables/useLiveRiskProfiles'
 import { frozenStationIds } from '~/composables/useFrozenStations'
@@ -210,6 +211,10 @@ function createLiveDashboard(
       forecast: { horizons: forecasts },
     }
   })
+  const { snapshotsFor } = useStationSnapshots()
+  for (const station of stations) {
+    station.statusDurationMinutes = stationStatusDurationMinutes(station, snapshotsFor(station.id), Date.now())
+  }
   const plan = buildLiveOperations(stations, response.meta.asOf)
   const summary = summarize(stations, plan.alerts, plan.dispatches)
 

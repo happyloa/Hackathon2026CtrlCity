@@ -1,22 +1,56 @@
 <script setup lang="ts">
-import { ArrowDownToLine, ArrowUpFromLine, ArrowUpRight, ArrowUpDown, MapPin, Route } from '@lucide/vue'
+import { ArrowDownToLine, ArrowUpFromLine, ArrowUpRight, ArrowUpDown, MapPin, Navigation, Pencil, Route } from '@lucide/vue'
 import type { DispatchRoutePlan, DispatchRouteStopAction } from '~/shared/dispatch-route-planner'
+import type { StationRisk } from '~/shared/ops'
 
 const props = defineProps<{
   route: DispatchRoutePlan
   routeNumber: number
   selectedSequence: number | null
+  stations: StationRisk[]
+  isManual?: boolean
+  labelOverride?: string
 }>()
 
 const emit = defineEmits<{
   selectStop: [sequence: number]
   inspectStation: [stationId: string]
+  editRoute: []
 }>()
 
 const timelineElement = ref<HTMLElement | null>(null)
 const headingId = useId()
-const routeLabel = computed(() => `路線 ${String(props.routeNumber).padStart(2, '0')}`)
+const routeLabel = computed(() => props.labelOverride || `路線 ${String(props.routeNumber).padStart(2, '0')}`)
 const routeShape = computed(() => JSON.stringify(props.route.stops.map(stop => [stop.stationId, stop.action])))
+
+/**
+ * Google's key-free "Maps URLs" directions format (`/maps/dir/?api=1`), not
+ * the paid Directions API -- this only ever opens Google Maps with the same
+ * stop order already planned here, so a dispatcher can hand the route to a
+ * driver without re-typing every stop. `dir_action=navigate` skips the route
+ * preview and drops straight into turn-by-turn on the Google Maps mobile app;
+ * desktop just opens the normal directions page.
+ */
+const googleMapsUrl = computed(() => {
+  const stationById = new Map(props.stations.map(station => [station.id, station]))
+  const coordinates = props.route.stops
+    .map(stop => stationById.get(stop.stationId))
+    .filter((station): station is StationRisk => station !== undefined
+      && Number.isFinite(station.latitude) && Number.isFinite(station.longitude))
+    .map(station => `${station.latitude},${station.longitude}`)
+  if (coordinates.length < 2) return null
+
+  const params = new URLSearchParams({
+    api: '1',
+    origin: coordinates[0]!,
+    destination: coordinates[coordinates.length - 1]!,
+    travelmode: 'driving',
+    dir_action: 'navigate',
+  })
+  const waypoints = coordinates.slice(1, -1)
+  if (waypoints.length) params.set('waypoints', waypoints.join('|'))
+  return `https://www.google.com/maps/dir/?${params.toString()}`
+})
 
 function loadPercent(load: number) {
   return Math.min(100, Math.max(0, load / Math.max(1, props.route.vehicleCapacity) * 100))
@@ -69,10 +103,11 @@ onMounted(() => { void revealSelectedStop() })
     <header class="flow-header">
       <div class="flow-title-row">
         <div>
-          <p class="flow-eyebrow"><Route :size="15" :stroke-width="2" aria-hidden="true" />停靠順序</p>
+          <p class="flow-eyebrow"><Route :size="15" :stroke-width="2" aria-hidden="true" />停靠順序{{ isManual ? '（手動）' : '' }}</p>
           <h2 :id="headingId">{{ routeLabel }}</h2>
         </div>
-        <span class="flow-priority">優先分數 <strong>{{ Math.round(route.highestPriorityScore) }}</strong></span>
+        <span v-if="isManual" class="flow-priority"><button type="button" class="flow-edit-button" @click="emit('editRoute')"><Pencil :size="13" aria-hidden="true" />在下方編輯</button></span>
+        <span v-else class="flow-priority">優先分數 <strong>{{ Math.round(route.highestPriorityScore) }}</strong><button type="button" class="flow-edit-button" @click="emit('editRoute')"><Pencil :size="13" aria-hidden="true" />建立可編輯版本</button></span>
       </div>
 
       <dl class="flow-metrics">
@@ -89,7 +124,12 @@ onMounted(() => { void revealSelectedStop() })
       </div>
     </header>
 
-    <div class="flow-instruction"><MapPin :size="14" :stroke-width="2" aria-hidden="true" />點選站點，在地圖定位</div>
+    <div class="flow-instruction">
+      <span><MapPin :size="14" :stroke-width="2" aria-hidden="true" />點選站點，在地圖定位</span>
+      <a v-if="googleMapsUrl" class="flow-export-link" :href="googleMapsUrl" target="_blank" rel="noopener" :aria-label="`在 Google 地圖開啟${routeLabel}的導航路線`">
+        <Navigation :size="13" :stroke-width="2" aria-hidden="true" />Google 導航
+      </a>
+    </div>
 
     <div ref="timelineElement" class="flow-scroll" tabindex="0" :aria-label="`${routeLabel}停靠站點清單`">
       <ol class="flow-stops">
@@ -152,8 +192,10 @@ onMounted(() => { void revealSelectedStop() })
 .flow-title-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .flow-eyebrow { display: flex; align-items: center; gap: 6px; margin: 0 0 5px; color: var(--muted); font-size: var(--type-body2); }
 .flow-title-row h2 { margin: 0; font-size: var(--type-h6); line-height: 1.25; font-weight: 650; letter-spacing: -.025em; }
-.flow-priority { display: grid; justify-items: end; gap: 3px; color: var(--muted); font-size: var(--type-body2); }
+.flow-priority { display: grid; justify-items: end; gap: 5px; color: var(--muted); font-size: var(--type-body2); }
 .flow-priority strong { color: var(--ink); font-size: var(--type-body1); font-weight: 600; font-variant-numeric: tabular-nums; }
+.flow-edit-button { display: flex; align-items: center; gap: 5px; min-height: 30px; padding: 4px 9px; border: 1px solid var(--line); border-radius: 6px; color: var(--accent); font-size: var(--type-body2); white-space: nowrap; }
+.flow-edit-button:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 6%, transparent); }
 .flow-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 18px 0 15px; }
 .flow-metrics > div + div { border-left: 1px solid var(--line); padding-left: 14px; }
 .flow-metrics dt { color: var(--muted); font-size: var(--type-body2); margin-bottom: 4px; }
@@ -164,7 +206,10 @@ onMounted(() => { void revealSelectedStop() })
 .flow-capacity strong span { color: var(--muted); font-weight: 400; }
 .flow-capacity-track { height: 5px; border-radius: 10px; background: var(--panel-muted); overflow: hidden; }
 .flow-capacity-track > span { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
-.flow-instruction { display: flex; align-items: center; gap: 6px; flex-shrink: 0; padding: 11px 20px 0; color: var(--muted); font-size: var(--type-body2); }
+.flow-instruction { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-shrink: 0; padding: 11px 20px 0; color: var(--muted); font-size: var(--type-body2); }
+.flow-instruction > span { display: flex; align-items: center; gap: 6px; }
+.flow-export-link { display: flex; align-items: center; gap: 5px; min-height: 30px; padding: 4px 9px; border: 1px solid var(--line); border-radius: 6px; color: var(--accent); font-size: var(--type-body2); font-weight: 550; white-space: nowrap; text-decoration: none; }
+.flow-export-link:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 6%, transparent); }
 .flow-scroll { min-height: 0; flex: 1; overflow-y: auto; overscroll-behavior-y: contain; padding: 15px 16px 18px; scrollbar-gutter: stable; }
 .flow-stops { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
 .flow-stop { --stop-color: var(--dispatch-mixed, var(--warning)); display: grid; position: relative; grid-template-columns: 42px minmax(0, 1fr); align-items: start; gap: 10px; min-width: 0; }

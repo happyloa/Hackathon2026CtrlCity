@@ -639,3 +639,25 @@ test('"60" keeps every station already picked up at "30", even if that station\'
   const sixty = buildLiveOperationsForHorizon(stations, OBSERVED_AT, '60')
   assert.deepEqual(sixty.dispatches.map(dispatch => dispatch.toStationId), [recovering.id])
 })
+
+test('duration raises current shortage priority with a ten-point cap', () => {
+  const base = { riskScore: 0.6, currentFailure: true, gap: 3, quality: 1 }
+  const original = scoreAlertPriority(base).priorityScore
+  assert.equal(scoreAlertPriority({ ...base, durationMinutes: 30 }).priorityScore, original + 5)
+  assert.equal(scoreAlertPriority({ ...base, durationMinutes: 180 }).priorityScore, original + 10)
+  assert.equal(scoreAlertPriority({ ...base, durationMinutes: null }).priorityScore, original)
+  assert.equal(scoreAlertPriority({ ...base, durationMinutes: -10 }).priorityScore, original)
+  assert.equal(scoreAlertPriority({ ...base, riskScore: 1, gap: 8, durationMinutes: 60 }).priorityScore, 100)
+  assert.equal(scoreAlertPriority({ ...base, currentFailure: false, durationMinutes: 60 }).priorityScore,
+    scoreAlertPriority({ ...base, currentFailure: false }).priorityScore)
+})
+
+test('longer continuous shortage is prioritized by the live planner', () => {
+  const recent = { ...station({ id: 'a-recent', availableBikes: 0, currentState: 'empty_now' }), statusDurationMinutes: 4 }
+  const prolonged = { ...station({ id: 'z-prolonged', availableBikes: 0, currentState: 'empty_now' }), statusDurationMinutes: 34 }
+  const plan = buildLiveOperations([recent, prolonged], OBSERVED_AT)
+  assert.equal(plan.alerts[0].stationId, prolonged.id)
+  assert.ok(plan.alerts[0].priorityScore > plan.alerts[1].priorityScore)
+  assert.equal(plan.alerts[0].durationMinutes, 34)
+  assert.equal(Date.parse(plan.alerts[0].startedAt), Date.parse(OBSERVED_AT) - 34 * 60_000)
+})

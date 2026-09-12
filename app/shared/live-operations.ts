@@ -60,6 +60,7 @@ interface DispatchEdge extends DispatchCandidate {
 }
 
 export interface AlertPriorityInput {
+  durationMinutes?: number | null
   riskScore: number
   currentFailure: boolean
   gap: number
@@ -276,6 +277,7 @@ function actionableAlert(
     currentFailure,
     gap,
     quality: alertDataQuality(station, forecast),
+    durationMinutes: station.statusDurationMinutes,
   })
 
   return {
@@ -289,8 +291,8 @@ function actionableAlert(
       stationId: station.id,
       condition,
       severity: severityFor(riskScore, forecast, currentFailure),
-      startedAt: observedAt,
-      durationMinutes: 0,
+      startedAt: new Date(Date.parse(observedAt) - (currentFailure ? station.statusDurationMinutes ?? 0 : 0) * 60_000).toISOString(),
+      durationMinutes: currentFailure ? station.statusDurationMinutes ?? 0 : 0,
       riskScore,
       ...score,
       dispatchEligible: gap >= policy.minimumTransferBikes,

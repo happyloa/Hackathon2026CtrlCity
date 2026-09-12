@@ -46,7 +46,7 @@ export interface DispatchRoutePlan {
   vehicleCapacity: number
   highestPriorityScore: number
   averagePriorityScore: number
-  planningMethod: 'priority_adjacent_insertion_heuristic'
+  planningMethod: 'priority_adjacent_insertion_heuristic' | 'manual_user_authored'
   distanceBasis: 'station_straight_line'
   reasons: string[]
 }
