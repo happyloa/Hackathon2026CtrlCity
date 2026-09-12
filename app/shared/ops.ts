@@ -212,6 +212,26 @@ export interface DashboardArtifact {
   briefingFacts: BriefingFact[]
   stationHistories: Record<string, StationHistoryPoint[]>
   scenarios?: Record<string, DashboardScenario>
+  /**
+   * Station ids whose live available-bikes count has stayed below
+   * `LIVE_SNAPSHOT_POLICY.lowBikesThreshold` for at least 30/60 continuous
+   * minutes, per the browser's own persisted snapshot buffer
+   * (`useStationSnapshots.ts`). Live mode only -- absent in replay/historical
+   * dashboards, which have no rolling live buffer to draw this from.
+   */
+  realtimeLowBikes?: {
+    atLeast30: string[]
+    atLeast60: string[]
+  }
+  /**
+   * Stations where one metric (bikes or docks) has sat at one fixed reading
+   * from 0 through `FROZEN_STATION_POLICY.stuckValueCeiling` for at least
+   * `minRunMinutes` while the other stayed positive -- "站點連續停滯", the
+   * client-side live counterpart to `scripts/detect-frozen-stations.mjs`
+   * (loosened for live monitoring; see that policy's doc comment). Live mode
+   * only, same buffer dependency as `realtimeLowBikes` above.
+   */
+  frozenStations?: { stationId: string; metric: 'bikes' | 'docks'; stuckValue: number }[]
 }
 
 export interface DashboardScenario {

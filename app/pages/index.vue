@@ -149,13 +149,16 @@ function focusDispatchQueue(event: MouseEvent) {
           <Bike style="width: 1em; height: 1em" aria-hidden="true" />
         </div>
         <div class="metric-value inventory-value"><span class="empty-count">{{ dashboard?.summary.emptyNow ?? '—'
-            }}</span><i>/</i>{{ dashboard?.summary.fullNow ?? '—' }}<span>站</span></div>
+        }}</span><i>/</i>{{ dashboard?.summary.fullNow ?? '—' }}<span>站</span></div>
         <div class="metric-bottom"><span>無車可借／無位可還</span><span class="metric-tag">即時</span></div>
       </NuxtLink>
     </section>
 
     <WarningPanel v-if="dashboard" :stations="dashboard.stations" :as-of="dashboard.meta.asOf"
-      :summary="dashboard.summary" @select="selectedStationId = $event" />
+      :summary="dashboard.summary" :realtime-low-bikes="dashboard.realtimeLowBikes"
+      @select="selectedStationId = $event" />
+    <!-- <FrozenStationPanel v-if="dashboard" :stations="dashboard.stations" :frozen-stations="dashboard.frozenStations"
+      @select="selectedStationId = $event" /> -->
 
     <section class="workspace-toolbar" aria-label="工作區範圍與資料狀態">
       <div class="workspace-district">

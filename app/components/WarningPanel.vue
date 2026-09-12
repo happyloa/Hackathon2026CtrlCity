@@ -8,16 +8,34 @@ const props = defineProps<{
   stations: StationRisk[]
   asOf: string
   summary: DashboardSummary
+  realtimeLowBikes?: { atLeast30: string[]; atLeast60: string[] }
 }>()
 
 const emit = defineEmits<{ select: [stationId: string] }>()
 
-const TABS: { key: HorizonKey; label: string }[] = [
-  { key: '30', label: '30 分鐘' },
-  { key: '60', label: '60 分鐘' },
+type RealtimeTabKey = 'rt30' | 'rt60'
+type TabKey = HorizonKey | RealtimeTabKey
+
+interface TabDef {
+  key: TabKey
+  kind: 'forecast' | 'realtime'
+  label: string
+  minutes: number
+}
+
+const FORECAST_TABS: { key: HorizonKey; label: string }[] = [
+  { key: '30', label: '預測 30 分鐘' },
+  { key: '60', label: '預測 60 分鐘' },
 ]
 
-const activeHorizon = ref<HorizonKey>('30')
+const TABS: TabDef[] = [
+  ...FORECAST_TABS.map(tab => ({ ...tab, kind: 'forecast' as const, minutes: Number(tab.key) })),
+  { key: 'rt30', kind: 'realtime', label: '即時缺車 ≥30 分鐘', minutes: 30 },
+  { key: 'rt60', kind: 'realtime', label: '即時缺車 ≥60 分鐘', minutes: 60 },
+]
+
+const activeTab = ref<TabKey>('30')
+const activeTabDef = computed(() => TABS.find(tab => tab.key === activeTab.value) ?? TABS[0]!)
 
 /**
  * A station only belongs here once its forecast for this horizon is
@@ -26,7 +44,7 @@ const activeHorizon = ref<HorizonKey>('30')
  * "empty_now" instead and is excluded, because that's not a warning anymore,
  * it's something to dispatch for right now.
  */
-function warningsFor(horizon: HorizonKey) {
+function forecastWarningsFor(horizon: HorizonKey) {
   const alerts = shortageWarningsFor(props.stations, props.asOf, horizon)
   const stationLookup = new Map(props.stations.map(station => [station.id, station]))
   return alerts
@@ -45,58 +63,106 @@ function warningsFor(horizon: HorizonKey) {
     .sort((left, right) => right.refillBikes - left.refillBikes || left.station.id.localeCompare(right.station.id))
 }
 
-const warningsByHorizon = computed(() => Object.fromEntries(
-  TABS.map(({ key }) => [key, warningsFor(key)]),
-) as Record<HorizonKey, ReturnType<typeof warningsFor>>)
-const countsByHorizon = computed(() => Object.fromEntries(
-  TABS.map(({ key }) => [key, warningsByHorizon.value[key].length]),
-) as Record<HorizonKey, number>)
-const activeWarnings = computed(() => warningsByHorizon.value[activeHorizon.value])
+/**
+ * Real-time counterpart to the forecast tabs above: stations the browser's
+ * own rolling snapshot buffer (`useLiveRiskProfiles.ts`) has observed with
+ * available bikes continuously below the threshold for at least this many
+ * minutes -- not a prediction, a direct read of what has already happened
+ * this session. Empty until this page has stayed open long enough to build
+ * up that much history.
+ */
+function realtimeWarningsFor(key: RealtimeTabKey) {
+  const ids = key === 'rt30' ? props.realtimeLowBikes?.atLeast30 : props.realtimeLowBikes?.atLeast60
+  const stationLookup = new Map(props.stations.map(station => [station.id, station]))
+  return (ids ?? [])
+    .map(id => stationLookup.get(id))
+    .filter((station): station is StationRisk => Boolean(station))
+    .sort((left, right) => left.availableBikes - right.availableBikes || left.id.localeCompare(right.id))
+}
+
+const forecastByHorizon = computed(() => Object.fromEntries(
+  FORECAST_TABS.map(({ key }) => [key, forecastWarningsFor(key)]),
+) as Record<HorizonKey, ReturnType<typeof forecastWarningsFor>>)
+const realtimeByTab = computed(() => ({
+  rt30: realtimeWarningsFor('rt30'),
+  rt60: realtimeWarningsFor('rt60'),
+}) as Record<RealtimeTabKey, ReturnType<typeof realtimeWarningsFor>>)
+
+const countsByTab = computed(() => Object.fromEntries(
+  TABS.map(tab => [tab.key, tab.kind === 'forecast'
+    ? forecastByHorizon.value[tab.key as HorizonKey].length
+    : realtimeByTab.value[tab.key as RealtimeTabKey].length]),
+) as Record<TabKey, number>)
+
 const expanded = ref(false)
 const warningContentId = useId()
-const forecastAvailable = computed(() => Object.fromEntries(TABS.map(({ key }) => [key, props.stations.some(station => station.serviceStatus === 'operational' && station.forecast.horizons[key].baselineStatus === 'matched')])) as Record<HorizonKey, boolean>)
-const hasForecast = computed(() => TABS.some(({ key }) => forecastAvailable.value[key]))
-const hasWarnings = computed(() => countsByHorizon.value['30'] > 0 || countsByHorizon.value['60'] > 0)
+const forecastAvailable = computed(() => Object.fromEntries(FORECAST_TABS.map(({ key }) => [key, props.stations.some(station => station.serviceStatus === 'operational' && station.forecast.horizons[key].baselineStatus === 'matched')])) as Record<HorizonKey, boolean>)
+const hasForecast = computed(() => FORECAST_TABS.some(({ key }) => forecastAvailable.value[key]))
+const hasWarnings = computed(() => TABS.some(tab => countsByTab.value[tab.key] > 0))
 </script>
 
 <template>
-  <section class="warning-panel" :class="{ 'has-warnings': hasWarnings, 'forecast-unavailable': !hasForecast }" aria-label="缺車預警">
+  <section class="warning-panel" :class="{ 'has-warnings': hasWarnings, 'forecast-unavailable': !hasForecast && !hasWarnings }" aria-label="缺車通報">
     <button class="warning-trigger" type="button" :aria-expanded="expanded" :aria-controls="warningContentId" @click="expanded = !expanded">
-      <span class="warning-symbol"><component :is="!hasForecast ? Info : hasWarnings ? BellRing : CheckCircle2" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" /></span>
-      <span class="warning-heading">{{ !hasForecast ? '預測暫不可用' : hasWarnings ? '缺車預警' : '已對照站點無缺車預警' }}<small>{{ hasForecast ? '預測缺車 · 不含目前空站' : '目前僅顯示即時庫存' }}</small></span>
-      <span class="warning-figures"><span><b>30</b> 分鐘 <strong>{{ forecastAvailable['30'] ? countsByHorizon['30'] : '—' }}</strong> 站</span><span><b>60</b> 分鐘 <strong>{{ forecastAvailable['60'] ? countsByHorizon['60'] : '—' }}</strong> 站</span></span>
-      <span class="warning-action">{{ expanded ? '收合清單' : '查看預警' }}<ChevronDown style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" :class="{ 'is-expanded': expanded }" /></span>
+      <span class="warning-symbol"><component :is="!hasForecast && !hasWarnings ? Info : hasWarnings ? BellRing : CheckCircle2" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" /></span>
+      <span class="warning-heading">{{ !hasForecast && !hasWarnings ? '預測暫不可用' : hasWarnings ? '缺車通報' : '已對照站點無缺車通報' }}<small>{{ hasForecast ? '預測缺車 · 不含目前空站' : '目前僅顯示即時庫存' }}</small></span>
+      <span class="warning-figures"><span><b>預測 30</b> 分鐘 <strong>{{ forecastAvailable['30'] ? countsByTab['30'] : '—' }}</strong> 站</span><span><b>預測 60</b> 分鐘 <strong>{{ forecastAvailable['60'] ? countsByTab['60'] : '—' }}</strong> 站</span><span><b>即時 ≥30</b> 分鐘 <strong>{{ countsByTab['rt30'] }}</strong> 站</span><span><b>即時 ≥60</b> 分鐘 <strong>{{ countsByTab['rt60'] }}</strong> 站</span></span>
+      <span class="warning-action">{{ expanded ? '收合清單' : '查看通報' }}<ChevronDown style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" :class="{ 'is-expanded': expanded }" /></span>
     </button>
     <div v-if="expanded" :id="warningContentId" class="warning-content">
-      <p class="warning-context">各時點分別預測，站點可能重疊；目前空站另列於上方營運摘要。</p>
-      <div class="flex flex-wrap gap-2 px-4 pb-3 pt-1" role="group" aria-label="缺車預警時間">
-        <button v-for="tab in TABS" :key="tab.key" type="button" :aria-pressed="activeHorizon === tab.key"
-          class="min-h-9 rounded-md border px-3 text-body1 font-semibold transition-colors" :class="activeHorizon === tab.key
+      <p class="warning-context">「預測」為各時點分別估算，站點可能重疊；「即時缺車」是此頁面持續開啟期間，直接觀測到可借車數持續偏低的站點，需要開啟足夠時間才會出現。目前空站另列於上方營運摘要。</p>
+      <div class="flex flex-wrap gap-2 px-4 pb-3 pt-1" role="group" aria-label="缺車通報分類">
+        <button v-for="tab in TABS" :key="tab.key" type="button" :aria-pressed="activeTab === tab.key"
+          class="min-h-9 rounded-md border px-3 text-body1 font-semibold transition-colors" :class="activeTab === tab.key
             ? 'border-accent-strong bg-accent text-on-accent'
-            : 'border-line bg-panel-muted text-muted hover:border-accent-strong'" @click="activeHorizon = tab.key">
-          {{ tab.label }}（{{ forecastAvailable[tab.key] ? countsByHorizon[tab.key] : '—' }}）
+            : 'border-line bg-panel-muted text-muted hover:border-accent-strong'" @click="activeTab = tab.key">
+          {{ tab.label }}（{{ tab.kind === 'forecast' && !forecastAvailable[tab.key as HorizonKey] ? '—' : countsByTab[tab.key] }}）
         </button>
       </div>
 
-      <div v-if="activeWarnings.length" class="divide-y divide-line border-t border-line">
-        <button v-for="item in activeWarnings" :key="item.station.id" type="button"
-          class="flex w-full flex-wrap items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-panel-muted"
-          @click="emit('select', item.station.id)">
-          <span class="grid size-10 shrink-0 place-items-center rounded-full bg-warning-surface text-h6 text-warning">
-            <TriangleAlert style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />
-          </span>
-          <span class="min-w-0 flex-1 text-body1 leading-6 text-ink">
-            <strong class="block break-words font-bold">{{ displayStationName(item.station.name) }}</strong>
-            <span class="mt-1 block text-muted">{{ item.station.district || '行政區未標示' }}</span>
-          </span>
-          <span class="ml-auto flex w-full items-center justify-between gap-2 text-body1 sm:w-auto sm:flex-col sm:items-end">
-            <span class="text-muted">預估可借車 <strong class="font-mono text-ink">{{ item.predictedBikesDisplay }}</strong> 台</span>
-            <span class="text-muted">建議補 <strong class="font-mono text-ink">{{ item.refillBikes }}</strong> 台</span>
-          </span>
-        </button>
+      <div v-if="activeTabDef.kind === 'forecast'">
+        <div v-if="forecastByHorizon[activeTabDef.key as HorizonKey].length" class="divide-y divide-line border-t border-line">
+          <button v-for="item in forecastByHorizon[activeTabDef.key as HorizonKey]" :key="item.station.id" type="button"
+            class="flex w-full flex-wrap items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-panel-muted"
+            @click="emit('select', item.station.id)">
+            <span class="grid size-10 shrink-0 place-items-center rounded-full bg-warning-surface text-h6 text-warning">
+              <TriangleAlert style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />
+            </span>
+            <span class="min-w-0 flex-1 text-body1 leading-6 text-ink">
+              <strong class="block break-words font-bold">{{ displayStationName(item.station.name) }}</strong>
+              <span class="mt-1 block text-muted">{{ item.station.district || '行政區未標示' }}</span>
+            </span>
+            <span class="ml-auto flex w-full items-center justify-between gap-2 text-body1 sm:w-auto sm:flex-col sm:items-end">
+              <span class="text-muted">預估可借車 <strong class="font-mono text-ink">{{ item.predictedBikesDisplay }}</strong> 台</span>
+              <span class="text-muted">建議補 <strong class="font-mono text-ink">{{ item.refillBikes }}</strong> 台</span>
+            </span>
+          </button>
+        </div>
+        <div v-else class="flex min-h-24 items-center justify-center gap-2 border-t border-line p-4 text-center text-body1 font-semibold text-positive">
+          <component class="icon-md" :is="forecastAvailable[activeTabDef.key as HorizonKey] ? CheckCircle2 : Info" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />{{ forecastAvailable[activeTabDef.key as HorizonKey] ? '這個時點已對照的站點，沒有預測缺車情形。' : '這個時點沒有可用預測，請先查看即時站況。' }}
+        </div>
       </div>
-      <div v-else class="flex min-h-24 items-center justify-center gap-2 border-t border-line p-4 text-center text-body1 font-semibold text-positive">
-        <component class="icon-md" :is="forecastAvailable[activeHorizon] ? CheckCircle2 : Info" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />{{ forecastAvailable[activeHorizon] ? '這個時點已對照的站點，沒有預測缺車情形。' : '這個時點沒有可用預測，請先查看即時站況。' }}
+      <div v-else>
+        <div v-if="realtimeByTab[activeTabDef.key as RealtimeTabKey].length" class="divide-y divide-line border-t border-line">
+          <button v-for="station in realtimeByTab[activeTabDef.key as RealtimeTabKey]" :key="station.id" type="button"
+            class="flex w-full flex-wrap items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-panel-muted"
+            @click="emit('select', station.id)">
+            <span class="grid size-10 shrink-0 place-items-center rounded-full bg-warning-surface text-h6 text-warning">
+              <TriangleAlert style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />
+            </span>
+            <span class="min-w-0 flex-1 text-body1 leading-6 text-ink">
+              <strong class="block break-words font-bold">{{ displayStationName(station.name) }}</strong>
+              <span class="mt-1 block text-muted">{{ station.district || '行政區未標示' }}</span>
+            </span>
+            <span class="ml-auto flex w-full items-center justify-between gap-2 text-body1 sm:w-auto sm:flex-col sm:items-end">
+              <span class="text-muted">目前可借車 <strong class="font-mono text-ink">{{ station.availableBikes }}</strong> 台</span>
+              <span class="text-muted">已持續 ≥{{ activeTabDef.minutes }} 分鐘</span>
+            </span>
+          </button>
+        </div>
+        <div v-else class="flex min-h-24 items-center justify-center gap-2 border-t border-line p-4 text-center text-body1 font-semibold text-positive">
+          <CheckCircle2 class="icon-md" style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true" />這個條件目前沒有符合的站點；此清單需頁面持續開啟並累積至少 {{ activeTabDef.minutes }} 分鐘的即時快照才會出現。
+        </div>
       </div>
     </div>
   </section>

@@ -1,4 +1,6 @@
 import { buildLiveOperations } from '~/shared/live-operations'
+import { lowBikesPersistedIds } from '~/composables/useLiveRiskProfiles'
+import { frozenStationIds } from '~/composables/useFrozenStations'
 import type {
   Alert,
   ApiEnvelope,
@@ -183,6 +185,8 @@ function createLiveDashboard(
   response: LiveResponse,
   forecastByStation: Map<string, Record<HorizonKey, Forecast>>,
   riskPolicy: LiveProfilePolicy,
+  realtimeLowBikes: { atLeast30: string[]; atLeast60: string[] },
+  frozenStations: { stationId: string; metric: 'bikes' | 'docks'; stuckValue: number }[],
 ): DashboardArtifact {
   const stations: StationRisk[] = response.data.stations.map((station) => {
     const forecasts = forecastByStation.get(station.id) || {
@@ -245,6 +249,8 @@ function createLiveDashboard(
     dispatches: plan.dispatches,
     briefingFacts: briefingFacts(summary),
     stationHistories: {},
+    realtimeLowBikes,
+    frozenStations,
   }
 }
 
@@ -274,6 +280,16 @@ function scopedDashboard(dashboard: DashboardArtifact | null, district: string):
   const alerts = plan.alerts
   const dispatches = plan.dispatches
   const summary = summarize(stations, alerts, dispatches)
+  const stationIds = district ? new Set(stations.map(station => station.id)) : null
+  const realtimeLowBikes = stationIds && dashboard.realtimeLowBikes
+    ? {
+        atLeast30: dashboard.realtimeLowBikes.atLeast30.filter(id => stationIds.has(id)),
+        atLeast60: dashboard.realtimeLowBikes.atLeast60.filter(id => stationIds.has(id)),
+      }
+    : dashboard.realtimeLowBikes
+  const frozenStations = stationIds && dashboard.frozenStations
+    ? dashboard.frozenStations.filter(entry => stationIds.has(entry.stationId))
+    : dashboard.frozenStations
   return {
     ...dashboard,
     summary,
@@ -281,6 +297,8 @@ function scopedDashboard(dashboard: DashboardArtifact | null, district: string):
     alerts,
     dispatches,
     briefingFacts: briefingFacts(summary),
+    realtimeLowBikes,
+    frozenStations,
   }
 }
 
@@ -310,7 +328,16 @@ export function useLiveDashboard() {
       const forecasts = await forecastsFor(response.data.stations, response.meta.asOf, {
         refreshProfiles: Boolean(options.manual),
       })
-      const nextDashboard = createLiveDashboard(response, forecasts, profileManifest.value)
+      // Read after forecastsFor resolves: it records this poll's snapshot for
+      // every station internally, so the persistence check below already
+      // sees the just-updated buffer, including the current reading.
+      const realtimeLowBikes = {
+        atLeast30: [...lowBikesPersistedIds(response.data.stations, response.meta.asOf, 30)],
+        atLeast60: [...lowBikesPersistedIds(response.data.stations, response.meta.asOf, 60)],
+      }
+      const frozenStations = [...frozenStationIds(response.data.stations, response.meta.asOf)]
+        .map(([stationId, info]) => ({ stationId, ...info }))
+      const nextDashboard = createLiveDashboard(response, forecasts, profileManifest.value, realtimeLowBikes, frozenStations)
       const nextSignature = snapshotSignature(response)
       const nextBaselineSignature = profileSignature(profileError.value, profileCoverage.value)
       const hadPrevious = Boolean(payload.value)

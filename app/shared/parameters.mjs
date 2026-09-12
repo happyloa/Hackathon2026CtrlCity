@@ -250,3 +250,103 @@ export const XGBOOST_PREDICTION_POLICY = Object.freeze({
    */
   baselineF1RoutingThreshold: 0.6,
 })
+
+/**
+ * Governs the browser-side rolling snapshot buffer `useStationSnapshots.ts`
+ * keeps per station -- persisted to localStorage so it survives a reload,
+ * not just in memory -- and every feature built on top of it: the
+ * "已持續缺車" real-time-persistence lists in `WarningPanel.vue`, the
+ * momentum term in the rule-baseline forecast (`useLiveRiskProfiles.ts`), and
+ * client-side frozen/stuck-station detection ("壞車"). `lowBikesThreshold` is
+ * a fixed absolute bike count, unlike `LOW_INVENTORY_POLICY` above, which
+ * scales with station size -- the two answer different questions ("is this
+ * station's inventory low relative to its own capacity" vs. "does this
+ * station realistically have close to zero usable bikes right now").
+ *
+ * `maxSnapshotsPerStation` is set to line up with
+ * `scripts/detect-frozen-stations.mjs`'s `MIN_RUN_SLOTS = 6` (6 half-hour
+ * slots = 3 hours) -- the shortest run that script treats as a real frozen
+ * candidate rather than ordinary demand noise -- at the live poll cadence
+ * (`useLivePolling.ts`'s 5-minute interval): 3 hours needs 36 five-minute
+ * snapshots. `localStorageRetentionHours` is kept wider than that active
+ * window (double it) so a tab reopened partway through still has a full
+ * 3-hour run available once stale entries are trimmed, rather than having to
+ * rebuild the whole window from scratch.
+ *
+ * 管理 `useStationSnapshots.ts` 幫每個站點保留的瀏覽器端捲動快照緩衝——會寫入
+ * localStorage，重新整理頁面也不會消失，不只是留在記憶體——以及建立在其上的所有
+ * 功能：`WarningPanel.vue` 的「已持續缺車」即時清單、規則基準預測裡的動量項
+ * （`useLiveRiskProfiles.ts`），以及瀏覽器端的壞車／卡住站點偵測（「壞車」）。
+ * `lowBikesThreshold` 是固定的絕對可借車數，跟上面會隨站點大小縮放的
+ * `LOW_INVENTORY_POLICY` 不同——兩者回答的問題不一樣（「這站庫存相對自己容量是否
+ * 偏低」vs.「這站現在是否幾乎沒車可借」）。
+ *
+ * `maxSnapshotsPerStation` 對齊 `scripts/detect-frozen-stations.mjs` 的
+ * `MIN_RUN_SLOTS = 6`（6 個半小時格 = 3 小時）——那是該腳本認定「值得通報的凍結」
+ * 而非一般需求雜訊的最短長度——換算成即時輪詢頻率（`useLivePolling.ts` 的 5 分鐘
+ * 一次）：3 小時需要 36 筆 5 分鐘快照。`localStorageRetentionHours` 刻意設得比這個
+ * 有效視窗更寬（兩倍），這樣中途重新打開分頁時，捨棄過期快照後仍有完整的 3 小時
+ * 資料可用，不必從頭重新累積整個視窗。
+ */
+export const LIVE_SNAPSHOT_POLICY = Object.freeze({
+  /**
+   * Max snapshots retained per station in the persisted buffer.
+   * 持久化緩衝中，每個站點保留的最大快照筆數。
+   */
+  maxSnapshotsPerStation: 36,
+  /**
+   * How long a persisted snapshot survives in localStorage before being discarded.
+   * 快照在 localStorage 中保留多久後會被捨棄。
+   */
+  localStorageRetentionHours: 6,
+  /**
+   * Absolute available-bikes count below which a station counts as "real-time low".
+   * 即時可借車數低於此值即視為「即時缺車」。
+   */
+  lowBikesThreshold: 3,
+})
+
+/**
+ * Governs `useFrozenStations.ts`'s live "站點連續停滯" detection, shown both
+ * in the homepage's frozen-station panel and as a filter on the station
+ * overview list. Originally mirrored `scripts/detect-frozen-stations.mjs`'s
+ * `MIN_RUN_SLOTS = 6` (6 half-hour slots = 3 hours) and its exactly-0 check;
+ * both have since been deliberately loosened for this live-monitoring use
+ * case, on top of (not a change to) that offline EDA script, which keeps its
+ * own stricter definition for historical batch analysis:
+ *   - `minRunMinutes` shortened to 2 hours -- long enough to rule out a
+ *     normal brief lull, short enough to flag a stuck station same-day
+ *     instead of waiting a full 3 hours.
+ *   - `stuckValueCeiling` widened from "stuck at exactly 0" to "stuck at any
+ *     single reading from 0 through this ceiling" -- a sensor stuck
+ *     reporting "2 bikes" for hours is just as suspicious as one stuck at 0,
+ *     especially at a station with many docks.
+ * A station still needs the OTHER metric to stay positive throughout, same
+ * as the offline script: a station stuck at 0 bikes AND 0 docks is a total
+ * outage, already covered by `serviceStatus`/`currentState`, not this.
+ *
+ * 管理 `useFrozenStations.ts` 的即時「站點連續停滯」偵測，同時用在首頁的壞車面板，
+ * 以及站點總覽清單的篩選項。原本對齊 `scripts/detect-frozen-stations.mjs` 的
+ * `MIN_RUN_SLOTS = 6`（6 個半小時格＝3 小時）與其「剛好等於 0」的判斷；這兩點都
+ * 已針對即時監看這個使用情境刻意放寬——是疊加在那支離線 EDA 腳本之上，不是改動它，
+ * 它自己歷史批次分析仍維持原本較嚴格的定義：
+ *   - `minRunMinutes` 縮短為 2 小時——夠長到排除一般短暫的需求空檔，也夠短能在
+ *     當天就標記出卡住的站點，不用等滿 3 小時。
+ *   - `stuckValueCeiling` 從「剛好卡在 0」放寬為「卡在 0 到這個上限之間的任一個
+ *     固定讀數」——感測器卡在回報「2 台車」跟卡在 0 一樣可疑，尤其是車柱數很多的
+ *     站點。
+ * 跟離線腳本一樣，另一項指標仍必須全程維持大於 0：一個可借車與可還位都卡在 0 的
+ * 站點是整站中斷，已經由 `serviceStatus`／`currentState` 涵蓋，不屬於這裡要抓的情況。
+ */
+export const FROZEN_STATION_POLICY = Object.freeze({
+  /**
+   * Minimum unbroken run length, in minutes, before a stuck metric counts as frozen.
+   * 判定為「疑似凍結」前，該指標卡住不變所需的最短連續分鐘數。
+   */
+  minRunMinutes: 120,
+  /**
+   * A metric stuck at any single reading from 0 through this ceiling counts as frozen.
+   * 指標卡在 0 到這個上限之間的任一個固定讀數，即視為凍結。
+   */
+  stuckValueCeiling: 3,
+})

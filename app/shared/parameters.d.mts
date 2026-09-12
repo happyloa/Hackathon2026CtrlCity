@@ -51,3 +51,11 @@ export const XGBOOST_PREDICTION_POLICY: Readonly<{
   lowInventoryFloor: number
   baselineF1RoutingThreshold: number
 }>
+
+export const LIVE_SNAPSHOT_POLICY: Readonly<{
+  maxSnapshotsPerStation: number
+  localStorageRetentionHours: number
+  lowBikesThreshold: number
+}>
+
+export const FROZEN_STATION_POLICY: Readonly<{ minRunMinutes: number; stuckValueCeiling: number }>

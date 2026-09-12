@@ -2,7 +2,7 @@
 import { Info, LoaderCircle, RefreshCw, Search, TriangleAlert, X } from '@lucide/vue'
 import { stationOverviewStatus, type StationOverviewStatus } from '~/shared/station-overview'
 import { summarizeStationDistricts } from '~/shared/district-summary'
-type StationFilter = 'all' | StationOverviewStatus
+type StationFilter = 'all' | StationOverviewStatus | 'frozen'
 
 const route = useRoute()
 const router = useRouter()
@@ -28,6 +28,7 @@ const filterOptions: Array<{ value: StationFilter; label: string }> = [
   { value: 'stable', label: '穩定' },
   { value: 'unknown', label: '資料不足' },
   { value: 'service', label: '服務異常' },
+  { value: 'frozen', label: '連續停滯' },
 ]
 
 // The shared layout owns live polling for every operations page.
@@ -42,6 +43,7 @@ const districtPickerOptions = computed(() => [
   ...(live.dashboard.value?.districts || []).map(district => ({ value: district, label: district })),
 ])
 const alertLookup = computed(() => new Map((dashboard.value?.alerts || []).map(alert => [alert.stationId, alert])))
+const frozenLookup = computed(() => new Map((dashboard.value?.frozenStations || []).map(entry => [entry.stationId, entry])))
 const contextQuery = computed<Record<string, string>>(() => {
   const query: Record<string, string> = {}
   if (selectedDistrict.value) query.district = selectedDistrict.value
@@ -54,8 +56,12 @@ const filteredStations = computed(() => {
   const rank: Record<StationOverviewStatus, number> = { empty: 0, full: 0, service: 1, unknown: 2, stable: 3 }
   return [...(dashboard.value?.stations || [])]
     .filter((station) => {
-      const status = stationOverviewStatus(station, alertLookup.value.get(station.id))
-      if (stationFilter.value !== 'all' && status !== stationFilter.value) return false
+      if (stationFilter.value === 'frozen') {
+        if (!frozenLookup.value.has(station.id)) return false
+      } else if (stationFilter.value !== 'all') {
+        const status = stationOverviewStatus(station, alertLookup.value.get(station.id))
+        if (status !== stationFilter.value) return false
+      }
       return !query || `${station.name} ${station.district}`.toLocaleLowerCase('zh-TW').includes(query)
     })
     .sort((left, right) => {
@@ -75,6 +81,7 @@ const counts = computed(() => {
     stable: stations.filter(station => stationOverviewStatus(station, alertLookup.value.get(station.id)) === 'stable').length,
     unknown: stations.filter(station => stationOverviewStatus(station, alertLookup.value.get(station.id)) === 'unknown').length,
     service: stations.filter(station => stationOverviewStatus(station, alertLookup.value.get(station.id)) === 'service').length,
+    frozen: stations.filter(station => frozenLookup.value.has(station.id)).length,
   }
 })
 
@@ -109,7 +116,7 @@ watch(() => route.query.district, (district) => {
         <div class="stations-filter-bottom"><div class="stations-status-filters" role="group" aria-label="站點狀態篩選"><button v-for="item in filterOptions" :key="item.value" type="button" :class="{ active: stationFilter === item.value }" :aria-pressed="stationFilter === item.value" @click="stationFilter = item.value">{{ item.label }}<b>{{ counts[item.value] }}</b></button></div><span>{{ selectedDistrict || '全市' }} · 含 60 分鐘預測</span></div>
         <span class="sr-only" role="status" aria-live="polite">{{ locationMessage }}</span>
       </section>
-      <DistrictStationList :stations="filteredStations" :alerts="dashboard.alerts" :reset-key="`${selectedDistrict}|${stationFilter}|${stationQuery}`" @select="selectedStationId = $event" />
+      <DistrictStationList :stations="filteredStations" :alerts="dashboard.alerts" :frozen-stations="dashboard.frozenStations" :reset-key="`${selectedDistrict}|${stationFilter}|${stationQuery}`" @select="selectedStationId = $event" />
       <DisclosurePanel class="panel stations-method" title="匯總與分數怎麼看" description="查看統計範圍與計算方式" icon="solar:info-circle-outline">
         <div><p><Info :size="16" aria-hidden="true" />區域摘要固定以全市資料計算；搜尋與狀態篩選只影響下方站點清單。</p><p>需關注站點包含目前或 60 分鐘內可能缺車／缺位的站點。地圖以這些站點占該區總站數的比例著色；服務異常與資料不足另行標示。</p><p>平均風險為有可用預測、且正常營運站點的 60 分鐘模型風險平均（0–100），沒有預測時顯示「—」。預測高風險站數沿用模型的高風險／極高風險分級。</p><p>站點優先分用來安排處理順序：當下空滿 50、60 分鐘風險 25、庫存缺口 20、基線品質 5；與模型風險分數不同。</p></div>
       </DisclosurePanel>

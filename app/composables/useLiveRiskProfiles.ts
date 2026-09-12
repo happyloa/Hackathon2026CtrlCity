@@ -5,7 +5,8 @@ import type {
   PredictionCoverage,
   PredictionMetadata,
 } from '~/shared/ops'
-import { LOW_INVENTORY_POLICY } from '~/shared/parameters.mjs'
+import { LIVE_SNAPSHOT_POLICY, LOW_INVENTORY_POLICY } from '~/shared/parameters.mjs'
+import { useStationSnapshots, type StationSnapshot } from '~/composables/useStationSnapshots'
 
 type CompactProfile = [number, number, number, number, number, number]
 
@@ -28,19 +29,12 @@ type SlotPayload = {
   profiles: Array<CompactProfile | null>
 }
 
-type LiveSnapshot = {
-  at: number
-  bikes: number
-  docks: number
-}
-
 const HORIZONS: HorizonKey[] = ['30', '60']
 const FALLBACK_THRESHOLDS: Record<HorizonKey, number> = { '30': .45, '60': .45 }
 const PRIMARY_HORIZON: HorizonKey = '60'
 const SUFFICIENT_BASELINE_MIN_SAMPLES = 6
 const HIGH_CONFIDENCE_MIN_SAMPLES = 12
 const slotCache = new Map<number, SlotPayload>()
-const snapshotsByStation = new Map<string, LiveSnapshot[]>()
 let matchIndex: Map<string, number[]> | undefined
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -140,10 +134,13 @@ function inventoryOnlyForecast(
   }
 }
 
-function recentMomentum(station: LiveStation, observedAt: string): { bikes: number; docks: number } | null {
+function recentMomentum(
+  snapshots: readonly StationSnapshot[],
+  station: LiveStation,
+  observedAt: string,
+): { bikes: number; docks: number } | null {
   const epoch = Date.parse(observedAt)
   if (!Number.isFinite(epoch)) return null
-  const snapshots = snapshotsByStation.get(station.id) || []
   const target = epoch - 30 * 60_000
   const previous = [...snapshots]
     .filter(snapshot => snapshot.at <= target && snapshot.at >= target - 10 * 60_000)
@@ -153,18 +150,45 @@ function recentMomentum(station: LiveStation, observedAt: string): { bikes: numb
     : null
 }
 
-function rememberSnapshot(station: LiveStation, observedAt: string) {
+// Tolerates one missed 5-minute poll (`useLivePolling.ts`'s cadence) without
+// dropping a station that has genuinely been low the whole window.
+const PERSISTENCE_POLL_TOLERANCE_MS = 6 * 60_000
+
+/**
+ * Station ids whose live available-bikes count has been below
+ * `LIVE_SNAPSHOT_POLICY.lowBikesThreshold` for every snapshot covering at
+ * least the last `minutes` minutes -- not merely "is low right now". Backed
+ * entirely by the shared `useStationSnapshots()` buffer, so it only ever
+ * reports what this browser has actually observed: a fresh buffer (first
+ * visit, cleared storage, or a station that only just started polling) has
+ * no history yet and so reports nothing until it catches up.
+ */
+export function lowBikesPersistedIds(
+  stations: readonly LiveStation[],
+  observedAt: string,
+  minutes: number,
+): Set<string> {
+  const result = new Set<string>()
   const epoch = Date.parse(observedAt)
-  if (!Number.isFinite(epoch)) return
-  const existing = snapshotsByStation.get(station.id) || []
-  const next = [...existing.filter(snapshot => snapshot.at !== epoch), {
-    at: epoch,
-    bikes: station.availableBikes,
-    docks: station.availableDocks,
-  }]
-    .sort((left, right) => left.at - right.at)
-    .slice(-8)
-  snapshotsByStation.set(station.id, next)
+  if (!Number.isFinite(epoch)) return result
+  const windowStart = epoch - minutes * 60_000
+  const { snapshotsFor } = useStationSnapshots()
+
+  for (const station of stations) {
+    if (station.serviceStatus !== 'operational') continue
+    if (station.availableBikes >= LIVE_SNAPSHOT_POLICY.lowBikesThreshold) continue
+
+    const snapshots = snapshotsFor(station.id)
+    const withinWindow = snapshots.filter(snapshot => snapshot.at <= epoch
+      && snapshot.at >= windowStart - PERSISTENCE_POLL_TOLERANCE_MS)
+    const earliest = withinWindow[0]
+    if (!earliest || earliest.at > windowStart + PERSISTENCE_POLL_TOLERANCE_MS) continue
+    if (withinWindow.every(snapshot => snapshot.bikes < LIVE_SNAPSHOT_POLICY.lowBikesThreshold)) {
+      result.add(station.id)
+    }
+  }
+
+  return result
 }
 
 function makeForecast(
@@ -321,6 +345,7 @@ export function useLiveRiskProfiles() {
   const manifest = useState<ProfileManifest | null>('live-risk-profile-manifest', () => null)
   const error = useState('live-risk-profile-error', () => '')
   const coverage = useState<PredictionCoverage | null>('live-risk-profile-coverage', () => null)
+  const { snapshotsFor, remember } = useStationSnapshots()
 
   function clearProfileCache() {
     manifest.value = null
@@ -374,7 +399,7 @@ export function useLiveRiskProfiles() {
       for (const station of stations) {
         const candidates = matchIndex?.get(liveMatchKey(station)) || []
         const historicalIndex = candidates.length === 1 ? candidates[0] ?? null : null
-        const momentum = recentMomentum(station, observedAt)
+        const momentum = recentMomentum(snapshotsFor(station.id), station, observedAt)
         const horizons = {} as Record<HorizonKey, Forecast>
         const primaryProfile = historicalIndex === null ? null : slots[PRIMARY_HORIZON]?.profiles[historicalIndex] || null
 
@@ -396,8 +421,8 @@ export function useLiveRiskProfiles() {
             : inventoryOnlyForecast(station, horizon, '找不到可用的歷史資料，目前只顯示即時庫存。', 'unmatched', observedAt)
         }
         results.set(station.id, horizons)
-        rememberSnapshot(station, observedAt)
       }
+      remember(stations, observedAt)
       coverage.value = {
         asOf: observedAt,
         primaryHorizonMinutes: profileManifest.prediction.primaryHorizonMinutes,
