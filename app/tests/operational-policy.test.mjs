@@ -7,6 +7,7 @@ import {
   safetyStockFor,
   stationSeverityFor,
 } from '../shared/operational-policy.mjs'
+import { LIVE_SNAPSHOT_POLICY, NEAR_EMPTY_BIKES } from '../shared/parameters.mjs'
 
 function station(overrides = {}) {
   return {
@@ -33,6 +34,17 @@ test('a full station and a fully empty station are mutually exclusive severities
 test('near-empty is judged on an absolute bike count, independent of station size', () => {
   assert.equal(stationSeverityFor(station({ totalDocks: 60, availableBikes: 1, availableDocks: 40 })), SEVERITY_LEVELS.NEAR_EMPTY)
   assert.equal(stationSeverityFor(station({ totalDocks: 4, availableBikes: 1, availableDocks: 2 })), SEVERITY_LEVELS.NEAR_EMPTY)
+})
+
+test('the near-empty boundary is the one 缺車 line the whole system shares', () => {
+  // The map coloured by NEAR_EMPTY_BIKES while every list used
+  // lowBikesThreshold, and the two held different numbers -- so the map showed
+  // strictly fewer 缺車 stations than the lists that claimed the same standard.
+  assert.equal(NEAR_EMPTY_BIKES, LIVE_SNAPSHOT_POLICY.lowBikesThreshold, '地圖與清單必須共用同一條缺車門檻')
+  // Compared with `<`: 低於 3 台 means the last qualifying station has 2.
+  const last = NEAR_EMPTY_BIKES - 1
+  assert.equal(stationSeverityFor(station({ totalDocks: 60, availableBikes: last, availableDocks: 40 })), SEVERITY_LEVELS.NEAR_EMPTY)
+  assert.notEqual(stationSeverityFor(station({ totalDocks: 60, availableBikes: NEAR_EMPTY_BIKES, availableDocks: 40 })), SEVERITY_LEVELS.NEAR_EMPTY)
 })
 
 test('low is judged on a ratio of total docks, with the halfway point itself counted as normal', () => {

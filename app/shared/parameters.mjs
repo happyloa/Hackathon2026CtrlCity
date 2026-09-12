@@ -175,10 +175,32 @@ export const ALERT_PRIORITY_THRESHOLDS = Object.freeze({
 })
 
 /**
- * Below this many available bikes a station is "near empty" regardless of its size.
- * 可借車數低於此值時，無論站點大小都視為「接近無車」。
+ * Below this many available bikes a station is "near empty" regardless of its
+ * size: 近端缺車, 全系統判定「缺車」的統一門檻. Compared with `<`, so this reads
+ * as 低於 3 台 -- 0, 1 or 2 bikes. Everything that answers "is this station
+ * short of bikes right now" must read this constant rather than restate the
+ * number: the map severity (`stationSeverityFor`), its legend, and the
+ * real-time persistence runs (`LIVE_SNAPSHOT_POLICY.lowBikesThreshold`). Only
+ * 完全缺車 (`currentState === 'empty_now'`, exactly zero) is narrower, and it
+ * answers a different question: 空站 is the extreme case of 缺車, not a synonym.
+ *
+ * This sat at 2 while every threshold added around it was written as 3
+ * (`LOW_INVENTORY_POLICY.floor`, `SAFETY_STOCK_POLICY.minimum`,
+ * `FROZEN_STATION_POLICY.stuckValueCeiling`, and `lowBikesThreshold` itself),
+ * so the map coloured a strictly smaller set of stations than every list that
+ * claimed the same standard. Keep them aligned.
+ *
+ * 可借車數低於此值時，無論站點大小都視為「近端缺車」——全系統判定「缺車」的統一
+ * 門檻。比較用 `<`，所以語意是「低於 3 台」（0、1、2 台）。所有回答「這站現在是否
+ * 缺車」的地方都必須引用這個常數，而不是各自寫死數字：地圖嚴重度、地圖圖例、即時
+ * 持續缺車清單。只有「完全缺車」（恰好為零）比它更窄，而那是另一個問題：空站是缺車
+ * 的極端情況，不是同義詞。
+ *
+ * 這個值原本停在 2，但後來加入的門檻全部寫成 3（`LOW_INVENTORY_POLICY.floor`、
+ * `SAFETY_STOCK_POLICY.minimum`、`FROZEN_STATION_POLICY.stuckValueCeiling`，以及
+ * `lowBikesThreshold` 本身），導致地圖著色的站點集合嚴格小於所有宣稱同一標準的清單。
  */
-export const NEAR_EMPTY_BIKES = 2
+export const NEAR_EMPTY_BIKES = 3
 
 /**
  * Risk score (0-1) above which the XGBoost-overridden forecast raises an alert.
@@ -300,10 +322,16 @@ export const LIVE_SNAPSHOT_POLICY = Object.freeze({
    */
   localStorageRetentionHours: 6,
   /**
-   * Absolute available-bikes count below which a station counts as "real-time low".
-   * 即時可借車數低於此值即視為「即時缺車」。
+   * Absolute available-bikes count below which a station counts as "real-time
+   * low". Deliberately the same constant the map colours by: this list and the
+   * map answered the same question with different numbers (< 3 vs < 2), so the
+   * homepage reported far more 缺車 stations than the map ever showed. The
+   * value is unchanged -- 3 was always right here; the map's 2 was the stale one.
+   * 即時可借車數低於此值即視為「近端缺車」。刻意與地圖著色共用同一個常數：兩者
+   * 原本用不同的數字（< 3 與 < 2）回答同一個問題，導致首頁清單的缺車站數遠多於
+   * 地圖顯示的數量。數值本身沒有變——這裡一直是 3，漏改的是地圖那邊的 2。
    */
-  lowBikesThreshold: 3,
+  lowBikesThreshold: NEAR_EMPTY_BIKES,
 })
 
 /**

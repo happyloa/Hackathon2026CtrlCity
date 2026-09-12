@@ -2,15 +2,28 @@ import type { Alert, StationRisk } from './ops.ts'
 
 export type StationOverviewStatus = 'empty' | 'full' | 'stable' | 'unknown' | 'service'
 
+/**
+ * The metric a shortage clock would be measuring, or null when the station has
+ * nothing wrong to time. This is the whole definition of "異常時長": only a
+ * station that is currently out of bikes (or out of docks) has a duration --
+ * a station sitting at `normal` has been normal for hours by definition, and
+ * reporting that as a 持續時間 turns a shortage warning into noise.
+ */
+export function shortageMetricFor(station: StationRisk): 'bikes' | 'docks' | null {
+  if (station.serviceStatus !== 'operational') return null
+  if (station.currentState === 'empty_now' && station.availableBikes === 0) return 'bikes'
+  if (station.currentState === 'full_now' && station.availableDocks === 0) return 'docks'
+  return null
+}
+
 /** Observed continuous inventory shortage; snapshots use five-minute slots. */
 export function stationStatusDurationMinutes(
   station: StationRisk,
   snapshots: readonly { at: number; bikes: number; docks: number }[],
   now: number,
 ): number | null {
-  if (station.serviceStatus !== 'operational' || !Number.isFinite(now)) return null
-  const metric = station.currentState === 'empty_now' && station.availableBikes === 0 ? 'bikes'
-    : station.currentState === 'full_now' && station.availableDocks === 0 ? 'docks' : null
+  if (!Number.isFinite(now)) return null
+  const metric = shortageMetricFor(station)
   if (!metric) return null
   const slot = 5 * 60_000
   // Nearest-slot timestamps may be up to half a slot ahead of the clock.

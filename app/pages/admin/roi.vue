@@ -160,7 +160,7 @@ const dayPeak = computed(() => {
  * peak so the differing scales are never implied to be comparable.
  */
 const dayRows = computed(() => ([
-  { key: 'emptyRate' as const, label: '缺車率', barClass: 'bg-danger' },
+  { key: 'emptyRate' as const, label: '空站率', barClass: 'bg-danger' },
   { key: 'fullRate' as const, label: '滿柱率', barClass: 'bg-warning' },
 ]).map((row) => {
   const values = day.value.map(item => item?.[row.key] ?? 0)
@@ -278,7 +278,7 @@ watch([selectedDistrict, selectedWeekday, selectedSlot, selectedStationId], () =
         <p v-if="baselineF1.scope === 'station'" class="mt-1 mb-0 text-body1 text-muted">
           這是該站自己的數字（樣本 {{ baselineF1.samples.toLocaleString() }} 筆），不是行政區平均——同一區的其他站可能差很多。
           <template v-if="baselineF1.actualEvents === 0">
-            這站在6月的評估時段內完全沒發生過缺車/滿柱事件（可能是雙0停運時段太多、或是本來就很少缺車），Precision/Recall 是 0/0 的邊界情況，不代表基線預測失準。
+            這站在6月的評估時段內完全沒發生過空站/滿柱事件（可能是雙0停運時段太多、或是本來就很少空站），Precision/Recall 是 0/0 的邊界情況，不代表基線預測失準。
           </template>
           <template v-else-if="baselineF1.alertsIssued === 0">
             基線在這站完全沒發出過警報，Precision 是 0/0 的邊界情況，不代表誤報。
@@ -288,16 +288,16 @@ watch([selectedDistrict, selectedWeekday, selectedSlot, selectedStationId], () =
           <MetricCard
             label="Precision"
             :value="percent(baselineF1.precision)"
-            caption="警報中真的發生缺車/滿柱的比例"
+            caption="警報中真的發生空站/滿柱的比例"
             icon="solar:target-outline"
-            tooltip="精確率。系統發出的警報裡，有多少比例是真的發生缺車或滿柱。數字越高代表誤報越少；太低代表常常「狼來了」。"
+            tooltip="精確率。系統發出的警報裡，有多少比例是真的發生空站或滿柱。數字越高代表誤報越少；太低代表常常「狼來了」。"
           />
           <MetricCard
             label="Recall"
             :value="percent(baselineF1.recall)"
             caption="真實事件中被成功預警的比例"
             icon="solar:radar-outline"
-            tooltip="召回率。實際發生缺車或滿柱的時段裡，有多少比例被系統事先警告。數字越高代表漏報越少；太低代表常常「狀況發生了卻沒提醒」。"
+            tooltip="召回率。實際發生空站或滿柱的時段裡，有多少比例被系統事先警告。數字越高代表漏報越少；太低代表常常「狀況發生了卻沒提醒」。"
           />
           <MetricCard
             label="F1"
@@ -391,7 +391,7 @@ watch([selectedDistrict, selectedWeekday, selectedSlot, selectedStationId], () =
         </div>
         <div class="flex gap-2">
           <button
-            v-for="option in [{ key: 'emptyRate', label: '缺車率' }, { key: 'fullRate', label: '滿柱率' }]"
+            v-for="option in [{ key: 'emptyRate', label: '空站率' }, { key: 'fullRate', label: '滿柱率' }]"
             :key="option.key"
             class="inline-flex min-h-11 items-center rounded-lg border px-3 text-body1 font-bold transition-colors"
             :class="mapMetric === option.key
@@ -416,7 +416,7 @@ watch([selectedDistrict, selectedWeekday, selectedSlot, selectedStationId], () =
 
     <section v-if="current" class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <MetricCard
-        label="缺車率"
+        label="空站率"
         :value="percent(current.emptyRate)"
         :caption="`${weekdayNames[weekday]} ${slotLabel} · 可借車數為 0`"
         icon="solar:bicycling-round-outline"
@@ -451,7 +451,7 @@ watch([selectedDistrict, selectedWeekday, selectedSlot, selectedStationId], () =
       <div class="flex flex-wrap items-baseline justify-between gap-2">
         <h3 class="m-0 text-h6 font-bold">{{ weekdayNames[weekday] }} 全日走勢</h3>
         <p v-if="dayPeak" class="m-0 text-body1 text-muted">
-          缺車最嚴重：<strong class="text-ink">{{ dayPeak.label }}</strong> {{ percent(dayPeak.rate) }}
+          空站最嚴重：<strong class="text-ink">{{ dayPeak.label }}</strong> {{ percent(dayPeak.rate) }}
         </p>
       </div>
 
@@ -462,7 +462,7 @@ watch([selectedDistrict, selectedWeekday, selectedSlot, selectedStationId], () =
         <strong class="text-ink">{{ readout.label }}</strong>
         <span class="text-muted">{{ readout.isHover ? '滑鼠指向' : '目前選定' }}</span>
         <template v-if="readout.cell">
-          <span>缺車 <strong class="text-danger">{{ percent(readout.cell.emptyRate) }}</strong></span>
+          <span>空站 <strong class="text-danger">{{ percent(readout.cell.emptyRate) }}</strong></span>
           <span>滿柱 <strong class="text-warning">{{ percent(readout.cell.fullRate) }}</strong></span>
           <span class="text-muted">平均可借 {{ readout.cell.meanBikes }} · 可還 {{ readout.cell.meanDocks }}</span>
           <span class="text-muted">樣本 {{ readout.cell.observations.toLocaleString() }}</span>
@@ -508,7 +508,7 @@ watch([selectedDistrict, selectedWeekday, selectedSlot, selectedStationId], () =
         </div>
       </div>
       <p class="mt-2 text-body1 text-muted">
-        兩列各自獨立縮放，高度不可互相比較 —— 缺車在全系統約為滿柱的 9 倍，共用刻度會讓滿柱那列縮成一條線。點選長條可切換時段。
+        兩列各自獨立縮放，高度不可互相比較 —— 空站在全系統約為滿柱的 9 倍，共用刻度會讓滿柱那列縮成一條線。點選長條可切換時段。
       </p>
     </section>
 
@@ -523,7 +523,7 @@ watch([selectedDistrict, selectedWeekday, selectedSlot, selectedStationId], () =
           <thead>
             <tr class="border-b border-line text-left text-muted">
               <th class="py-2 pr-3 font-bold">星期</th>
-              <th class="py-2 pr-3 text-right font-bold">缺車率</th>
+              <th class="py-2 pr-3 text-right font-bold">空站率</th>
               <th class="py-2 pr-3 text-right font-bold">滿柱率</th>
               <th class="py-2 pr-3 text-right font-bold">平均可借</th>
               <th class="py-2 pr-3 text-right font-bold">平均可還</th>
@@ -589,7 +589,7 @@ watch([selectedDistrict, selectedWeekday, selectedSlot, selectedStationId], () =
                   {{ record.availableDocks }}
                 </td>
                 <td class="py-2 text-right">
-                  <span v-if="record.availableBikes === 0" class="font-bold text-danger">缺車</span>
+                  <span v-if="record.availableBikes === 0" class="font-bold text-danger">空站</span>
                   <span v-else-if="record.availableDocks === 0" class="font-bold text-warning">滿柱</span>
                   <span v-else class="text-muted">正常</span>
                 </td>
@@ -598,7 +598,7 @@ watch([selectedDistrict, selectedWeekday, selectedSlot, selectedStationId], () =
           </table>
         </div>
         <p class="mt-3 mb-0 text-body1 text-muted">
-          共 {{ detailRecords.length }} 筆，其中缺車 {{ detailRecords.filter(r => r.availableBikes === 0).length }} 次、滿柱
+          共 {{ detailRecords.length }} 筆，其中空站 {{ detailRecords.filter(r => r.availableBikes === 0).length }} 次、滿柱
           {{ detailRecords.filter(r => r.availableDocks === 0).length }} 次。停運（可借與可還皆為 0）的時段不會出現在這裡。
         </p>
       </template>

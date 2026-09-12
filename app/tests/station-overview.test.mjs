@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { stationOverviewStatus } from '../shared/station-overview.ts'
+import { shortageMetricFor, stationOverviewStatus } from '../shared/station-overview.ts'
 
 function station(overrides = {}) {
   const horizon = { baselineStatus: 'matched' }
@@ -49,6 +49,18 @@ test('does not bridge missing snapshots or extrapolate stale history', () => {
   assert.equal(stationStatusDurationMinutes(empty, [snapshot(0)], 18 * minute), null)
   assert.equal(stationStatusDurationMinutes(empty, [], 18 * minute), null)
   assert.equal(stationStatusDurationMinutes(empty, [snapshot(15, 1)], 18 * minute), null)
+})
+
+test('a shortage clock exists only while the station is actually short', () => {
+  // The duration is 異常時長, not 狀態時長: a station that is simply running
+  // normally has nothing to time, so anything holding a stored clock (the
+  // scheduler's `stateMinutes`, which counts `normal` too) must gate on this.
+  assert.equal(shortageMetricFor(empty), 'bikes')
+  assert.equal(shortageMetricFor(station({ currentState: 'full_now', availableDocks: 0 })), 'docks')
+  assert.equal(shortageMetricFor(station()), null)
+  assert.equal(shortageMetricFor(station({ currentState: 'normal', availableBikes: 1 })), null)
+  assert.equal(shortageMetricFor(station({ currentState: 'unavailable', availableBikes: 0 })), null)
+  assert.equal(shortageMetricFor({ ...empty, serviceStatus: 'official_inactive' }), null)
 })
 
 test('handles rounded future slots and excludes forecasts and unavailable stations', () => {

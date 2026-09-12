@@ -40,7 +40,7 @@ type SortKey = 'name' | 'status' | 'duration' | 'bikes' | 'docks' | 'priority'
 const sortKey = ref<SortKey>('priority')
 const sortDirection = ref<'asc' | 'desc'>('desc')
 const sortOptions: { value: SortKey; label: string }[] = [
-  { value: 'priority', label: '優先分' }, { value: 'duration', label: '站點狀態維持' },
+  { value: 'priority', label: '優先分' }, { value: 'duration', label: '缺車／滿柱持續' },
   { value: 'bikes', label: '可借車' }, { value: 'docks', label: '可還位' },
   { value: 'name', label: '站點名稱' }, { value: 'status', label: '站點狀態' },
 ]
@@ -124,7 +124,7 @@ function rowStyle(station: StationRisk) {
         <NuxtLink :to="{ path: '/dispatch', query: { district: group.district } }" class="station-district-dispatch" :aria-label="`前往${group.district}調度規劃`">此區調度<ArrowUpRight :size="15" aria-hidden="true" /></NuxtLink>
       </header>
       <div v-if="isOpen(group.district, index)" :id="`station-district-${group.district}`">
-        <div class="station-table-heading"><button type="button" :aria-label="sortLabel('name', '站點名稱')" @click="toggleSort('name')">站點名稱{{ sortMark('name') }}</button><button type="button" :aria-label="sortLabel('status', '站點狀態')" @click="toggleSort('status')">站點狀態{{ sortMark('status') }}</button><button type="button" :aria-label="sortLabel('duration', '站點狀態維持')" @click="toggleSort('duration')">站點狀態維持{{ sortMark('duration') }}</button><span><button type="button" :aria-label="sortLabel('bikes', '可借車')" @click="toggleSort('bikes')">可借車{{ sortMark('bikes') }}</button> / <button type="button" :aria-label="sortLabel('docks', '可還位')" @click="toggleSort('docks')">可還位{{ sortMark('docks') }}</button></span><button type="button" :aria-label="sortLabel('priority', '優先分')" @click="toggleSort('priority')">優先分{{ sortMark('priority') }}</button><span>站點資料</span></div>
+        <div class="station-table-heading"><button type="button" :aria-label="sortLabel('name', '站點名稱')" @click="toggleSort('name')">站點名稱{{ sortMark('name') }}</button><button type="button" :aria-label="sortLabel('status', '站點狀態')" @click="toggleSort('status')">站點狀態{{ sortMark('status') }}</button><button type="button" :aria-label="sortLabel('duration', '缺車／滿柱持續')" @click="toggleSort('duration')">缺車／滿柱持續{{ sortMark('duration') }}</button><span><button type="button" :aria-label="sortLabel('bikes', '可借車')" @click="toggleSort('bikes')">可借車{{ sortMark('bikes') }}</button> / <button type="button" :aria-label="sortLabel('docks', '可還位')" @click="toggleSort('docks')">可還位{{ sortMark('docks') }}</button></span><button type="button" :aria-label="sortLabel('priority', '優先分')" @click="toggleSort('priority')">優先分{{ sortMark('priority') }}</button><span>站點資料</span></div>
         <article v-for="station in group.stations.slice(0, visible(group.district))" :key="station.id" class="station-row" :data-status="statusFor(station)" :style="rowStyle(station)">
           <button class="station-row-name" type="button" @click="emit('select', station.id)"><component :is="statusIcon(station)" :size="17" aria-hidden="true" /><strong>{{ displayStationName(station.name) }}</strong><span v-if="frozenInfo(station)" class="station-row-frozen-badge" title="疑似連續停滯"><Wrench :size="13" aria-hidden="true" /><span class="sr-only">疑似連續停滯</span></span></button>
           <span class="station-row-status">{{ statusLabel(station) }}</span>

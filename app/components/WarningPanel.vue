@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { BellRing, CheckCircle2, ChevronDown, Info, TriangleAlert } from '@lucide/vue'
 import { refillAmountFor } from '~/shared/operational-policy.mjs'
+import { NEAR_EMPTY_BIKES } from '~/shared/parameters.mjs'
 import { shortageWarningsFor } from '~/shared/shortage-warnings'
 import { displayStationName, type DashboardSummary, type HorizonKey, type StationRisk } from '~/shared/ops'
 
@@ -32,6 +33,9 @@ const TABS: TabDef[] = [
   ...FORECAST_TABS.map(tab => ({ ...tab, kind: 'forecast' as const, minutes: Number(tab.key) })),
   { key: 'rt30', kind: 'realtime', label: '即時缺車 ≥30 分鐘', minutes: 30 },
   { key: 'rt60', kind: 'realtime', label: '即時缺車 ≥60 分鐘', minutes: 60 },
+  // Both read LIVE_SNAPSHOT_POLICY.lowBikesThreshold, which is NEAR_EMPTY_BIKES:
+  // the same 缺車 line the map colours by, so the counts here and the red
+  // stations on the map are the same population.
 ]
 
 const activeTab = ref<TabKey>('30')
@@ -125,7 +129,7 @@ const hasWarnings = computed(() => TABS.some(tab => countsByTab.value[tab.key] >
       </span>
     </button>
     <div v-if="expanded" :id="warningContentId" class="warning-content">
-      <p class="warning-context">「預測」為各時點分別估算，站點可能重疊；「即時缺車」是此頁面持續開啟期間，直接觀測到可借車數持續偏低的站點，需要開啟足夠時間才會出現。目前空站另列於上方營運摘要。</p>
+      <p class="warning-context">「缺車」在全系統的統一定義是可借車數低於 {{ NEAR_EMPTY_BIKES }} 台（近端缺車），與地圖著色同一條線。「預測」為各時點分別估算，站點可能重疊；「即時缺車」不是預測，是已經觀測到的連續缺車時長{{ serverBackedRuns ? '，由排程每 5 分鐘記錄，開啟頁面即為完整結果' : '，需頁面持續開啟自行累積' }}。已經完全沒車的空站另列於上方營運摘要。</p>
       <div class="flex flex-wrap gap-2 px-4 pb-3 pt-1" role="group" aria-label="缺車通報分類">
         <button v-for="tab in TABS" :key="tab.key" type="button" :aria-pressed="activeTab === tab.key"
           class="min-h-9 rounded-md border px-3 text-body1 font-semibold transition-colors" :class="activeTab === tab.key

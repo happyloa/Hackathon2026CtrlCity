@@ -53,6 +53,7 @@ test('handler writes raw, latest and state objects', async () => {
 const {
   freshPersistence, hasServerRuns, lowBikesIdsFromPersistence, frozenStationsFromPersistence,
 } = await import('../shared/station-persistence.ts')
+const { LIVE_SNAPSHOT_POLICY, NEAR_EMPTY_BIKES } = await import('../shared/parameters.mjs')
 
 /** Replays one capture every 5 minutes, the way the scheduler actually runs. */
 function replay(readings, fromIso, count) {
@@ -65,20 +66,27 @@ function replay(readings, fromIso, count) {
 }
 
 test('tracks how long available bikes stayed below the low threshold', () => {
-  // 3 bikes is at the threshold, not below it: no run is recorded.
-  const atThreshold = mergePersistence(null, [station('a', 3, 17)], at('2026-09-12T01:00:00Z'))
+  // Derived from the constant rather than hardcoded, so the run boundary can
+  // never drift away from the 缺車 line the map and this list share.
+  const threshold = LIVE_SNAPSHOT_POLICY.lowBikesThreshold
+  assert.equal(threshold, NEAR_EMPTY_BIKES, '即時缺車清單必須與地圖用同一條門檻')
+
+  // Sitting exactly at the threshold is not below it: no run is recorded.
+  const atThreshold = mergePersistence(null, [station('a', threshold, 20 - threshold)], at('2026-09-12T01:00:00Z'))
   assert.equal(atThreshold.stations.a.lowBikesSince, undefined)
   assert.equal(atThreshold.stations.a.lowBikesMinutes, undefined)
 
-  // 01:00 -> 01:35 at 2 bikes is 8 captures, so 35 minutes of an unbroken run.
-  const low = replay([station('a', 2, 18)], '2026-09-12T01:00:00Z', 8)
+  // 01:00 -> 01:35 one bike below the threshold is 8 captures, so 35 minutes
+  // of an unbroken run.
+  const bikes = threshold - 1
+  const low = replay([station('a', bikes, 20 - bikes)], '2026-09-12T01:00:00Z', 8)
   assert.equal(low.stations.a.lowBikesSince, '2026-09-12T01:00:00.000Z')
   assert.equal(low.stations.a.lowBikesMinutes, 35)
 
   // Refilling clears the run rather than pausing it.
   const refilled = mergePersistence(low, [station('a', 9, 11)], at('2026-09-12T01:40:00Z'))
   assert.equal(refilled.stations.a.lowBikesSince, undefined)
-  const lowAgain = mergePersistence(refilled, [station('a', 1, 19)], at('2026-09-12T01:45:00Z'))
+  const lowAgain = mergePersistence(refilled, [station('a', 0, 20, 'empty_now')], at('2026-09-12T01:45:00Z'))
   assert.equal(lowAgain.stations.a.lowBikesMinutes, 0)
 })
 

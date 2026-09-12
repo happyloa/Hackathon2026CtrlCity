@@ -6,7 +6,7 @@ import {
   type PersistenceState,
   type StationPersistence,
 } from '~/shared/station-persistence'
-import { stationStatusDurationMinutes } from '~/shared/station-overview'
+import { shortageMetricFor, stationStatusDurationMinutes } from '~/shared/station-overview'
 import { buildLiveOperations } from '~/shared/live-operations'
 import { FROZEN_STATION_POLICY } from '~/shared/parameters.mjs'
 import { lowBikesPersistedIds } from '~/composables/useLiveRiskProfiles'
@@ -132,9 +132,14 @@ function createLiveDashboard(
     // The browser buffer is only the fallback for hosts without the scheduler.
     const describesThisReading = Boolean(carried) && carried!.currentState === station.currentState
       && carried!.last[0] === station.availableBikes && carried!.last[1] === station.availableDocks
-    station.statusDurationMinutes = describesThisReading
-      ? carried!.stateMinutes
-      : stationStatusDurationMinutes(station, snapshotsFor(station.id), Date.now())
+    // `stateMinutes` clocks *every* state, `normal` included, so it is only the
+    // answer for a station that is actually short -- otherwise a station that
+    // has simply been fine all morning would report a multi-hour 持續時間.
+    station.statusDurationMinutes = shortageMetricFor(station) === null
+      ? null
+      : describesThisReading
+        ? carried!.stateMinutes
+        : stationStatusDurationMinutes(station, snapshotsFor(station.id), Date.now())
 
     if (describesThisReading) {
       const hour = new Date(Date.parse(response.meta.asOf) + 8 * 3600000).getUTCHours()

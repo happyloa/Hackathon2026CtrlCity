@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Info, LocateFixed, MapPin, MapPinSearch, RefreshCw, Search, TriangleAlert, X } from '@lucide/vue'
 import { stationSeverityFor, type SeverityLevel } from '~/shared/operational-policy.mjs'
+import { NEAR_EMPTY_BIKES } from '~/shared/parameters.mjs'
 import { displayStationName, type DataMode, type HorizonKey, type PredictionCoverage, type StationRisk } from '~/shared/ops'
 import type { DispatchRouteStop, DispatchRouteStopAction } from '~/shared/dispatch-route-planner'
 
@@ -307,7 +308,9 @@ const SEVERITY_LEGEND: { severity: Severity, label: string }[] = [
   { severity: 'service_disruption', label: '服務異常' },
   { severity: 'full', label: '滿柱・可還車位 0' },
   { severity: 'empty', label: '完全缺車・可借車數 0' },
-  { severity: 'near_empty', label: '近端缺車・可借車數 < 2' },
+  // Built from the constant, never restated: this legend read "< 2" while the
+  // colouring already used NEAR_EMPTY_BIKES, so the two drifted apart silently.
+  { severity: 'near_empty', label: `近端缺車・可借車數 < ${NEAR_EMPTY_BIKES}` },
   { severity: 'low', label: '偏低・低於總車格一半' },
   { severity: 'normal', label: '正常' },
 ]
