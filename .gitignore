@@ -1,3 +1,9 @@
+# Local environment files hold secrets; ignore them at any depth. Committed
+# examples (such as app/.env.example) document the variable names only.
+.env
+.env.*
+!.env.example
+
 # Raw source data is kept locally; it is too large for the repository.
 docs/資料集/
 
