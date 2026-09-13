@@ -39,7 +39,7 @@ type SortKey = 'name' | 'status' | 'duration' | 'bikes' | 'docks' | 'priority'
 const sortKey = ref<SortKey>('priority')
 const sortDirection = ref<'asc' | 'desc'>('desc')
 const sortOptions: { value: SortKey; label: string }[] = [
-  { value: 'priority', label: '優先分' }, { value: 'duration', label: '缺車／滿柱持續' },
+  { value: 'priority', label: '優先分' }, { value: 'duration', label: '空站／滿柱持續' },
   { value: 'bikes', label: '可借車' }, { value: 'docks', label: '可還位' },
   { value: 'name', label: '站點名稱' }, { value: 'status', label: '站點狀態' },
 ]
@@ -125,6 +125,7 @@ function rowStyle(station: StationRisk) {
         </select></label>
       <button type="button" @click="sortDirection = sortDirection === 'desc' ? 'asc' : 'desc'">{{ sortDirection ===
         'desc' ? '由高到低 ↓' : '由低到高 ↑' }}</button>
+      <span>已觸發的庫存告警依持續缺車分層，再參考風險、缺口與資料品質；優先分並非發生機率。</span>
     </div>
     <div v-if="!groups.length" class="station-list-empty" role="status">
       <Search :size="24" aria-hidden="true" /><strong>找不到符合條件的站點</strong><span>請調整搜尋文字、行政區或站點狀態。</span>
@@ -147,8 +148,8 @@ function rowStyle(station: StationRisk) {
         <div class="station-table-heading"><button type="button" :aria-label="sortLabel('name', '站點名稱')"
             @click="toggleSort('name')">站點名稱{{ sortMark('name') }}</button><button type="button"
             :aria-label="sortLabel('status', '站點狀態')" @click="toggleSort('status')">站點狀態{{ sortMark('status')
-            }}</button><button type="button" :aria-label="sortLabel('duration', '缺車／滿柱持續')"
-            @click="toggleSort('duration')">缺車／滿柱持續{{ sortMark('duration') }}</button><span><button type="button"
+            }}</button><button type="button" :aria-label="sortLabel('duration', '空站／滿柱持續')"
+            @click="toggleSort('duration')">空站／滿柱持續{{ sortMark('duration') }}</button><span><button type="button"
               :aria-label="sortLabel('bikes', '可借車')" @click="toggleSort('bikes')">可借車{{ sortMark('bikes') }}</button> /
             <button type="button" :aria-label="sortLabel('docks', '可還位')" @click="toggleSort('docks')">可還位{{
               sortMark('docks') }}</button></span><button type="button" :aria-label="sortLabel('priority', '優先分')"
@@ -163,7 +164,7 @@ function rowStyle(station: StationRisk) {
             </span>
           </button>
           <span class="station-row-status">{{ statusLabel(station) }}</span>
-          <span class="station-row-duration" title="依連續快照估算無車／無位至今的分鐘數；快照每 5 分鐘記錄，資料不足或非目前無車／無位時顯示 —"><small>狀態維持
+          <span class="station-row-duration" title="僅計空站（可借車為 0）或滿柱（可還位為 0）的連續時間；快照每 5 分鐘記錄，資料不足或目前未空站／滿柱時顯示 —。此欄與少於 3 台的持續缺車通報不同。"><small>空站／滿柱持續
             </small>{{ durationLabel(station) }}</span>
           <div class="station-row-inventory"><span><b>{{ station.availableBikes }}</b><small>
                 車</small></span><i>/</i><span><b>{{ station.availableDocks }}</b><small> 位</small></span></div>
@@ -646,3 +647,4 @@ function rowStyle(station: StationRisk) {
   }
 }
 </style>
+

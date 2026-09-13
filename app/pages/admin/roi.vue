@@ -263,7 +263,7 @@ watch([selectedDistrict, selectedWeekday, selectedSlot, selectedStationId], () =
       <div class="min-w-0">
         <h2 class="m-0 text-h6 font-bold">預測品質 F1 對照</h2>
         <p class="mt-1 text-body1 leading-6 text-muted">
-          規則基線是固定目標值（6月保留測試集，不受下方篩選影響）；模型 F1 依所選時段與範圍換算，待 XGBoost 完成後顯示。
+          規則基線與 XGBoost 均顯示 6 月保留測試集的離線評估。行政區與站點選擇會切換可用評估範圍；缺少單站結果時，依序顯示行政區或全站結果。星期與半小時時段只影響下方歷史統計，不會重算 F1。
         </p>
       </div>
 
@@ -278,7 +278,7 @@ watch([selectedDistrict, selectedWeekday, selectedSlot, selectedStationId], () =
         <p v-if="baselineF1.scope === 'station'" class="mt-1 mb-0 text-body1 text-muted">
           這是該站自己的數字（樣本 {{ baselineF1.samples.toLocaleString() }} 筆），不是行政區平均——同一區的其他站可能差很多。
           <template v-if="baselineF1.actualEvents === 0">
-            這站在6月的評估時段內完全沒發生過空站/滿柱事件（可能是雙0停運時段太多、或是本來就很少空站），Precision/Recall 是 0/0 的邊界情況，不代表基線預測失準。
+            這站在 6 月的有效評估樣本中沒有空站／滿柱事件，Recall 的分母為 0，需搭配樣本數與發出警報的數量判讀。
           </template>
           <template v-else-if="baselineF1.alertsIssued === 0">
             基線在這站完全沒發出過警報，Precision 是 0/0 的邊界情況，不代表誤報。
@@ -305,7 +305,7 @@ watch([selectedDistrict, selectedWeekday, selectedSlot, selectedStationId], () =
             caption="Precision 與 Recall 的調和平均"
             icon="solar:medal-star-outline"
             tone="warning"
-            tooltip="F1 分數，把 Precision 跟 Recall 兩個常常互相拉扯的指標合成一個總分（調和平均，不是單純平均）。用來判斷整體預測品質，是比對規則基線跟未來模型好壞的主要依據。"
+            tooltip="F1 是 Precision 與 Recall 的調和平均，用來比較規則基線與 XGBoost 的預測品質；比較時也應確認預測分鐘數、評估範圍及樣本數。"
           />
           <MetricCard
             label="樣本數"
@@ -319,10 +319,7 @@ watch([selectedDistrict, selectedWeekday, selectedSlot, selectedStationId], () =
 
       <div class="mt-5">
         <h3 class="m-0 text-body1 font-bold text-muted">
-          XGBoost 模型 F1{{
-            modelF1Rows.some(r => r.scope === 'station') ? `（${selectedStation?.station.name}）`
-            : selectedDistrict ? `（${selectedDistrict}）` : '（全站）'
-          }} · 6月測試集
+          XGBoost 模型 F1 · 6月測試集
         </h3>
         <div class="mt-2 space-y-2">
           <div
@@ -330,25 +327,25 @@ watch([selectedDistrict, selectedWeekday, selectedSlot, selectedStationId], () =
             :key="row.horizon"
             class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line bg-surface px-3 py-2"
           >
-            <span class="text-body1 font-bold">{{ row.horizon }} 分鐘</span>
+            <span class="text-body1 font-bold">{{ row.horizon }} 分鐘 · {{ row.scope === 'station' ? selectedStation?.station.name : row.scope === 'district' ? selectedDistrict : '全站' }}</span>
             <span v-if="row.metrics" class="text-body1">
               Precision {{ percent(row.metrics.precision) }} · Recall {{ percent(row.metrics.recall) }} · F1 {{ percent(row.metrics.f1) }}
             </span>
             <span v-else-if="row.scope === null && selectedStation" class="text-body1 text-muted">
-              尚未產生（這個視野的鄰站特徵模型還沒訓練，只有60分鐘有單站數字）
+              此預測分鐘數尚無可用評估結果
             </span>
-            <span v-else class="text-body1 text-muted">尚未產生 · 等待 Step 5-7 XGBoost 訓練與評估完成</span>
+            <span v-else class="text-body1 text-muted">此預測分鐘數尚無可用評估結果</span>
           </div>
         </div>
         <p class="mt-2 mb-0 text-body1 text-muted">
           <template v-if="modelF1Rows.some(r => r.scope === 'station')">
-            這是該站自己的數字，不是行政區平均。單站樣本量比行政區小很多，分數會比較不穩定，尤其該站幾乎沒發生過事件時，Precision/Recall 可能落在 0/0 這種邊界情況（不代表模型失準）。
+            各列標示實際評估範圍。單站結果依該站樣本計算，缺少單站結果時顯示較大範圍的結果；樣本或實際事件較少時，分數更容易波動。
           </template>
           <template v-else-if="selectedDistrict && (activeScope?.stationCount ?? 0) < 20">
             這個行政區只有 {{ activeScope?.stationCount ?? 0 }} 站，樣本少、分數容易大起大落，不適合直接拿來判斷模型好壞。
           </template>
           <template v-else>
-            站數愈多的行政區，模型對規則基線的改善愈穩定；站數很少的行政區可能因樣本不足而波動劇烈，甚至比基線差。
+            各列標示實際評估範圍。比較模型與規則基線時，請使用相同的預測分鐘數與範圍；站點或樣本較少時，分數更容易波動。
           </template>
         </p>
       </div>
@@ -377,6 +374,9 @@ watch([selectedDistrict, selectedWeekday, selectedSlot, selectedStationId], () =
         <ModalPicker v-model="selectedWeekday" label="星期" :options="WEEKDAY_OPTIONS" />
         <ModalPicker v-model="selectedSlot" label="時段" :options="SLOT_OPTIONS" />
       </div>
+      <p class="mt-3 mb-0 text-body1 text-muted">
+        {{ selectedDistrict || '全市' }}歷史統計涵蓋 {{ activeScope?.stationCount?.toLocaleString() ?? 0 }} 個有可用營運觀測的站點；可選清單保留 {{ districtStations.length.toLocaleString() }} 個有座標的站點，包含排除停運時段後沒有可用觀測的站，因此兩者站數可能不同。
+      </p>
 
       <p v-if="shardError" class="mt-3 rounded-md border border-warning bg-warning-surface px-3 py-2 text-body1">
         {{ shardError }}

@@ -7,10 +7,10 @@ const live = useLiveDashboard()
 onMounted(() => { if (!live.dashboard.value) void live.refresh() })
 
 const PATTERN_OPTIONS: { value: DemandEventPattern; label: string; hint: string }[] = [
-  { value: 'borrow_surge', label: '單純借車潮（全程缺車風險）', hint: '整段時間借車量偏高，例如長時間開放的市集或景點。' },
-  { value: 'return_surge', label: '單純還車潮（全程滿車風險）', hint: '整段時間還車量偏高，站點容易滿位。' },
-  { value: 'fills_then_empties', label: '先滿後空（開場還車、散場借車）', hint: '單場次活動最常見：開場人潮湧入還車，散場人潮湧出借車。' },
-  { value: 'empties_then_fills', label: '先空後滿（開場借車、散場還車）', hint: '較少見：開場人潮騎車前來聚集，散場再還車離開。' },
+  { value: 'borrow_surge', label: '單向借車潮（開場缺車風險）', hint: '以開始時間為借車潮觸發點，僅在開始前 60 分鐘內評估預先補車。' },
+  { value: 'return_surge', label: '單向還車潮（開場滿柱風險）', hint: '以開始時間為還車潮觸發點，僅在開始前 60 分鐘內評估預先移車、保留可還位。' },
+  { value: 'fills_then_empties', label: '先滿柱後空站（開場還車、散場借車）', hint: '以開始時間評估還車潮、結束時間評估借車潮；各階段前 60 分鐘內分別評估。' },
+  { value: 'empties_then_fills', label: '先空站後滿柱（開場借車、散場還車）', hint: '以開始時間評估借車潮、結束時間評估還車潮；各階段前 60 分鐘內分別評估。' },
 ]
 
 const name = ref('')
@@ -64,7 +64,7 @@ function remove(id: string) { replace({ events: events.value.filter(event => eve
   <main class="mx-auto max-w-screen-lg space-y-4 p-6 text-body1">
     <h1 class="text-h5 font-bold">活動管理</h1>
     <NuxtLink to="/admin/adjustments" class="text-accent">營運排除窗</NuxtLink>
-    <p>記錄活動名稱、影響站點與台北時間。活動開始前 60 分鐘內，營運總覽與調度規劃會依此評估鄰近站點的補位能力。</p>
+    <p>記錄活動名稱、影響站點與台北時間。各階段開始前 60 分鐘內，營運總覽會顯示活動影響，調度規劃的 30／60 分鐘需求會依距離階段開始的時間評估預先補位。「目前」需求仍依即時站況建立。</p>
     <p class="text-body2 text-muted">活動只保存在這台瀏覽器，換裝置或清除瀏覽資料後需重新建立。</p>
     <fieldset class="grid gap-3 rounded-xl border border-line bg-panel p-4">
       <label class="grid gap-1">活動名稱<input v-model="name" class="min-h-11 border border-line bg-surface p-2" /></label>
