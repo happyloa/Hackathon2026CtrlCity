@@ -119,9 +119,9 @@ const hasWarnings = computed(() => TABS.some(tab => countsByTab.value[tab.key] >
       </span>
       <span class="warning-heading">{{ !hasForecast && !hasWarnings ? '預測暫不可用' : hasWarnings ? '缺車通報' : '已對照站點無缺車通報'
         }}<small>{{ hasForecast ? '預測缺車 · 不含目前空站' : '目前僅顯示即時庫存' }}</small></span>
-      <span class="warning-figures"><span><b>預測 30</b> 分鐘 <strong>{{ forecastAvailable['30'] ? countsByTab['30'] : '—'
-            }}</strong> 站</span><span><b>預測 60</b> 分鐘 <strong>{{ forecastAvailable['60'] ? countsByTab['60'] : '—'
-            }}</strong> 站</span><span><b>即時 ≥30</b> 分鐘 <strong>{{ countsByTab['rt30'] }}</strong> 站</span><span><b>即時
+      <span class="warning-figures"><span class="figure-forecast"><b>預測 30</b> 分鐘 <strong>{{ forecastAvailable['30'] ? countsByTab['30'] : '—'
+            }}</strong> 站</span><span class="figure-forecast"><b>預測 60</b> 分鐘 <strong>{{ forecastAvailable['60'] ? countsByTab['60'] : '—'
+            }}</strong> 站</span><span class="figure-realtime"><b>即時 ≥30</b> 分鐘 <strong>{{ countsByTab['rt30'] }}</strong> 站</span><span class="figure-realtime"><b>即時
             ≥60</b> 分鐘 <strong>{{ countsByTab['rt60'] }}</strong> 站</span></span>
       <span class="warning-action">{{ expanded ? '收合清單' : '查看通報' }}
         <ChevronDown style="width: 1em; height: 1em" :stroke-width="2" aria-hidden="true"
@@ -362,6 +362,82 @@ const hasWarnings = computed(() => TABS.some(tab => countsByTab.value[tab.key] >
 
   .warning-figures strong {
     margin-left: 3px;
+  }
+}
+
+/*
+ * The panel is exactly as tall as the trigger's hover area -- no padding frames
+ * it -- and the trigger follows the panel's rounded corners so its hover colour
+ * does not square them off.
+ */
+.warning-panel,
+.warning-panel.has-warnings {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.warning-trigger {
+  padding-top: 14px;
+  padding-bottom: 14px;
+  border-radius: inherit;
+}
+
+.warning-trigger[aria-expanded="true"] {
+  border-bottom-right-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+/*
+ * Forecast and real-time figures share one type treatment so neither reads as
+ * secondary; the real-time counts sit on a tinted ground so the two kinds are
+ * told apart at a glance. The figures stay inline rather than flex so the
+ * template's spaces survive -- "169 站", matching the summary cards above.
+ */
+.warning-figures {
+  align-items: center;
+}
+
+.warning-figures .figure-forecast,
+.warning-figures .figure-realtime {
+  color: var(--ink);
+}
+
+.warning-figures .figure-forecast b,
+.warning-figures .figure-realtime b {
+  font-weight: 650;
+}
+
+.warning-figures .figure-forecast strong,
+.warning-figures .figure-realtime strong {
+  font-size: var(--type-h5);
+  line-height: 1;
+}
+
+.warning-figures .figure-realtime {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--warning) 10%, transparent);
+}
+
+@media (max-width: 640px) {
+  /* Two columns keep forecasts on one row and real-time counts on the next. */
+  .warning-figures {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 6px;
+    margin-left: 0;
+  }
+
+  /* Both kinds of figure step down together so each keeps to one line in its cell. */
+  .warning-figures .figure-forecast strong,
+  .warning-figures .figure-realtime strong {
+    font-size: var(--type-body1);
+  }
+
+  .warning-figures .figure-realtime {
+    padding: 4px 6px;
+    text-align: center;
   }
 }
 </style>

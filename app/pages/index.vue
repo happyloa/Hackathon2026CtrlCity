@@ -3,6 +3,8 @@ import { ArrowRight, Bike, Info, LoaderCircle, RefreshCw, Route as RouteIcon, Tr
 import { buildDispatchRoutePlans, type DispatchRouteStop } from '~/shared/dispatch-route-planner'
 import { buildLiveOperations, buildLiveOperationsForHorizon } from '~/shared/live-operations'
 import { shortageWarningsFor } from '~/shared/shortage-warnings'
+import { SquareParking } from '@lucide/vue'
+import { inventoryStatusTotals } from '~/shared/inventory-status-totals'
 import { overrideStationsWithXgboost } from '~/shared/xgboost-overrides'
 import { briefingFacts, summarize } from '~/composables/useLiveDashboard'
 import { usePredictionMode } from '~/composables/usePredictionMode'
@@ -126,6 +128,18 @@ const currentPlanning = computed(() => {
 const currentTransferCount = computed(() => currentPlanning.value.routes.reduce((sum, item) => sum + item.totalTransferBikes, 0))
 const shortageCount60 = computed(() => dashboard.value ? shortageWarningsFor(dashboard.value.stations, dashboard.value.meta.asOf, '60').length : 0)
 const hasForecast = computed(() => dashboard.value?.stations.some(station => station.serviceStatus === 'operational' && station.forecast.horizons['60'].baselineStatus === 'matched') ?? false)
+
+/**
+ * The station overview's 缺車／缺位 counts for the summary above the shortage
+ * warning. Read from `baselineDashboard` -- the same `dashboardForDistrict`
+ * the /stations page counts from -- rather than the XGBoost-overridden
+ * `dashboard`, so both pages show the same figure for the same district
+ * whichever prediction source is selected here.
+ */
+const inventoryTotals = computed(() => inventoryStatusTotals(
+  baselineDashboard.value?.stations ?? [],
+  baselineDashboard.value?.alerts ?? [],
+))
 const dataStatus = computed(() => live.error.value ? '資料更新中斷' : live.pending.value ? '正在同步' : dashboard.value ? '官方即時站況' : '等待資料')
 
 function focusDispatchQueue(event: MouseEvent) {
@@ -167,13 +181,6 @@ function focusDispatchQueue(event: MouseEvent) {
       </NuxtLink>
     </section> -->
 
-    <WarningPanel v-if="dashboard" :stations="dashboard.stations" :as-of="dashboard.meta.asOf"
-      :summary="dashboard.summary" :realtime-low-bikes="dashboard.realtimeLowBikes"
-      @select="selectedStationId = $event" />
-    <DemandSurgePanel v-if="dashboard" :stations="dashboard.stations" @select="selectedStationId = $event" />
-    <!-- <FrozenStationPanel v-if="dashboard" :stations="dashboard.stations" :frozen-stations="dashboard.frozenStations"
-      @select="selectedStationId = $event" /> -->
-
     <section class="workspace-toolbar" aria-label="工作區範圍與資料狀態">
       <div class="workspace-district">
         <ModalPicker v-model="selectedDistrict" :label="selectionSource === 'location' ? '行政區（依位置）' : '行政區'"
@@ -193,6 +200,32 @@ function focusDispatchQueue(event: MouseEvent) {
         <RefreshCw v-else style="width: 1em; height: 1em" aria-hidden="true" />{{ live.pending.value ? '更新中' : '更新資料' }}
       </button>
     </section>
+
+    <section v-if="dashboard" class="overview-metrics inventory-overview" aria-label="營運摘要">
+      <NuxtLink :to="{ path: '/stations', query: contextQuery }" class="overview-metric metric-inventory"
+        :aria-label="`缺車 ${inventoryTotals.empty.total} 站：目前空站 ${inventoryTotals.empty.now}、60 分鐘預測 ${inventoryTotals.empty.forecast}，前往站點總覽`">
+        <div class="metric-label"><span>缺車</span>
+          <Bike style="width: 1em; height: 1em" aria-hidden="true" />
+        </div>
+        <div class="metric-value">{{ inventoryTotals.empty.total }}<span>站</span></div>
+        <div class="metric-bottom"><span>目前空站 {{ inventoryTotals.empty.now }} · 60 分鐘預測 {{ inventoryTotals.empty.forecast }}</span></div>
+      </NuxtLink>
+      <NuxtLink :to="{ path: '/stations', query: contextQuery }" class="overview-metric metric-full"
+        :aria-label="`缺位 ${inventoryTotals.full.total} 站：目前滿柱 ${inventoryTotals.full.now}、60 分鐘預測 ${inventoryTotals.full.forecast}，前往站點總覽`">
+        <div class="metric-label"><span>缺位</span>
+          <SquareParking style="width: 1em; height: 1em" aria-hidden="true" />
+        </div>
+        <div class="metric-value">{{ inventoryTotals.full.total }}<span>站</span></div>
+        <div class="metric-bottom"><span>目前滿柱 {{ inventoryTotals.full.now }} · 60 分鐘預測 {{ inventoryTotals.full.forecast }}</span></div>
+      </NuxtLink>
+    </section>
+
+    <WarningPanel v-if="dashboard" :stations="dashboard.stations" :as-of="dashboard.meta.asOf"
+      :summary="dashboard.summary" :realtime-low-bikes="dashboard.realtimeLowBikes"
+      @select="selectedStationId = $event" />
+    <DemandSurgePanel v-if="dashboard" :stations="dashboard.stations" @select="selectedStationId = $event" />
+    <!-- <FrozenStationPanel v-if="dashboard" :stations="dashboard.stations" :frozen-stations="dashboard.frozenStations"
+      @select="selectedStationId = $event" /> -->
 
     <div v-if="live.pending.value && !dashboard" class="loading-board" role="status" aria-live="polite"
       aria-busy="true">
@@ -639,6 +672,91 @@ function focusDispatchQueue(event: MouseEvent) {
     scroll-behavior: auto !important;
     transition: none !important;
     animation: none !important;
+  }
+}
+
+/*
+ * 缺車／缺位 summary above the shortage warning, matching the station
+ * overview's filter counts. Reuses the metric card styles but lays each card
+ * out as one compact row -- label and the now/forecast split on the left, the
+ * total on the right -- so it sits below the forecast panel in visual weight.
+ * Colours follow the station overview and map legend: danger for empty
+ * stations, info for full ones.
+ */
+.inventory-overview {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.inventory-overview .overview-metric {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "label value"
+    "bottom value";
+  align-items: center;
+  column-gap: 16px;
+  row-gap: 2px;
+  padding: 10px 18px;
+}
+
+.inventory-overview .overview-metric::before {
+  top: 12px;
+  bottom: 12px;
+}
+
+.inventory-overview .metric-label {
+  grid-area: label;
+  justify-content: start;
+  gap: 8px;
+  line-height: var(--type-body1-lh);
+}
+
+.inventory-overview .metric-label svg {
+  font-size: var(--icon-md);
+}
+
+.inventory-overview .metric-value {
+  grid-area: value;
+  margin: 0;
+  gap: 6px;
+  color: var(--metric-color);
+  font-size: var(--type-h4);
+  letter-spacing: var(--type-h4-ls);
+}
+
+.inventory-overview .metric-bottom {
+  grid-area: bottom;
+  justify-content: start;
+  gap: 8px;
+}
+
+.metric-full {
+  --metric-color: var(--info);
+  color: var(--ink);
+  text-decoration: none;
+  transition: border-color .15s;
+}
+
+.metric-full:hover,
+.metric-full:focus-visible {
+  border-color: var(--info);
+}
+
+@media (max-width: 640px) {
+  .inventory-overview .overview-metric {
+    grid-template-areas: "label value";
+    column-gap: 8px;
+    padding: 10px 12px;
+  }
+
+  /* A half-width phone card cannot fit the icon beside a two-digit figure. */
+  .inventory-overview .metric-label svg {
+    display: none;
+  }
+
+  /* Phones keep the total; the now/forecast split stays in each link's aria-label. */
+  .inventory-overview .metric-bottom {
+    display: none;
   }
 }
 </style>
