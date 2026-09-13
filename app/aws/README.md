@@ -6,8 +6,8 @@
 - GitHub：`happyloa/Hackathon2026CtrlCity`，推送 `main` 觸發 `.github/workflows/deploy-aws.yml`。
 - GitHub Actions 先執行測試與型別檢查，再建置並驗證 Lambda bundle、更新 API、發布前端、等待 CloudFront 快取失效，最後執行線上 smoke test。
 - GitHub 使用 OIDC role `ctrlcity-github-deploy`，信任限於該 repo 的 `main`；role ARN 存在 repository variable `AWS_DEPLOY_ROLE_ARN`，不需要保存 AWS access key。
-- `infra/github-deploy-policy.json` 記錄這次部署的資源權限。若重建 stack，需更新其中的 bucket、distribution、Lambda ARN，再更新 role policy。
-- `infra/github-deploy-trust.json` 記錄 OIDC 信任條件；此 repo 使用含 owner ID／repo ID 的 immutable subject，不能改成舊版只含名稱的格式。Lambda 更新等待器需要 `lambda:GetFunction`，權限仍限本 Demo 函式。
+- `infra/github-deploy-policy.json` 記錄 CI 需要的資源權限。帳號 ID、site bucket、distribution ID 以 `<ACCOUNT_ID>`、`<SITE_BUCKET>`、`<DISTRIBUTION_ID>` 佔位，公開 repo 不保存帳號專屬識別碼；套用前依下方「更新 GitHub 部署 role」由 stack outputs 產生實際政策。Lambda 以 `ctrlcity-hackathon-…-*` 限定本 stack 的函式，重建 stack 後不需改檔。
+- `infra/github-deploy-trust.json` 記錄 OIDC 信任條件（帳號 ID 同樣以 `<ACCOUNT_ID>` 佔位）；此 repo 使用含 owner ID／repo ID 的 immutable subject，不能改成舊版只含名稱的格式。Lambda 更新等待器需要 `lambda:GetFunction`，權限仍限本 Demo 函式。
 - 自動部署更新前端、API 與已啟用的快照 Lambda 程式；修改基礎設施模板時，另執行下方 `aws:deploy`。CI role 沒有建立 IAM 或變更基礎設施的權限。
 
 Cloudflare Pages 的 Git Integration 繼續使用同一個 `main`，兩個平台各自建置。AWS 使用主辦方臨時帳號，活動後的保留期限依主辦方設定。
@@ -175,6 +175,22 @@ aws cognito-idp admin-create-user --user-pool-id <UserPoolId> --username <EMAIL>
 ```
 
 GitHub OIDC 部署 role 需套用更新後的 `infra/github-deploy-policy.json`，以更新 capture Lambda；CI 不負責部署基礎設施。回滾時移除對應旗標後重新部署**並重新發布前端**，以清除登入與快照設定。RawDataBucket 使用 Retain；若完全刪除整個 stack，仍需另行備份 site bucket 的 raw/state/operator 資料。
+
+#### 更新 GitHub 部署 role
+
+政策檔只含佔位符，先由 stack outputs 產生實際內容再套用；產生的檔案放在 `/tmp`，不要提交。`<POLICY_NAME>` 沿用 role 上現有的 inline policy 名稱（`aws iam list-role-policies --role-name ctrlcity-github-deploy` 可查）。
+
+```bash
+STACK=ctrlcity-hackathon REGION=us-west-2
+output() { aws cloudformation describe-stacks --stack-name "$STACK" --region "$REGION" --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue | [0]" --output text; }
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+sed -e "s/<ACCOUNT_ID>/$ACCOUNT_ID/g" -e "s/<SITE_BUCKET>/$(output SiteBucketName)/g" -e "s/<DISTRIBUTION_ID>/$(output DistributionId)/g" \
+  app/infra/github-deploy-policy.json > /tmp/github-deploy-policy.json
+sed -e "s/<ACCOUNT_ID>/$ACCOUNT_ID/g" app/infra/github-deploy-trust.json > /tmp/github-deploy-trust.json
+grep -q '<' /tmp/github-deploy-policy.json /tmp/github-deploy-trust.json && echo '仍有未替換的佔位符' && exit 1
+aws iam put-role-policy --role-name ctrlcity-github-deploy --policy-name <POLICY_NAME> --policy-document file:///tmp/github-deploy-policy.json
+aws iam update-assume-role-policy --role-name ctrlcity-github-deploy --policy-document file:///tmp/github-deploy-trust.json
+```
 
 ### 不部署的本地驗證
 

@@ -5,7 +5,7 @@
       "Sid": "ReadDemoOutputs",
       "Effect": "Allow",
       "Action": "cloudformation:DescribeStacks",
-      "Resource": "arn:aws:cloudformation:us-west-2:953694300276:stack/ctrlcity-hackathon/*"
+      "Resource": "arn:aws:cloudformation:us-west-2:<ACCOUNT_ID>:stack/ctrlcity-hackathon/*"
     },
     {
       "Sid": "ListDemoAssets",
@@ -14,7 +14,7 @@
         "s3:ListBucket",
         "s3:GetBucketLocation"
       ],
-      "Resource": "arn:aws:s3:::ctrlcity-hackathon-sitebucket-dbultpgfkry4"
+      "Resource": "arn:aws:s3:::<SITE_BUCKET>"
     },
     {
       "Sid": "PublishDemoAssets",
@@ -25,7 +25,7 @@
         "s3:DeleteObject",
         "s3:AbortMultipartUpload"
       ],
-      "Resource": "arn:aws:s3:::ctrlcity-hackathon-sitebucket-dbultpgfkry4/*"
+      "Resource": "arn:aws:s3:::<SITE_BUCKET>/*"
     },
     {
       "Sid": "RefreshDemoCache",
@@ -36,7 +36,7 @@
         "cloudfront:ListInvalidations",
         "cloudfront:GetDistribution"
       ],
-      "Resource": "arn:aws:cloudfront::953694300276:distribution/E3BSUAQW89PWH0"
+      "Resource": "arn:aws:cloudfront::<ACCOUNT_ID>:distribution/<DISTRIBUTION_ID>"
     },
     {
       "Sid": "UpdateDemoApi",
@@ -46,7 +46,7 @@
         "lambda:GetFunctionConfiguration",
         "lambda:GetFunction"
       ],
-      "Resource": "arn:aws:lambda:us-west-2:953694300276:function:ctrlcity-hackathon-OperationsApiFunction-XIwpZjVZet66"
+      "Resource": "arn:aws:lambda:us-west-2:<ACCOUNT_ID>:function:ctrlcity-hackathon-OperationsApiFunction-*"
     },
     {
       "Sid": "UpdateSnapshotCapture",
@@ -56,7 +56,7 @@
         "lambda:GetFunctionConfiguration",
         "lambda:GetFunction"
       ],
-      "Resource": "arn:aws:lambda:us-west-2:953694300276:function:ctrlcity-hackathon-SnapshotCaptureFunction-*"
+      "Resource": "arn:aws:lambda:us-west-2:<ACCOUNT_ID>:function:ctrlcity-hackathon-SnapshotCaptureFunction-*"
     }
   ]
 }
