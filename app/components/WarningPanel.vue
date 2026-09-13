@@ -129,7 +129,11 @@ const hasWarnings = computed(() => TABS.some(tab => countsByTab.value[tab.key] >
       </span>
     </button>
     <div v-if="expanded" :id="warningContentId" class="warning-content">
-      <p class="warning-context">「缺車」在全系統的統一定義是可借車數低於 {{ NEAR_EMPTY_BIKES }} 台（近端缺車），與地圖著色同一條線。「預測」為各時點分別估算，站點可能重疊；「即時缺車」不是預測，是已經觀測到的連續缺車時長{{ serverBackedRuns ? '，由排程每 5 分鐘記錄，開啟頁面即為完整結果' : '，需頁面持續開啟自行累積' }}。已經完全沒車的空站另列於上方營運摘要。</p>
+      <div class="warning-context">
+        <p>缺車通報：少於 {{ NEAR_EMPTY_BIKES }} 台，缺車空站：0 台。</p>
+        <p>預測：未來可能缺車，不含空站。</p>
+        <p>即時：少於 {{ NEAR_EMPTY_BIKES }} 台已持續 30／60 分鐘。</p>
+      </div>
       <div class="flex flex-wrap gap-2 px-4 pb-3 pt-1" role="group" aria-label="缺車通報分類">
         <button v-for="tab in TABS" :key="tab.key" type="button" :aria-pressed="activeTab === tab.key"
           class="min-h-9 rounded-md border px-3 text-body1 font-semibold transition-colors" :class="activeTab === tab.key
