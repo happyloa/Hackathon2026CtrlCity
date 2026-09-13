@@ -3,7 +3,9 @@ import test from 'node:test'
 
 import { nextUpcomingSurgePhase, upcomingDemandSurgeImpacts } from '../shared/demand-surge-impact.ts'
 
-const NOW = Date.parse('2026-09-12T20:00:00Z') // pseudo-UTC wall clock, matches parseLocalDateTime
+// Event startAt/endAt below are Taipei (UTC+8) wall-clock strings, e.g. '2026-09-12T20:45'
+// means 20:45 Taipei time. NOW is the real UTC instant of Taipei 20:00 that day.
+const NOW = Date.parse('2026-09-12T12:00:00Z')
 
 function station({
   id,

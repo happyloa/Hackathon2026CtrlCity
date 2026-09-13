@@ -3,8 +3,9 @@ import test from 'node:test'
 
 import { eventDrivenOperations } from '../shared/demand-surge-dispatch.ts'
 
-const NOW = Date.parse('2026-09-12T20:00:00Z')
+// event startAt/endAt are Taipei (UTC+8) wall-clock strings; NOW is the real UTC instant of Taipei 20:00.
 const OBSERVED_AT = '2026-09-12T20:00:00+08:00'
+const NOW = Date.parse(OBSERVED_AT)
 
 function station({
   id,

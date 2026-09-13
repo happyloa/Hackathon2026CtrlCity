@@ -4,6 +4,25 @@ import type { StationRisk } from './ops.ts'
 import { groupOperationalStations, type StationForGrouping } from './risk-map-visuals.ts'
 import { safetyStockFor } from './operational-policy.mjs'
 
+/** Demand events are always Taipei wall-clock strings (see demand-events.mjs); Taiwan has no DST, so this offset is constant. */
+const TAIPEI_UTC_OFFSET_MS = 8 * 60 * 60 * 1000
+
+/**
+ * `parseLocalDateTime` reads the string's digits as if they were UTC (the
+ * "pseudo-UTC" convention the offline dataset tooling relies on for
+ * timezone-independent weekday/slot alignment). Comparing that number
+ * directly against `Date.now()` -- a real UTC instant -- silently shifts
+ * every trigger by the host's UTC offset: on a Taipei browser (UTC+8) a
+ * phase reads as 8 hours later than it truly is, so it can linger for 8
+ * hours after the real event ends before its lead time finally goes
+ * negative. Subtracting the fixed Taipei offset here converts the pseudo-UTC
+ * value into the real UTC instant it names, so it lines up with `Date.now()`.
+ */
+function parseTaipeiTriggerEpoch(value: string): number | null {
+  const pseudoUtc = parseLocalDateTime(value)
+  return pseudoUtc === null ? null : pseudoUtc - TAIPEI_UTC_OFFSET_MS
+}
+
 /** How close to the phase's trigger time we are; 30min is the more urgent tier. */
 export type DemandSurgeImpactTier = '60min' | '30min'
 
@@ -64,7 +83,7 @@ export function nextUpcomingSurgePhase(events: readonly DemandEvent[], nowEpoch:
   let nearest: UpcomingSurgePhase | null = null
   for (const event of events) {
     for (const phase of phasesFor(event)) {
-      const triggerEpoch = parseLocalDateTime(phase.triggerAt)
+      const triggerEpoch = parseTaipeiTriggerEpoch(phase.triggerAt)
       if (triggerEpoch === null) continue
       const leadMinutes = Math.round((triggerEpoch - nowEpoch) / 60_000)
       if (leadMinutes < 0) continue
@@ -167,7 +186,7 @@ export function upcomingDemandSurgeImpacts(
   const impacts: DemandSurgeImpact[] = []
   for (const event of events) {
     for (const phase of phasesFor(event)) {
-      const triggerEpoch = parseLocalDateTime(phase.triggerAt)
+      const triggerEpoch = parseTaipeiTriggerEpoch(phase.triggerAt)
       if (triggerEpoch === null) continue
       const leadMinutes = Math.round((triggerEpoch - nowEpoch) / 60_000)
       const tier = tierFor(leadMinutes)
